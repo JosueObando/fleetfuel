@@ -11,8 +11,10 @@ export interface CargaJwt {
   roles: string[];
   permisos: string[];
   disp: string | null;
-  /** Marca el token de refresco para que no sirva como token de acceso. */
-  tipo?: 'acceso' | 'refresco';
+  /** Marca el token de refresco para que no sirva como token de acceso.
+   *  `inscripcion-mfa` es la sesión mutilada del §7: autentica, pero sólo
+   *  sirve para configurar el segundo factor. */
+  tipo?: 'acceso' | 'refresco' | 'inscripcion-mfa';
 }
 
 @Injectable()
@@ -40,6 +42,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       roles: carga.roles ?? [],
       permisos: carga.permisos ?? [],
       dispositivoId: carga.disp ?? null,
+      tipoSesion: carga.tipo ?? 'acceso',
     };
   }
 }

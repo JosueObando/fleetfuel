@@ -7,6 +7,7 @@ import { join } from 'path';
 import configuration from './config/configuration';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { PermisosGuard } from './common/guards/permisos.guard';
+import { InscripcionMfaGuard } from './common/guards/inscripcion-mfa.guard';
 import { ContextoEmpresaInterceptor } from './common/interceptors/contexto-empresa.interceptor';
 import { IdempotenciaInterceptor } from './common/interceptors/idempotencia.interceptor';
 import { AuditoriaInterceptor } from './common/interceptors/auditoria.interceptor';
@@ -17,6 +18,7 @@ import { RolesModule } from './modules/roles/roles.module';
 import { EmpresasModule } from './modules/empresas/empresas.module';
 import { AuditoriaModule } from './modules/auditoria/auditoria.module';
 import { DispositivosModule } from './modules/dispositivos/dispositivos.module';
+import { SaludModule } from './modules/salud/salud.module';
 
 @Module({
   imports: [
@@ -46,11 +48,15 @@ import { DispositivosModule } from './modules/dispositivos/dispositivos.module';
     EmpresasModule,
     AuditoriaModule,
     DispositivosModule,
+    SaludModule,
   ],
   providers: [
     // Guards: autenticar y luego autorizar. Corren ANTES que los interceptores,
     // que es lo que permite al de contexto leer request.user.
     { provide: APP_GUARD, useClass: JwtAuthGuard },
+    // Entre ambos: necesita el usuario que resuelve JwtAuthGuard, y tiene que
+    // cortar antes que PermisosGuard para dar el motivo real del rechazo (§7).
+    { provide: APP_GUARD, useClass: InscripcionMfaGuard },
     { provide: APP_GUARD, useClass: PermisosGuard },
 
     // Interceptores: el orden de registro es el orden de anidamiento, y aquí

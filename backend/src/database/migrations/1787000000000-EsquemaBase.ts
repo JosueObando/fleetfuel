@@ -280,8 +280,25 @@ export class EsquemaBase1787000000000 implements MigrationInterface {
                          'usuarios_roles', 'usuarios', 'roles', 'permisos', 'empresas']) {
       await q.query(`DROP TABLE IF EXISTS ${tabla} CASCADE`);
     }
-    await q.query(`DROP OWNED BY ${usuarioApp} CASCADE`).catch(() => undefined);
-    await q.query(`DROP ROLE IF EXISTS ${usuarioApp}`).catch(() => undefined);
+    // `DROP OWNED BY` sólo alcanza la base en curso, pero un rol pertenece al
+    // clúster: si conserva privilegios en otra base —el caso normal en la
+    // máquina de un desarrollador, con la de trabajo y la de pruebas juntas—
+    // el `DROP ROLE` falla con dependent_objects_still_exist.
+    //
+    // Un `.catch()` de JavaScript no sirve para tolerarlo: se traga el rechazo,
+    // pero Postgres ya abortó la transacción y la siguiente sentencia muere con
+    // 25P02. Un bloque PL/pgSQL con EXCEPTION abre una subtransacción, que es
+    // el único mecanismo que permite fallar y continuar dentro de la misma
+    // transacción.
+    await q.query(`DROP OWNED BY ${usuarioApp} CASCADE`);
+    await q.query(`
+      DO $$
+      BEGIN
+        DROP ROLE IF EXISTS ${usuarioApp};
+      EXCEPTION WHEN dependent_objects_still_exist THEN
+        RAISE NOTICE 'El rol ${usuarioApp} conserva privilegios en otra base del clúster; se deja en pie.';
+      END $$;
+    `);
   }
 }
 

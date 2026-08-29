@@ -24,9 +24,11 @@ export default () => ({
   },
   mfa: {
     emisor: process.env.MFA_EMISOR || 'FleetFuel Control',
-    // §7: TOTP obligatorio para Administrador, Finanzas y Auditor.
-    rolesObligatorios: (process.env.MFA_ROLES_OBLIGATORIOS || 'Administrador,Finanzas,Auditor')
-      .split(',').map((r) => r.trim()).filter(Boolean),
+    // §7 («TOTP obligatorio para Administrador, Finanzas y Auditor») NO se
+    // configura aquí: la fuente de verdad es la columna `roles.exige_mfa`, que
+    // es dato por empresa y un administrador puede marcarla en un rol nuevo.
+    // Antes existía además MFA_ROLES_OBLIGATORIOS: una segunda regla, global y
+    // que nadie aplicaba. Tener dos es cómo se llegó a no aplicar ninguna.
   },
   idempotencia: {
     ttlHoras: parseInt(process.env.IDEMPOTENCIA_TTL_HORAS || '24', 10),

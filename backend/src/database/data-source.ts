@@ -26,4 +26,6 @@ export const AppDataSource = new DataSource({
   logging: ['error', 'migration'],
 });
 
-export default AppDataSource;
+// Sin `export default`: el cargador del CLI de TypeORM (`loadDataSource`)
+// rechaza un archivo con más de un export que sea instancia de DataSource, y
+// el default más el nombrado contaban como dos.

@@ -13,6 +13,20 @@ import { CargaJwt } from './jwt.strategy';
 import { LoginDto } from './dto/login.dto';
 import { Contexto, ejecutarEnContexto } from '../../common/contexto/contexto-peticion';
 
+/**
+ * §7: sesión mutilada para quien tiene un rol que exige TOTP y aún no lo
+ * configuró. No lleva refreshToken a propósito: si lo llevara, `refrescar()`
+ * la ascendería a sesión completa y el segundo factor quedaría esquivado con
+ * una llamada más.
+ */
+export interface SesionInscripcionMfa {
+  accessToken: string;
+  expiraEn: string;
+  debeInscribirMfa: true;
+  siguiente: string;
+  usuario: { id: string; nombre: string; correo: string; empresaId: string; roles: string[] };
+}
+
 export interface SesionEmitida {
   accessToken: string;
   refreshToken: string;
@@ -40,7 +54,7 @@ export class AuthService {
     private readonly tokens: TokensService,
   ) {}
 
-  async login(dto: LoginDto, ip?: string): Promise<SesionEmitida> {
+  async login(dto: LoginDto, ip?: string): Promise<SesionEmitida | SesionInscripcionMfa> {
     const [fila]: FilaLogin[] = await this.dataSource.query(
       `SELECT * FROM fn_login_resolver($1)`,
       [dto.correo],
@@ -63,22 +77,37 @@ export class AuthService {
     // A partir de aquí ya se conoce la empresa: todo lo demás corre con el
     // contexto fijado, igual que cualquier otra petición.
     return this.enContextoDe(fila.empresa_id, fila.usuario_id, ip, async (ctx) => {
-      const { roles, permisos } = await this.rolesYPermisos(ctx, fila.usuario_id);
+      const { roles, permisos, exigeMfa } = await this.rolesYPermisos(ctx, fila.usuario_id);
+      const correo = await this.correoDe(ctx, fila.usuario_id);
+
+      // §7: el rol exige segundo factor y el usuario todavía no lo configuró.
+      // No se le puede negar la entrada —tiene que poder inscribirse alguna
+      // vez— pero tampoco darle la sesión completa. Se le da una sesión que no
+      // sirve para nada salvo configurar el TOTP.
+      if (exigeMfa && !fila.mfa_habilitado) {
+        await this.registrarAcceso(ctx, fila, ip, 'login-inscripcion-mfa');
+        return {
+          accessToken: this.firmarAcceso({
+            sub: String(fila.usuario_id), emp: String(fila.empresa_id), correo,
+            roles, permisos: [], disp: null, tipo: 'inscripcion-mfa',
+          }),
+          expiraEn: this.config.get<string>('jwt.expiresIn') ?? '15m',
+          debeInscribirMfa: true,
+          siguiente: 'POST /auth/mfa/iniciar y luego POST /auth/mfa/confirmar',
+          usuario: {
+            id: String(fila.usuario_id), nombre: fila.nombre, correo,
+            empresaId: String(fila.empresa_id), roles,
+          },
+        };
+      }
+
       const dispositivoId = dto.dispositivo
         ? await this.registrarDispositivo(ctx, fila, dto)
         : null;
 
-      await ctx.manager.query(
-        `UPDATE usuarios SET ultimo_acceso_en = now() WHERE usuario_id = $1`,
-        [fila.usuario_id],
-      );
-      await ctx.manager.query(
-        `INSERT INTO auditoria (empresa_id, usuario_id, accion, entidad, entidad_id, ip, ruta)
-         VALUES ($1,$2,'login','usuarios',$3,$4::inet,'POST /auth/login')`,
-        [fila.empresa_id, fila.usuario_id, fila.usuario_id, ip ?? null],
-      );
+      await this.registrarAcceso(ctx, fila, ip, 'login');
 
-      return this.emitir(fila, roles, permisos, dispositivoId);
+      return this.emitir(fila, correo, roles, permisos, dispositivoId);
     });
   }
 
@@ -101,7 +130,7 @@ export class AuthService {
 
     return this.enContextoDe(carga.emp, carga.sub, undefined, async (ctx) => {
       const [usuario] = await ctx.manager.query(
-        `SELECT usuario_id, empresa_id, nombre, estado FROM usuarios
+        `SELECT usuario_id, empresa_id, nombre, estado, correo, mfa_habilitado FROM usuarios
           WHERE usuario_id = $1 AND eliminado_en IS NULL`,
         [carga.sub],
       );
@@ -114,12 +143,25 @@ export class AuthService {
         throw new UnauthorizedException('Dispositivo revocado');
       }
 
-      const { roles, permisos } = await this.rolesYPermisos(ctx, carga.sub);
+      const { roles, permisos, exigeMfa } = await this.rolesYPermisos(ctx, carga.sub);
+
+      // §7 otra vez, y no es redundante: entre el login y este refresco a este
+      // usuario le pudieron asignar un rol que exige TOTP. Su refresh token
+      // sigue siendo válido, así que sin esta comprobación refrescaría hacia
+      // una sesión completa sin haberse inscrito nunca.
+      if (exigeMfa && !usuario.mfa_habilitado) {
+        await this.tokens.revocar(carga.jti as string);
+        throw new UnauthorizedException(
+          'Tu rol ahora exige segundo factor. Inicia sesión de nuevo para configurarlo.',
+        );
+      }
+
       // Rotación: el refresh usado se invalida al emitir el siguiente, para que
       // un token robado sirva una vez y su uso delate al ladrón o al legítimo.
       await this.tokens.revocar(carga.jti as string);
       return this.emitir(
         { empresa_id: usuario.empresa_id, usuario_id: usuario.usuario_id, nombre: usuario.nombre } as FilaLogin,
+        usuario.correo ?? '',
         roles, permisos, carga.disp ?? null,
       );
     });
@@ -151,8 +193,8 @@ export class AuthService {
   // ── apoyo ─────────────────────────────────────────────────────────────────
 
   private async rolesYPermisos(ctx: Contexto, usuarioId: string) {
-    const filas: Array<{ rol: string; permiso: string | null }> = await ctx.manager.query(
-      `SELECT r.nombre AS rol, p.codigo AS permiso
+    const filas: Array<{ rol: string; permiso: string | null; exige_mfa: boolean }> = await ctx.manager.query(
+      `SELECT r.nombre AS rol, r.exige_mfa, p.codigo AS permiso
          FROM usuarios_roles ur
          JOIN roles r ON r.rol_id = ur.rol_id
          LEFT JOIN roles_permisos rp ON rp.rol_id = r.rol_id
@@ -163,7 +205,34 @@ export class AuthService {
     return {
       roles: [...new Set(filas.map((f) => f.rol))],
       permisos: [...new Set(filas.map((f) => f.permiso).filter((p): p is string => !!p))],
+      // La columna `roles.exige_mfa` es la fuente de verdad del §7: es dato por
+      // empresa y un administrador puede marcarla en un rol nuevo. La variable
+      // MFA_ROLES_OBLIGATORIOS era una segunda regla, en paralelo y sin aplicar.
+      exigeMfa: filas.some((f) => f.exige_mfa === true),
     };
+  }
+
+  /** El correo no viene de `fn_login_resolver`; dentro del contexto de empresa
+   *  la RLS ya permite leerlo del usuario propio. */
+  private async correoDe(ctx: Contexto, usuarioId: string): Promise<string> {
+    const [u] = await ctx.manager.query(
+      `SELECT correo FROM usuarios WHERE usuario_id = $1`, [usuarioId],
+    );
+    return u?.correo ?? '';
+  }
+
+  private async registrarAcceso(
+    ctx: Contexto, fila: FilaLogin, ip: string | undefined, accion: string,
+  ): Promise<void> {
+    await ctx.manager.query(
+      `UPDATE usuarios SET ultimo_acceso_en = now() WHERE usuario_id = $1`,
+      [fila.usuario_id],
+    );
+    await ctx.manager.query(
+      `INSERT INTO auditoria (empresa_id, usuario_id, accion, entidad, entidad_id, ip, ruta)
+       VALUES ($1,$2,$5,'usuarios',$3,$4::inet,'POST /auth/login')`,
+      [fila.empresa_id, fila.usuario_id, fila.usuario_id, ip ?? null, accion],
+    );
   }
 
   private async registrarDispositivo(ctx: Contexto, fila: FilaLogin, dto: LoginDto): Promise<string> {
@@ -187,8 +256,18 @@ export class AuthService {
     return !d || !!d.revocado_en;
   }
 
+  /** Firma un token de acceso. Lo comparten la sesión normal y la de
+   *  inscripción del §7; lo único que cambia entre ambas es la carga. */
+  private firmarAcceso(carga: CargaJwt): string {
+    return this.jwt.sign(carga, {
+      secret: this.config.get<string>('jwt.secret'),
+      expiresIn: this.config.get<string>('jwt.expiresIn'),
+    });
+  }
+
   private async emitir(
     fila: Pick<FilaLogin, 'empresa_id' | 'usuario_id' | 'nombre'>,
+    correo: string,
     roles: string[],
     permisos: string[],
     dispositivoId: string | null,
@@ -196,7 +275,7 @@ export class AuthService {
     const base: CargaJwt = {
       sub: String(fila.usuario_id),
       emp: String(fila.empresa_id),
-      correo: '',
+      correo,
       roles, permisos,
       disp: dispositivoId,
       tipo: 'acceso',
@@ -208,10 +287,7 @@ export class AuthService {
     });
 
     return {
-      accessToken: this.jwt.sign(base, {
-        secret: this.config.get<string>('jwt.secret'),
-        expiresIn: this.config.get<string>('jwt.expiresIn'),
-      }),
+      accessToken: this.firmarAcceso(base),
       refreshToken: this.jwt.sign(
         { ...base, tipo: 'refresco', jti, permisos: [], roles: [] },
         {
@@ -223,7 +299,7 @@ export class AuthService {
       usuario: {
         id: String(fila.usuario_id),
         nombre: fila.nombre,
-        correo: '',
+        correo,
         empresaId: String(fila.empresa_id),
         roles, permisos,
       },

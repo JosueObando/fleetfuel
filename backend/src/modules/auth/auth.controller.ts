@@ -6,6 +6,7 @@ import { RefrescarDto } from './dto/refrescar.dto';
 import { ConfirmarMfaDto } from './dto/mfa.dto';
 import { Publico } from '../../common/decorators/publico.decorator';
 import { SinIdempotencia } from '../../common/decorators/sin-idempotencia.decorator';
+import { PermiteInscripcionMfa } from '../../common/decorators/permite-inscripcion-mfa.decorator';
 import { UsuarioActual, UsuarioAutenticado } from '../../common/decorators/usuario-actual.decorator';
 import { Ip } from '@nestjs/common';
 
@@ -40,11 +41,13 @@ export class AuthController {
     await this.auth.cerrarSesion(dto.refreshToken);
   }
 
+  @PermiteInscripcionMfa()
   @Get('yo')
   yo(@UsuarioActual() usuario: UsuarioAutenticado) {
     return usuario;
   }
 
+  @PermiteInscripcionMfa()
   @SinIdempotencia()
   @HttpCode(200)
   @Post('mfa/iniciar')
@@ -52,6 +55,7 @@ export class AuthController {
     return this.mfa.iniciar(usuario.id, usuario.correo);
   }
 
+  @PermiteInscripcionMfa()
   @SinIdempotencia()
   @HttpCode(200)
   @Post('mfa/confirmar')

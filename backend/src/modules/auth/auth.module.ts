@@ -29,6 +29,6 @@ import { JwtStrategy } from './jwt.strategy';
         }),
     },
   ],
-  exports: [AuthService, TokensService, CifradoService],
+  exports: [AuthService, TokensService, CifradoService, REDIS],
 })
 export class AuthModule {}

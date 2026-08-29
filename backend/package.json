@@ -11,6 +11,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "typeorm": "typeorm-ts-node-commonjs -d src/database/data-source.ts",
     "migration:run": "npm run typeorm -- migration:run",
+    "migration:run:dist": "typeorm migration:run -d dist/database/data-source.js",
+    "seed:dist": "node dist/database/seeds/seed.js",
     "migration:revert": "npm run typeorm -- migration:revert",
     "seed": "ts-node src/database/seeds/seed.ts",
     "test": "jest --config test/jest.unit.json",

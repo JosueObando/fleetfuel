@@ -1,0 +1,11 @@
+# El `npm ci` de la imagen instala para node:22-alpine (musl). Los node_modules
+# del host están compilados para el Node del host sobre glibc: copiarlos encima
+# rompe cualquier módulo nativo, y en silencio hasta que se ejecuta.
+node_modules
+dist
+coverage
+
+# Secretos: el compose los inyecta con env_file, no viajan en la imagen.
+.env
+*.log
+.git

@@ -8,7 +8,7 @@ export class Rol {
 
   @Column({ name: 'empresa_id', type: 'bigint' }) empresaId: string;
   @Column({ length: 80 }) nombre: string;
-  @Column({ length: 240, nullable: true }) descripcion: string | null;
+  @Column({ type: 'varchar', length: 240, nullable: true }) descripcion: string | null;
 
   /** §7: TOTP obligatorio para Administrador, Finanzas y Auditor. */
   @Column({ name: 'exige_mfa', default: false }) exigeMfa: boolean;

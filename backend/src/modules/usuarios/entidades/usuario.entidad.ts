@@ -14,7 +14,7 @@ export class Usuario {
   // a un log ni a una respuesta. Se pide explícitamente donde hace falta.
   @Column({ name: 'hash_clave', length: 120, select: false }) hashClave: string;
 
-  @Column({ length: 40, nullable: true }) telefono: string | null;
+  @Column({ type: 'varchar', length: 40, nullable: true }) telefono: string | null;
   @Column({ length: 20, default: 'activo' }) estado: 'activo' | 'suspendido';
 
   @Column({ name: 'mfa_habilitado', default: false }) mfaHabilitado: boolean;

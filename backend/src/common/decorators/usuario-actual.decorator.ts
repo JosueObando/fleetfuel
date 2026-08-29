@@ -7,6 +7,8 @@ export interface UsuarioAutenticado {
   roles: string[];
   permisos: string[];
   dispositivoId: string | null;
+  /** `inscripcion-mfa` restringe la sesión a los endpoints de MFA (§7). */
+  tipoSesion: 'acceso' | 'inscripcion-mfa';
 }
 
 /** Inyecta el usuario resuelto por JwtStrategy en el controlador. */

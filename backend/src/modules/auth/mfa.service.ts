@@ -55,10 +55,4 @@ export class MfaService {
     });
     return { mfaHabilitado: true };
   }
-
-  /** §7: los perfiles administrativos no son opcionales en esto. */
-  async exigidoPara(roles: string[]): Promise<boolean> {
-    const obligatorios = this.config.get<string[]>('mfa.rolesObligatorios') ?? [];
-    return roles.some((r) => obligatorios.includes(r));
-  }
 }

@@ -33,6 +33,9 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      # Etapa con devDependencies y src/: `migration:run` y `seed` son scripts
+      # de ts-node sobre las fuentes, que la etapa `production` no incluye.
+      target: development
     container_name: fleetfuel_backend
     restart: unless-stopped
     env_file: .env
@@ -49,7 +52,7 @@ services:
     # Las migraciones corren como DUEÑO (DATABASE_USER); el proceso que queda
     # sirviendo se conecta con el rol restringido. Es la misma imagen: lo que
     # cambia es qué credencial usa cada comando.
-    command: sh -c "npm run migration:run && npm run start:prod"
+    command: sh -c "npm run migration:run && npm run start:dev"
 
 volumes:
   db_data:

@@ -62,6 +62,22 @@ docker compose exec backend npm run seed
 # API: http://localhost:4100/api
 ```
 
+El compose apunta a la etapa `development` de la imagen: conserva las
+devDependencies y `src/`, que es lo que hace que los comandos de arriba
+funcionen dentro del contenedor.
+
+Para la imagen de producción, que se construye con `npm ci --omit=dev` y sin
+fuentes, los comandos equivalentes operan sobre el código compilado:
+
+```bash
+docker build --target production -t fleetfuel-backend:prod ./backend
+docker run --rm ... fleetfuel-backend:prod npm run migration:run:dist
+docker run --rm ... fleetfuel-backend:prod npm run seed:dist
+```
+
+No son los mismos scripts porque no pueden serlo: `migration:run` y `seed`
+invocan `ts-node` sobre `src/`, y en esa imagen no existe ninguno de los dos.
+
 Sin Docker, con Postgres 16 + PostGIS y Redis propios:
 
 ```bash
@@ -88,6 +104,8 @@ probarlos contra un doble es probar el doble.
 ## Endpoints
 
 ```
+GET    /api/salud                 público · sin token · 200 sano / 503 degradado
+
 POST   /api/auth/login            público · correo, clave y codigoTotp si hay MFA
 POST   /api/auth/refrescar        público · rota el refresh y revoca el anterior
 POST   /api/auth/cerrar-sesion    público · revoca el refresh en Redis
@@ -110,6 +128,51 @@ PATCH  /api/dispositivos/:id/revocar dispositivos:revocar · corta sesiones viva
 
 GET    /api/auditoria             auditoria:leer      · sólo lectura, sin escritura
 ```
+
+### `GET /api/salud`
+
+La única ruta que se puede abrir en un navegador. Comprueba Postgres y Redis en
+paralelo, con un límite de 2 s por dependencia — un chequeo que se cuelga es
+peor que uno que falla, porque el monitor espera y nadie se entera.
+
+```jsonc
+// 200 sano · 503 si alguna dependencia está caída
+{ "estado": "ok", "version": "0.1.0", "tiempoActivoSegundos": 21,
+  "dependencias": { "postgres": "ok", "redis": "ok" } }
+```
+
+Devuelve **503**, no un 200 con un campo que avise: los monitores miran el
+código de estado. El motivo del fallo va al log del servidor y no a la
+respuesta — la ruta es pública y un error de Postgres trae versiones, nombres de
+host y a veces credenciales.
+
+### El login del §7 tiene dos desenlaces
+
+Si el usuario tiene un rol con `exige_mfa` y todavía no configuró su TOTP, el
+login **no** devuelve una sesión normal: devuelve una *sesión de inscripción*.
+
+```jsonc
+// 200 · admin@mupa.gob.pa que aún no configuró su segundo factor
+{
+  "accessToken": "…",        // tipo: "inscripcion-mfa", permisos: []
+  "debeInscribirMfa": true,
+  "siguiente": "POST /auth/mfa/iniciar y luego POST /auth/mfa/confirmar"
+  //  ↑ sin refreshToken, a propósito
+}
+```
+
+Ese token sólo abre `/auth/yo`, `/auth/mfa/iniciar` y `/auth/mfa/confirmar`.
+Cualquier otra ruta responde **403** explicando que falta el segundo factor.
+Al confirmar el TOTP se vuelve a iniciar sesión y ahí sí llega la sesión completa.
+
+No lleva `refreshToken` por diseño: si lo llevara, `POST /auth/refrescar` la
+ascendería a sesión completa y el segundo factor se esquivaría con una llamada
+más. Por el mismo motivo el refresco revalida la regla, para el caso de que a
+alguien le asignen un rol que exige MFA mientras tiene una sesión viva.
+
+La lista de endpoints que una sesión de inscripción puede tocar es de
+**permitidos**, no de prohibidos (`@PermiteInscripcionMfa()`): una ruta nueva
+queda cerrada por omisión.
 
 Todo `POST` exige la cabecera `Idempotency-Key` (ADR 004). Las excepciones son
 explícitas y están marcadas con `@SinIdempotencia()`: login, refresco y cierre de

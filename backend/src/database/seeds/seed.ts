@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import { hash } from 'bcryptjs';
-import AppDataSource from '../data-source';
+import { AppDataSource } from '../data-source';
 
 /**
  * Siembra la empresa operadora, los 12 roles del §5 del PRD y el administrador
