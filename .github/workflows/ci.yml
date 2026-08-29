@@ -1,0 +1,70 @@
+name: CI
+
+# §19 pide «CI/CD con pruebas de integración contra Postgres real». Nada de
+# sqlite ni de mocks del motor: la mitad de las garantías de este sistema —RLS,
+# restricciones de exclusión, unicidad bajo concurrencia— sólo existen dentro
+# de Postgres. Probarlas contra otra cosa es probar otra cosa.
+
+on:
+  push: { branches: [main] }
+  pull_request:
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_DB: fleetfuel_test
+          POSTGRES_USER: fleetfuel_owner
+          POSTGRES_PASSWORD: ci_password
+        ports: ["5433:5432"]
+        options: >-
+          --health-cmd "pg_isready -U fleetfuel_owner -d fleetfuel_test"
+          --health-interval 10s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6380:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s --health-timeout 5s --health-retries 10
+
+    env:
+      APP_ENV: test
+      DATABASE_HOST: localhost
+      DATABASE_PORT: 5433
+      DATABASE_NAME: fleetfuel_test
+      DATABASE_USER: fleetfuel_owner
+      DATABASE_PASSWORD: ci_password
+      DATABASE_APP_USER: fleetfuel_app
+      DATABASE_APP_PASSWORD: ci_password_app
+      JWT_SECRET: ci_secret_de_pruebas_no_usar_en_produccion
+      REFRESH_TOKEN_SECRET: ci_refresh_de_pruebas_no_usar_en_produccion
+      REDIS_HOST: localhost
+      REDIS_PORT: 6380
+
+    defaults:
+      run: { working-directory: backend }
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - run: npm ci
+      - name: Compilación de tipos
+        run: npm run typecheck
+      - name: Pruebas unitarias
+        run: npm test
+      - name: Migraciones contra Postgres real
+        run: npm run migration:run
+      - name: Seed
+        run: npm run seed
+      - name: Pruebas de integración (RLS, idempotencia, auditoría)
+        run: npm run test:integracion
+      - name: La migración se puede revertir
+        run: npm run migration:revert

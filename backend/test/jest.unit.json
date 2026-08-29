@@ -1,0 +1,8 @@
+{
+  "rootDir": "..",
+  "testEnvironment": "node",
+  "testRegex": "\\.spec\\.ts$",
+  "transform": { "^.+\\.ts$": ["ts-jest", { "tsconfig": "tsconfig.json" }] },
+  "moduleFileExtensions": ["ts", "js", "json"],
+  "collectCoverageFrom": ["src/**/*.ts", "!src/**/*.module.ts", "!src/main.ts"]
+}

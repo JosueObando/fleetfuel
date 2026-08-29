@@ -1,0 +1,56 @@
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: fleetfuel_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DATABASE_NAME:-fleetfuel_db}
+      POSTGRES_USER: ${DATABASE_USER:-fleetfuel_owner}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-cambiar_en_produccion}
+    ports:
+      # 5433 y no 5432: SISOP MUPA ya ocupa el puerto por defecto y los dos
+      # sistemas se desarrollan en la misma máquina.
+      - "${DATABASE_PORT:-5433}:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USER:-fleetfuel_owner} -d ${DATABASE_NAME:-fleetfuel_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: fleetfuel_redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6380}:6379"
+    volumes:
+      - redis_data:/data
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: fleetfuel_backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_HOST: db
+      DATABASE_PORT: 5432
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    ports:
+      - "${BACKEND_PORT:-4100}:4100"
+    depends_on:
+      db:
+        condition: service_healthy
+    # Las migraciones corren como DUEÑO (DATABASE_USER); el proceso que queda
+    # sirviendo se conecta con el rol restringido. Es la misma imagen: lo que
+    # cambia es qué credencial usa cada comando.
+    command: sh -c "npm run migration:run && npm run start:prod"
+
+volumes:
+  db_data:
+  redis_data:
