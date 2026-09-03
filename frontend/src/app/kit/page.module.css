@@ -96,3 +96,11 @@
   color: var(--fg-default);
   margin-top: var(--esp-3);
 }
+
+.seccion h3 {
+  font-size: var(--texto-md);
+  font-weight: var(--peso-semi);
+  color: var(--fg-strong);
+  margin: var(--esp-6) 0 var(--esp-3);
+}
+.seccion h3:first-of-type { margin-top: 0; }

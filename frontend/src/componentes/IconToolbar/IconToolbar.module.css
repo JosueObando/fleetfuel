@@ -1,0 +1,31 @@
+/* Ficha 4: 5 botones icono 32×32 en contenedor, radio 10, padding 6, gap 4.
+   Anclada al pie del sidebar. */
+.barra {
+  display: flex; align-items: center; gap: var(--esp-1);
+  padding: 6px;
+  border-radius: 10px;
+  background: var(--nav-superficie);
+}
+.boton {
+  flex: 0 0 32px; width: 32px; height: 32px;
+  display: grid; place-items: center;
+  border: none; background: transparent;
+  border-radius: var(--radius-sm);
+  color: var(--nav-fg);
+  transition: background var(--transicion-rapida), color var(--transicion-rapida);
+}
+.boton:hover:not(:disabled):not(.activo) { background: var(--nav-hover); color: var(--fg-on-action); }
+.boton:active:not(:disabled) { background: var(--nav-presionado); }
+.boton:focus-visible { outline: none; box-shadow: var(--anillo-foco-nav); }
+.activo { background: var(--nav-activo-bg); color: var(--nav-activo-fg); }
+.boton:disabled { color: var(--nav-fg-inerte); cursor: not-allowed; }
+
+.cargando { pointer-events: none; }
+.cargando .boton {
+  background: linear-gradient(90deg,
+    var(--nav-superficie) 25%, rgba(255,255,255,.22) 50%, var(--nav-superficie) 75%);
+  background-size: 200% 100%;
+  animation: brillo var(--duracion-shimmer) ease-in-out infinite;
+  color: transparent;
+}
+@keyframes brillo { from { background-position: 200% 0; } to { background-position: -200% 0; } }

@@ -1,4 +1,5 @@
 import estilos from './page.module.css';
+import { Chrome } from './Chrome';
 
 /*
  * Kit del sistema de diseño. Es el «equivalente a Storybook» del plan: una
@@ -90,6 +91,13 @@ export default function Kit() {
             comercial y no está en el repositorio, así que hoy caen en Montserrat.
             Faltan los <code>.woff2</code> de la marca.
           </p>
+        </section>
+
+        <section className={estilos.seccion}>
+          <h2 className={estilos.seccionTitulo}>
+            Chrome y navegación · 5 de 24
+          </h2>
+          <Chrome />
         </section>
 
         <section className={estilos.seccion}>

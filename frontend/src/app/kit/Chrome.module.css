@@ -1,0 +1,24 @@
+.rejillaEstados {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--esp-4);
+}
+.celda { min-width: 0; }
+.nombreEstado {
+  font-size: var(--texto-2xs); line-height: var(--interlineado-2xs);
+  font-weight: var(--peso-semi);
+  color: var(--fg-muted);
+  text-transform: uppercase; letter-spacing: 0.04em;
+  margin-bottom: var(--esp-2);
+}
+/* Los cinco componentes viven sobre el sidebar: mostrarlos sobre fondo claro
+   daría una impresión falsa de cómo se ven. */
+.lienzoSidebar {
+  background: var(--bg-inverse);
+  border-radius: var(--radius-card);
+  padding: var(--esp-3);
+}
+.nota {
+  font-size: var(--texto-2xs); color: var(--fg-muted);
+  margin: var(--esp-2) 0 0;
+}

@@ -37,6 +37,27 @@
   --fg-muted:       #5E6F80;   /* captions, placeholders */
   --fg-on-action:   #FFFFFF;   /* texto sobre --action y sobre --bg-inverse */
 
+  /* ── Color · sobre el sidebar azul ──────────────────────────────────────
+     La ficha del NavItem dice «Activo: fondo accent-500, texto blanco», que
+     funciona sobre el sidebar OSCURO del original. En MUPA el sidebar ES
+     accent (--bg-inverse y --action son ambos #0660FF), así que un activo
+     azul sobre azul es invisible.
+     Se invierte: el ítem activo pasa a fondo claro con texto azul. Es la
+     lectura fiel de la intención —«el activo destaca al máximo contra el
+     sidebar»— en vez de la copia literal del color, que aquí se anula.
+     Los demás estados se construyen con superposiciones de blanco, único
+     recurso que mantiene el matiz sobre un fondo de color. */
+  --nav-fg:            rgba(255, 255, 255, 0.88);
+  --nav-fg-tenue:      rgba(255, 255, 255, 0.62);
+  --nav-fg-inerte:     rgba(255, 255, 255, 0.40);  /* deshabilitado */
+  --nav-hover:         rgba(255, 255, 255, 0.12);
+  --nav-presionado:    rgba(255, 255, 255, 0.20);
+  --nav-superficie:    rgba(255, 255, 255, 0.10);  /* IconToolbar, círculo de marca */
+  --nav-guia:          rgba(255, 255, 255, 0.22);  /* guía vertical del NavGroup */
+  --nav-activo-bg:     #FCFDFD;
+  --nav-activo-fg:     #0550D6;   /* action-hover: más oscuro, mejor contraste sobre blanco */
+  --anillo-foco-nav:   0 0 0 2px var(--bg-inverse), 0 0 0 4px #FFFFFF;
+
   /* ── Color · borde ──────────────────────────────────────────────────────*/
   --border-subtle:  #D9D9D9;   /* bordes de tarjeta y divisores */
   --border-strong:  #B9C0C8;   /* nodos futuros del RouteTimeline */

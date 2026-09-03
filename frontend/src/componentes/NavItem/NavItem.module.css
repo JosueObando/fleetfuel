@@ -1,0 +1,43 @@
+/* Ficha 2: 44 px de alto, icono 20 + label 13/16 medium, gap 12, radio 8,
+   padding-x 12. Los seis estados se derivan para sidebar AZUL, no oscuro. */
+.item {
+  display: flex; align-items: center; gap: var(--esp-3);
+  width: 100%;
+  height: var(--alto-nav-item);
+  padding: 0 var(--esp-3);
+  border: none; background: transparent;
+  border-radius: var(--radius-sm);
+  color: var(--nav-fg);
+  font-size: var(--texto-md); line-height: var(--interlineado-md);
+  font-weight: var(--peso-medio);
+  text-align: left;
+  transition: background var(--transicion-rapida), color var(--transicion-rapida);
+}
+.etiqueta { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.item:hover:not(:disabled):not(.activo) { background: var(--nav-hover); color: var(--fg-on-action); }
+.item:active:not(:disabled)            { background: var(--nav-presionado); }
+
+/* Anillo blanco, no azul: sobre el sidebar azul un anillo de --action
+   desaparece. El foco debe verse SIEMPRE, es su única función. */
+.item:focus-visible { outline: none; box-shadow: var(--anillo-foco-nav); }
+
+/* Activo invertido: fondo claro, texto azul. Ver la nota en tokens.css. */
+.activo { background: var(--nav-activo-bg); color: var(--nav-activo-fg); font-weight: var(--peso-semi); }
+
+.item:disabled { color: var(--nav-fg-inerte); cursor: not-allowed; background: transparent; }
+
+/* Skeleton: bloques, sin spinner. Shimmer de 1.2 s (#/spec/ux-estados-pantalla). */
+.cargando { pointer-events: none; }
+.cargando .icono, .cargando .etiqueta {
+  border-radius: var(--radius-sm);
+  background: linear-gradient(90deg,
+    var(--nav-superficie) 25%, rgba(255,255,255,.22) 50%, var(--nav-superficie) 75%);
+  background-size: 200% 100%;
+  animation: brillo var(--duracion-shimmer) ease-in-out infinite;
+  color: transparent;
+}
+.cargando .icono    { width: 20px; height: 20px; flex: 0 0 20px; }
+.cargando .etiqueta { width: 96px; height: 12px; }
+
+@keyframes brillo { from { background-position: 200% 0; } to { background-position: -200% 0; } }

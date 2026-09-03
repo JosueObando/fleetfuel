@@ -1,0 +1,75 @@
+/* Ficha 3: cabecera con chevron a la derecha y badge numérico. Sub-ítems con
+   indentación 32, guía vertical 1 px, alto 32, label 12/16. */
+.grupo { width: 100%; }
+
+.cabecera {
+  display: flex; align-items: center; gap: var(--esp-3);
+  width: 100%; height: var(--alto-nav-item);
+  padding: 0 var(--esp-3);
+  border: none; background: transparent;
+  border-radius: var(--radius-sm);
+  color: var(--nav-fg);
+  font-size: var(--texto-md); line-height: var(--interlineado-md);
+  font-weight: var(--peso-medio);
+  text-align: left;
+  transition: background var(--transicion-rapida), color var(--transicion-rapida);
+}
+.cabecera:hover:not(:disabled) { background: var(--nav-hover); color: var(--fg-on-action); }
+.cabecera:active:not(:disabled) { background: var(--nav-presionado); }
+.cabecera:focus-visible { outline: none; box-shadow: var(--anillo-foco-nav); }
+.cabecera:disabled { color: var(--nav-fg-inerte); cursor: not-allowed; }
+
+.etiqueta { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.badge {
+  flex: 0 0 auto;
+  min-width: 20px; height: 20px;
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  background: var(--nav-superficie);
+  color: var(--fg-on-action);
+  font-size: var(--texto-2xs); line-height: 20px;
+  font-weight: var(--peso-semi);
+  text-align: center;
+  font-variant-numeric: tabular-nums;   /* el ancho no salta al cambiar el número */
+}
+
+.chevron { flex: 0 0 auto; transition: transform var(--transicion-media); }
+.abierto .chevron { transform: rotate(90deg); }
+
+/* Guía vertical: pseudo-elemento sobre el contenedor, no un borde por fila.
+   Un borde por fila deja escalones de 1 px entre ítems. */
+.lista { position: relative; padding-left: 32px; margin: var(--esp-1) 0 0; list-style: none; }
+.lista::before {
+  content: ''; position: absolute;
+  left: 20px; top: 4px; bottom: 4px;
+  width: 1px; background: var(--nav-guia);
+}
+
+.subitem {
+  display: flex; align-items: center;
+  width: 100%; height: 32px;
+  padding: 0 var(--esp-2);
+  border: none; background: transparent;
+  border-radius: var(--radius-sm);
+  color: var(--nav-fg-tenue);
+  font-size: var(--texto-sm); line-height: var(--interlineado-sm);
+  text-align: left;
+  transition: background var(--transicion-rapida), color var(--transicion-rapida);
+}
+.subitem:hover:not(:disabled):not(.subActivo) { background: var(--nav-hover); color: var(--fg-on-action); }
+.subitem:active:not(:disabled) { background: var(--nav-presionado); }
+.subitem:focus-visible { outline: none; box-shadow: var(--anillo-foco-nav); }
+.subActivo { background: var(--nav-activo-bg); color: var(--nav-activo-fg); font-weight: var(--peso-semi); }
+.subitem:disabled { color: var(--nav-fg-inerte); cursor: not-allowed; }
+
+.cargando { pointer-events: none; }
+.cargando .etiqueta, .cargando .badge {
+  border-radius: var(--radius-sm); color: transparent;
+  background: linear-gradient(90deg,
+    var(--nav-superficie) 25%, rgba(255,255,255,.22) 50%, var(--nav-superficie) 75%);
+  background-size: 200% 100%;
+  animation: brillo var(--duracion-shimmer) ease-in-out infinite;
+}
+.cargando .etiqueta { max-width: 88px; height: 12px; }
+@keyframes brillo { from { background-position: 200% 0; } to { background-position: -200% 0; } }

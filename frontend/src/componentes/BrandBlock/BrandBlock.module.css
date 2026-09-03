@@ -1,0 +1,34 @@
+/* Ficha 1: marca 32×32 sobre círculo, nombre 15/20 semibold, descriptor 11/14.
+   Alto de zona 88 px, padding 20/16. */
+.bloque {
+  display: flex; align-items: center; gap: var(--esp-3);
+  height: 88px;
+  padding: var(--esp-5) var(--esp-4);
+}
+.marca {
+  flex: 0 0 32px; width: 32px; height: 32px;
+  border-radius: var(--radius-pill);
+  background: var(--nav-superficie);
+  display: grid; place-items: center;
+  color: var(--fg-on-action);
+}
+.textos { min-width: 0; }
+.nombre {
+  font-size: var(--texto-lg); line-height: var(--interlineado-lg);
+  font-weight: var(--peso-semi);
+  font-family: var(--fuente-titulo);
+  color: var(--fg-on-action);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.descriptor {
+  font-size: var(--texto-xs); line-height: var(--interlineado-xs);
+  color: var(--nav-fg-tenue);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.cargando .marca, .cargando .nombre, .cargando .descriptor { color: transparent; }
+.cargando .nombre, .cargando .descriptor {
+  border-radius: var(--radius-sm);
+  background: var(--nav-superficie);
+}
+.cargando .nombre { width: 108px; height: 12px; }
+.cargando .descriptor { width: 76px; height: 10px; margin-top: 6px; }
