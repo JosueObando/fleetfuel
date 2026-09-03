@@ -1,0 +1,12 @@
+[Unit]
+Description=Respaldo verificado de la base de FleetFuel
+Documentation=file:/home/app/fleetfuel/ops/respaldo-postgres.sh
+
+[Service]
+Type=oneshot
+ExecStart=/home/app/fleetfuel/ops/respaldo-postgres.sh
+# El destino remoto se define aquí, no en el script, para que el script quede
+# versionado en git sin datos de infraestructura dentro.
+EnvironmentFile=-/home/app/.config/fleetfuel-respaldo.env
+# Un respaldo que tarda más de 15 min con una base de 16 MB está colgado.
+TimeoutStartSec=900

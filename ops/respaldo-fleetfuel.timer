@@ -1,0 +1,12 @@
+[Unit]
+Description=Respaldo diario de FleetFuel
+
+[Timer]
+OnCalendar=*-*-* 02:00:00
+# Si la máquina estaba apagada a las 02:00, corre al arrancar en vez de saltarse
+# el día. Sin esto, un equipo apagado de noche nunca se respalda.
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target
