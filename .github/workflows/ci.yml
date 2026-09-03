@@ -68,3 +68,29 @@ jobs:
         run: npm run test:integracion
       - name: La migración se puede revertir
         run: npm run migration:revert
+
+  # Trabajo aparte del backend: no comparte servicios ni variables, y así un
+  # fallo de estilo no queda enterrado bajo el arranque de Postgres.
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run: { working-directory: frontend }
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+      - name: Compilación de tipos
+        run: npx tsc --noEmit
+      # Criterio de salida de UX-0. Falla el build si un token deja de cumplir
+      # AA: es lo que impide que la accesibilidad se erosione token a token
+      # cuando nadie recuerde por qué --fg-muted tenía ese valor exacto.
+      - name: Auditoría de contraste AA
+        run: npm run auditar:contraste
+      - name: Build
+        run: npm run build

@@ -17,7 +17,7 @@ const COLORES: Array<[string, string, string]> = [
   ['--action', '#0660FF', 'Acción y selección'],
   ['--fg-strong', '#21252B', 'Títulos'],
   ['--fg-default', '#363B43', 'Cuerpo'],
-  ['--fg-muted', '#627485', 'Captions'],
+  ['--fg-muted', '#5E6F80', 'Captions'],
   ['--border-subtle', '#D9D9D9', 'Divisores'],
   ['--color-success-500', '#2ECC71', 'En ruta'],
   ['--color-warning-500', '#F59E0B', 'Esperando'],
@@ -58,9 +58,10 @@ export default function Kit() {
             ))}
           </div>
           <p className={estilos.aviso}>
-            <strong>Decisión abierta:</strong> <code>--fg-muted</code> da 4.45:1 sobre
-            el lienzo y falla AA por 0.05. Pasa sobre panel (4.73:1).
-            Ver <code>scripts/auditar-contraste.mjs</code>.
+            <strong>Corrección documentada:</strong> <code>--fg-muted</code> es{' '}
+            <code>#5E6F80</code> y no el <code>#627485</code> del spec. Ese valor
+            daba 4.45:1 sobre el lienzo y no alcanzaba AA. El actual da 4.77:1.
+            Verificado por <code>npm run auditar:contraste</code>.
           </p>
         </section>
 

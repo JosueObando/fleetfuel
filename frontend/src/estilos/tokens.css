@@ -23,11 +23,18 @@
   --action-subtle:  #EDF7FF;   /* botón secundario, contadores, chips activos */
 
   /* ── Color · texto ──────────────────────────────────────────────────────
-     Tres niveles. --fg-muted corrige el fg-tertiary #6B7178 del original,
-     que no alcanzaba AA sobre fondo claro. Ver auditar-contraste.mjs. */
+     Tres niveles.
+     --fg-muted se aparta del #627485 de la columna MUPA del spec, y es
+     deliberado: ese valor da 4.45:1 sobre --bg-base y no alcanza el 4.5 de
+     AA. La «corrección de fg-tertiary» del spec movió el matiz hacia el azul
+     pero empeoró el contraste — el #6B7178 del tema oscuro original daba
+     4.549. #5E6F80 conserva el matiz azulado y sube a 4.77:1 sobre lienzo y
+     5.07:1 sobre panel. La diferencia es imperceptible a ojo y salva la
+     auditoría automatizada, que es lo que protege esto a largo plazo.
+     Ver scripts/auditar-contraste.mjs. */
   --fg-strong:      #21252B;   /* títulos */
   --fg-default:     #363B43;   /* cuerpo, labels, metadatos */
-  --fg-muted:       #627485;   /* captions, placeholders */
+  --fg-muted:       #5E6F80;   /* captions, placeholders */
   --fg-on-action:   #FFFFFF;   /* texto sobre --action y sobre --bg-inverse */
 
   /* ── Color · borde ──────────────────────────────────────────────────────*/
