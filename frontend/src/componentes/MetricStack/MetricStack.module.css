@@ -1,0 +1,15 @@
+/* Ficha 11: tiempo hh:mm:ss 14/18 tabular semibold; distancia 11/14.
+   Columna fija de 84 px. */
+.pila { flex: 0 0 84px; width: 84px; }
+.tiempo {
+  font-size: 0.875rem; line-height: 1.125rem;
+  font-weight: var(--peso-semi);
+  color: var(--fg-strong);
+  /* Tabular: sin esto el ancho baila a cada segundo y la tarjeta tiembla. */
+  font-variant-numeric: tabular-nums;
+}
+.distancia {
+  font-size: var(--texto-xs); line-height: var(--interlineado-xs);
+  color: var(--fg-default);
+  font-variant-numeric: tabular-nums;
+}

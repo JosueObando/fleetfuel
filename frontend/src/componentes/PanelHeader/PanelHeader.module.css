@@ -1,0 +1,33 @@
+/* Ficha 6: título 24/28 semibold; botón buscar 32×32 a la derecha;
+   alto de zona 72 px, padding 24/24/12. */
+.cabecera {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--esp-3);
+  height: 72px;
+  padding: var(--esp-6) var(--esp-6) var(--esp-3);
+}
+.titulo {
+  font-family: var(--fuente-titulo);
+  font-size: var(--texto-display); line-height: var(--interlineado-display);
+  font-weight: var(--peso-semi);
+  color: var(--fg-strong);
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.buscar {
+  flex: 0 0 32px; width: 32px; height: 32px;
+  display: grid; place-items: center;
+  border: none; background: transparent;
+  border-radius: var(--radius-sm);
+  color: var(--fg-default);
+  transition: background var(--transicion-rapida), color var(--transicion-rapida);
+}
+.buscar:hover:not(:disabled) { background: var(--action-subtle); color: var(--action); }
+.buscar:active:not(:disabled) { background: var(--action-subtle); transform: scale(0.96); }
+.buscar:disabled { color: var(--fg-muted); opacity: 0.4; cursor: not-allowed; }
+.cargando .titulo {
+  color: transparent; border-radius: var(--radius-sm); width: 200px; height: 24px;
+  background: linear-gradient(90deg, #E9EDF0 25%, #F4F6F7 50%, #E9EDF0 75%);
+  background-size: 200% 100%;
+  animation: brillo var(--duracion-shimmer) ease-in-out infinite;
+}
+@keyframes brillo { from { background-position: 200% 0; } to { background-position: -200% 0; } }

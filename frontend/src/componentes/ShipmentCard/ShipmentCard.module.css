@@ -1,0 +1,53 @@
+/* Ficha 9: ancho 246, radio 12, borde 1 px, fondo de superficie.
+   Alto ≈176 (header 44 + datos 60 + imagen 72). */
+.tarjeta {
+  display: flex; flex-direction: column;
+  width: 246px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  text-align: left;
+  padding: 0;
+  overflow: hidden;
+  transition: border-color var(--transicion-rapida), box-shadow var(--transicion-rapida);
+}
+.tarjeta:hover:not(:disabled):not(.seleccionada) {
+  border-color: var(--fg-muted); box-shadow: var(--sombra-card);
+}
+.tarjeta:active:not(:disabled) { box-shadow: var(--sombra-sutil); }
+.tarjeta:focus-visible { outline: none; box-shadow: var(--anillo-foco); }
+.seleccionada { border-color: var(--action); box-shadow: var(--sombra-card); }
+.tarjeta:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.encabezado {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--esp-2);
+  height: 44px; padding: 0 var(--esp-3);
+}
+.identificador {
+  font-family: var(--fuente-titulo);
+  font-size: var(--texto-md); line-height: var(--interlineado-md);
+  font-weight: var(--peso-semi);
+  color: var(--fg-strong);
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.datos {
+  display: flex; gap: var(--esp-3);
+  height: 60px; padding: 0 var(--esp-3);
+  min-width: 0;
+}
+.imagen { height: 72px; padding: 0 var(--esp-3); }
+
+.cargando { pointer-events: none; }
+.cargando .identificador, .cargando .datos, .cargando .imagen {
+  border-radius: var(--radius-sm);
+  background: linear-gradient(90deg, #E9EDF0 25%, #F4F6F7 50%, #E9EDF0 75%);
+  background-size: 200% 100%;
+  animation: brillo var(--duracion-shimmer) ease-in-out infinite;
+  color: transparent;
+}
+/* Bloques de 12/60/72 px, como pide #/spec/ux-estados-pantalla. */
+.cargando .identificador { width: 92px; height: 12px; }
+.cargando .datos   { height: 60px; margin: 0 var(--esp-3); }
+.cargando .imagen  { height: 72px; margin: var(--esp-2) var(--esp-3) var(--esp-3); }
+@keyframes brillo { from { background-position: 200% 0; } to { background-position: -200% 0; } }

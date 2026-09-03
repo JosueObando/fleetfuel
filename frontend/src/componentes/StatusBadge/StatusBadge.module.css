@@ -1,0 +1,13 @@
+/* Ficha 10: punto 6 px + label 11/14 semibold. Sin fondo. */
+.insignia { display: inline-flex; align-items: center; gap: 6px; }
+.punto { width: 6px; height: 6px; border-radius: var(--radius-pill); flex: 0 0 6px; }
+.texto {
+  font-size: var(--texto-xs); line-height: var(--interlineado-xs);
+  font-weight: var(--peso-semi);
+  color: var(--fg-default);
+  white-space: nowrap;
+}
+.enRuta    .punto { background: var(--color-success-500); }
+.esperando .punto { background: var(--color-warning-500); }
+.retrasado .punto { background: var(--color-error-500); }
+.entregado .punto { background: var(--fg-muted); }

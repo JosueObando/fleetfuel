@@ -1,0 +1,39 @@
+/* Ficha 7: chip alto 28, radio 8, padding 0/10, label 12/16 + contador 11 px
+   en pastilla. Flujo envuelto, gap 8×8. Overline 11 px. */
+.grupo { padding: 0 var(--esp-6) var(--esp-4); }
+.overline {
+  font-size: var(--texto-xs); line-height: var(--interlineado-xs);
+  font-weight: var(--peso-semi);
+  color: var(--fg-muted);
+  text-transform: uppercase; letter-spacing: 0.04em;
+  margin-bottom: var(--esp-2);
+}
+.flujo { display: flex; flex-wrap: wrap; gap: var(--esp-2); }
+
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 28px; padding: 0 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  color: var(--fg-default);
+  font-size: var(--texto-sm); line-height: var(--interlineado-sm);
+  transition: border-color var(--transicion-rapida), background var(--transicion-rapida),
+              color var(--transicion-rapida);
+}
+.chip:hover:not(:disabled):not(.activo) { border-color: var(--fg-muted); }
+.chip:active:not(:disabled) { background: var(--action-subtle); }
+.chip:focus-visible { outline: none; box-shadow: var(--anillo-foco); }
+.activo { background: var(--action); border-color: var(--action); color: var(--fg-on-action); }
+.chip:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.contador {
+  font-size: var(--texto-xs); line-height: 16px;
+  padding: 0 5px; min-width: 18px;
+  border-radius: var(--radius-pill);
+  background: var(--action-subtle);
+  color: var(--fg-default);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.activo .contador { background: rgba(255, 255, 255, 0.2); color: var(--fg-on-action); }

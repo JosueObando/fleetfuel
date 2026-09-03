@@ -1,0 +1,20 @@
+/* Ficha 8: 3 opciones exclusivas con conteo. Seleccionada: fondo de acción +
+   texto blanco. Alto 28, radio 8, gap 8. */
+.grupo { display: flex; gap: var(--esp-2); padding: 0 var(--esp-6) var(--esp-4); }
+.opcion {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 28px; padding: 0 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  color: var(--fg-default);
+  font-size: var(--texto-sm); line-height: var(--interlineado-sm);
+  transition: border-color var(--transicion-rapida), background var(--transicion-rapida),
+              color var(--transicion-rapida);
+}
+.opcion:hover:not(:disabled):not(.activa) { border-color: var(--fg-muted); }
+.opcion:active:not(:disabled) { background: var(--action-subtle); }
+.opcion:focus-visible { outline: none; box-shadow: var(--anillo-foco); }
+.activa { background: var(--action); border-color: var(--action); color: var(--fg-on-action); }
+.opcion:disabled { opacity: 0.4; cursor: not-allowed; }
+.conteo { font-variant-numeric: tabular-nums; opacity: 0.8; }

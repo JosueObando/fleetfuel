@@ -1,0 +1,34 @@
+/* Ficha 12: máx. 4 filas; nodo 6 px + conector 1 px; fila 14 px,
+   label 10.5/13 truncado a una línea. */
+.linea { list-style: none; margin: 0; padding: 0; min-width: 0; }
+.fila {
+  display: flex; align-items: center; gap: var(--esp-2);
+  height: 14px;
+  position: relative;
+}
+.nodo {
+  flex: 0 0 6px; width: 6px; height: 6px;
+  border-radius: var(--radius-pill);
+  position: relative;
+}
+/* El conector cuelga de cada nodo hacia el siguiente, salvo en el último.
+   Así la línea se adapta sola al número de paradas sin cálculo aparte. */
+.fila:not(:last-child) .nodo::after {
+  content: ''; position: absolute;
+  left: 50%; top: 6px;
+  width: 1px; height: 8px;
+  transform: translateX(-50%);
+  background: var(--border-strong);
+}
+.etiqueta {
+  font-size: var(--texto-2xs); line-height: var(--interlineado-2xs);
+  color: var(--fg-default);
+  min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.pasada  .nodo { background: var(--fg-muted); }
+.actual  .nodo { background: var(--action); }
+.futura  .nodo { background: var(--border-strong); }
+.pasada  .etiqueta { color: var(--fg-muted); }
+.actual  .etiqueta { color: var(--fg-strong); font-weight: var(--peso-semi); }
+.futura  .etiqueta { color: var(--fg-muted); }
