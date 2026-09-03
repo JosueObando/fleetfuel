@@ -108,7 +108,7 @@ uso enseña más sobre lo que falta que tres módulos a medio terminar.»*
 
 ---
 
-## Estado al 2026-08-30
+## Estado al 2026-09-03
 
 | Fase | Duración §19 | Estado | Comentario |
 |---|---|---|---|
@@ -124,7 +124,8 @@ uso enseña más sobre lo que falta que tres módulos a medio terminar.»*
 | 4 · Integraciones | 45 d | ⬜ | |
 | 5 · Analítica | 40 d | ⬜ | |
 
-Repositorio: rama `fase-0-cierre`, commit `69ce64e`. `main` sigue en `59bdab0`.
+Repositorio: `main` en `c8b00f4`, respaldado en
+`git@github.com:JosueObando/fleetfuel.git` (privado). Local y remoto idénticos.
 
 ---
 
@@ -203,13 +204,20 @@ curl -s localhost:4100/api/salud | jq
 > decisión de infraestructura —dónde alojar— que no se resuelve escribiendo
 > código.
 
-### 0.7 · Respaldo del repositorio — 🚧
+### 0.7 · Respaldo del repositorio — ✅ (2026-09-03)
 
-- [ ] Remoto de git configurado y `push` verificado
-- [ ] `fase-0-cierre` fusionada a `main`
+- [x] Remoto de git configurado y `push` verificado
+- [x] `fase-0-cierre` fusionada a `main`
 
-> Todo el trabajo vive en un solo disco de una sola máquina. Es el riesgo más
-> barato de eliminar de todo el plan y sigue abierto.
+> Cerrado el 2026-09-03. Remoto privado en `JosueObando/fleetfuel`, autenticado
+> con llave ed25519 propia del repositorio (`~/.ssh/id_ed25519_fleetfuel`, con
+> `IdentitiesOnly` en `~/.ssh/config`) y la host key de GitHub verificada contra
+> la huella publicada. `fase-0-cierre` se fusionó a `main` por fast-forward y se
+> subió: `main` = `c8b00f4`, 3 commits, local y remoto idénticos.
+>
+> Este documento estaba **fuera de git** hasta el mismo cierre. Antes de subir
+> se verificó que `.env` está en `.gitignore` y nunca entró al historial, y que
+> ningún archivo versionado trae credenciales.
 
 **Criterio de salida de la Fase 0**
 
@@ -512,14 +520,22 @@ descubrirlo cuando `RequestList` ya esté maquetado.
 
 ---
 
-## Los tres bloqueos abiertos hoy
+## Los dos bloqueos abiertos hoy
 
-Ninguno es código. Los tres necesitan una decisión antes de que arranque 1A.
+Ninguno es código. Los dos necesitan una decisión antes de que arranque 1A.
 
-1. **Dónde viven prueba y producción.** Es lo único que impide cerrar la Fase 0.
-2. **Dónde se respalda el repositorio.** Todo está en un disco de una máquina.
-3. **Si `RouteRequest` y el chat entran al alcance.** Bloquea a UX-2, pero se
+1. **Cómo se respaldan los datos.** Decidido el 2026-09-03 que desarrollo y
+   producción vivirán en esta misma máquina, con sólo desarrollo por ahora. Eso
+   resuelve el "dónde" del 0.6, pero traslada el peso al respaldo: hoy no existe
+   ninguno de Postgres —sin cron, sin timer, sin dumps— y `db_data` es un volumen
+   Docker sin copia. Con dev y prod compartiendo disco, el respaldo sustituye al
+   aislamiento que se cede al no tener servidores separados. Falta decidir la
+   ventana de pérdida tolerable y a dónde sale la copia, que debe salir de esta
+   máquina.
+2. **Si `RouteRequest` y el chat entran al alcance.** Bloquea a UX-2, pero se
    decide ahora porque cambia el modelo de datos de la Fase 2.
+
+> **Cerrado:** el respaldo del repositorio (0.7), el 2026-09-03.
 
 ---
 
