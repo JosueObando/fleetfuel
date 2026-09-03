@@ -4,3 +4,8 @@ dist/
 *.log
 coverage/
 .DS_Store
+
+# Next.js
+frontend/.next/
+frontend/out/
+frontend/next-env.d.ts

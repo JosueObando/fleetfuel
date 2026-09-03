@@ -1,0 +1,57 @@
+@import './tokens.css';
+
+/*
+ * Base de la aplicación. Aquí solo va lo que es cierto para TODA la interfaz;
+ * cualquier cosa específica de un componente vive en su propio módulo CSS.
+ */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  /* La ventana NO scrollea (#/spec/ux-layout): scrollean los dos paneles.
+     Si el body pudiera crecer, el shell de tres columnas se rompería. */
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  background: var(--bg-base);
+  color: var(--fg-default);
+  /* La variable de next/font alimenta la pila declarada en tokens.css, para
+     que ningún componente tenga que conocer el nombre real de la fuente. */
+  font-family: var(--fuente-montserrat), var(--fuente-cuerpo);
+  font-size: var(--texto-md);
+  line-height: var(--interlineado-md);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 {
+  font-family: var(--fuente-titulo);
+  color: var(--fg-strong);
+  margin: 0;
+}
+
+/* Un solo anillo de foco para toda la aplicación, y solo por teclado:
+   `:focus-visible` y no `:focus`, para no dibujarlo en cada clic de ratón. */
+:focus-visible {
+  outline: none;
+  box-shadow: var(--anillo-foco);
+  border-radius: var(--radius-sm);
+}
+
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; }
+
+/* Visible solo para lectores de pantalla. Lo usan las regiones vivas que
+   anuncian cambios de estado sin ocupar espacio en pantalla. */
+.solo-lectores {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

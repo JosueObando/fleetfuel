@@ -1,0 +1,98 @@
+.pagina {
+  height: 100vh;
+  overflow-y: auto;
+  padding: var(--esp-8);
+  background: var(--bg-base);
+}
+.contenedor { max-width: 1100px; margin: 0 auto; }
+
+.titulo {
+  font-size: var(--texto-display);
+  line-height: var(--interlineado-display);
+  font-weight: var(--peso-fuerte);
+  margin-bottom: var(--esp-2);
+}
+.subtitulo {
+  color: var(--fg-muted);
+  font-size: var(--texto-md);
+  margin: 0 0 var(--esp-8);
+}
+
+.seccion {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  box-shadow: var(--sombra-card);
+  padding: var(--esp-6);
+  margin-bottom: var(--esp-6);
+}
+.seccionTitulo {
+  font-size: var(--texto-lg);
+  line-height: var(--interlineado-lg);
+  font-weight: var(--peso-semi);
+  margin-bottom: var(--esp-4);
+}
+
+.rejilla {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: var(--esp-3);
+}
+
+.muestra {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.muestraColor { height: 56px; }
+.muestraPie {
+  padding: var(--esp-2) var(--esp-3);
+  background: var(--bg-surface);
+}
+.muestraNombre {
+  font-size: var(--texto-xs);
+  line-height: var(--interlineado-xs);
+  font-weight: var(--peso-medio);
+  color: var(--fg-default);
+}
+.muestraValor {
+  font-size: var(--texto-2xs);
+  color: var(--fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.filaTipo {
+  display: flex;
+  align-items: baseline;
+  gap: var(--esp-4);
+  padding: var(--esp-2) 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.filaTipo:last-child { border-bottom: none; }
+.etiquetaTipo {
+  flex: 0 0 128px;
+  font-size: var(--texto-2xs);
+  color: var(--fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.formas { display: flex; gap: var(--esp-4); flex-wrap: wrap; }
+.forma {
+  width: 96px; height: 64px;
+  background: var(--action-subtle);
+  border: 1px solid var(--action);
+  display: grid; place-items: center;
+  font-size: var(--texto-2xs);
+  color: var(--fg-default);
+}
+
+.aviso {
+  border-left: 3px solid var(--color-warning-500);
+  background: var(--bg-surface);
+  padding: var(--esp-3) var(--esp-4);
+  border-radius: var(--radius-sm);
+  font-size: var(--texto-sm);
+  line-height: 1.5;
+  color: var(--fg-default);
+  margin-top: var(--esp-3);
+}

@@ -1,0 +1,114 @@
+/*
+ * Tokens del sistema de diseño · FleetFuel Control
+ *
+ * Valores tomados de la columna MUPA de la tabla de equivalencias del spec
+ * (#/spec/ux-equivalencias-mupa), NO de la columna del original oscuro. El
+ * ecosistema municipal es claro por defecto y su jerarquía se construye con
+ * sombras azuladas, no con luminancia. Construir sobre el tema oscuro y
+ * repintar después no es repintar: es rehacer los 24 componentes.
+ *
+ * Todo se declara aquí como variable CSS. Ningún componente escribe un
+ * color, un radio ni una duración literal.
+ */
+
+:root {
+  /* ── Color · superficies ────────────────────────────────────────────────
+     El original apila cuatro grises (surface-1..4) para dar profundidad por
+     luminancia. En claro eso no funciona: casi todas las superficies son el
+     mismo blanco y la profundidad la dan la sombra y el borde. Por eso
+     surface-2 y surface-3 colapsan en un único --bg-surface. */
+  --bg-base:        #F4F6F7;   /* lienzo de la aplicación */
+  --bg-surface:     #FCFDFD;   /* paneles, tarjetas, mapa */
+  --bg-inverse:     #0660FF;   /* sidebar: en MUPA es AZUL, no oscuro */
+  --action-subtle:  #EDF7FF;   /* botón secundario, contadores, chips activos */
+
+  /* ── Color · texto ──────────────────────────────────────────────────────
+     Tres niveles. --fg-muted corrige el fg-tertiary #6B7178 del original,
+     que no alcanzaba AA sobre fondo claro. Ver auditar-contraste.mjs. */
+  --fg-strong:      #21252B;   /* títulos */
+  --fg-default:     #363B43;   /* cuerpo, labels, metadatos */
+  --fg-muted:       #627485;   /* captions, placeholders */
+  --fg-on-action:   #FFFFFF;   /* texto sobre --action y sobre --bg-inverse */
+
+  /* ── Color · borde ──────────────────────────────────────────────────────*/
+  --border-subtle:  #D9D9D9;   /* bordes de tarjeta y divisores */
+  --border-strong:  #B9C0C8;   /* nodos futuros del RouteTimeline */
+
+  /* ── Color · acción y estado ────────────────────────────────────────────*/
+  --action:         #0660FF;   /* acción, selección, trazo de ruta */
+  --action-hover:   #0550D6;
+  --action-active:  #0442AE;
+  --color-success-500: #2ECC71;  /* En ruta / Entregado */
+  --color-warning-500: #F59E0B;  /* Esperando / Detenido */
+  --color-error-500:   #E53935;  /* Retrasado / Avería */
+
+  /* ── Tipografía · dos voces ─────────────────────────────────────────────
+     Noka SOLO en títulos e ID de envío. Montserrat en todo lo demás.
+     Prometo NUNCA en interfaz.
+     Noka es comercial y no está en el repositorio: hasta que lleguen los
+     .woff2 de la marca, la pila cae en Montserrat, igual que hace el spec. */
+  --fuente-titulo: 'Noka', 'Montserrat', system-ui, sans-serif;
+  --fuente-cuerpo: 'Montserrat', system-ui, sans-serif;
+
+  /* Escala del spec, en pares tamaño/interlineado.
+     Los medios (10.5, 12.5) son del spec original, no un redondeo nuestro. */
+  --texto-display:  1.5rem;    --interlineado-display:  1.75rem;  /* 24/28 */
+  --texto-titulo:   1.375rem;  --interlineado-titulo:   1.625rem; /* 22/26 */
+  --texto-lg:       0.9375rem; --interlineado-lg:       1.25rem;  /* 15/20 */
+  --texto-md:       0.8125rem; --interlineado-md:       1rem;     /* 13/16 */
+  --texto-sm:       0.75rem;   --interlineado-sm:       1rem;     /* 12/16 */
+  --texto-xs:       0.6875rem; --interlineado-xs:       0.875rem; /* 11/14 */
+  --texto-2xs:      0.65625rem;--interlineado-2xs:      0.8125rem;/* 10.5/13 */
+  --texto-3xs:      0.625rem;  --interlineado-3xs:      0.8125rem;/* 10/13 */
+
+  --peso-normal:   400;
+  --peso-medio:    500;
+  --peso-semi:     600;
+  --peso-fuerte:   700;
+
+  /* ── Forma ──────────────────────────────────────────────────────────────
+     Los botones MUPA son PASTILLA, no radio 8. Es la diferencia visual más
+     citada del spec respecto al original y la más fácil de perder. */
+  --radius-sm:    8px;    /* inputs, chips, miniaturas */
+  --radius-md:    12px;   /* DashedCTA */
+  --radius-card:  16px;   /* tarjetas y paneles */
+  --radius-pill:  999px;  /* botones */
+
+  /* ── Elevación ──────────────────────────────────────────────────────────
+     Sombras AZULADAS, no negras: en un tema claro la jerarquía la da la
+     sombra, y una sombra neutra sobre este lienzo se ve sucia. */
+  --sombra-sutil:  0 1px 2px rgba(33, 55, 88, 0.06);
+  --sombra-card:   0 2px 8px rgba(33, 55, 88, 0.08);
+  --sombra-flotante: 0 8px 24px rgba(33, 55, 88, 0.12);
+
+  /* ── Espaciado ──────────────────────────────────────────────────────────*/
+  --esp-1: 4px;  --esp-2: 8px;   --esp-3: 12px;  --esp-4: 16px;
+  --esp-5: 20px; --esp-6: 24px;  --esp-8: 32px;
+
+  /* ── Medidas fijas del layout (#/spec/ux-layout) ────────────────────────*/
+  --ancho-sidebar:            228px;
+  --ancho-sidebar-colapsado:  72px;
+  --ancho-panel-tracking:     540px;
+  --ancho-min-detalle:        560px;
+  --alto-nav-item:            44px;
+
+  /* ── Movimiento ─────────────────────────────────────────────────────────*/
+  --transicion-rapida: 120ms cubic-bezier(0.2, 0, 0.2, 1);
+  --transicion-media:  200ms cubic-bezier(0.2, 0, 0.2, 1);
+  --duracion-shimmer:  1.2s;
+
+  /* ── Foco ───────────────────────────────────────────────────────────────
+     Un solo anillo para toda la aplicación. Si cada componente inventa el
+     suyo, el recorrido de teclado deja de ser legible. */
+  --anillo-foco: 0 0 0 2px var(--bg-surface), 0 0 0 4px var(--action);
+}
+
+/* Quien pidió menos movimiento recibe menos movimiento: se anulan las
+   transiciones y el shimmer, no solo se acortan. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --transicion-rapida: 0ms;
+    --transicion-media:  0ms;
+    --duracion-shimmer:  0ms;
+  }
+}
