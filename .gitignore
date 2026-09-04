@@ -9,3 +9,6 @@ coverage/
 frontend/.next/
 frontend/out/
 frontend/next-env.d.ts
+
+# Secretos de produccion
+.env.produccion

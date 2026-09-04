@@ -1,0 +1,145 @@
+# Despliegue de producción de FleetFuel Control.
+#
+# Convive con el de desarrollo en la misma máquina —es la decisión del
+# 2026-09-04— así que TODO va separado: nombres de contenedor, volúmenes,
+# red y puertos. Un `docker compose down -v` en desarrollo no puede tocar los
+# datos de producción, que es exactamente el accidente que hay que impedir
+# cuando los dos viven juntos.
+#
+#   docker compose -f docker-compose.produccion.yml --env-file .env.produccion up -d
+#
+# La primera vez, y SOLO la primera, hay que sembrar la empresa y el
+# administrador:
+#   docker compose -f docker-compose.produccion.yml --env-file .env.produccion \
+#     run --rm migraciones npm run seed:dist
+
+name: fleetfuel-prod
+
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: fleetfuel_prod_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DATABASE_NAME}
+      POSTGRES_USER: ${DATABASE_USER}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
+    # SIN `ports`. En desarrollo el 5433 es cómodo para conectarse con psql; en
+    # producción es una puerta a la base de datos abierta a toda la red. El
+    # backend la alcanza por la red interna de Compose, que es lo único que
+    # necesita. Para un volcado manual: `docker exec`.
+    volumes:
+      - prod_db:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USER} -d ${DATABASE_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: fleetfuel_prod_redis
+    restart: unless-stopped
+    # Tampoco se publica. Redis sin contraseña y expuesto es de los servicios
+    # que más rápido encuentran los escáneres.
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - prod_redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Servicio de un solo uso: corre las migraciones y termina. En desarrollo van
+  # encadenadas al arranque (`migration:run && start:dev`), y eso tiene un
+  # efecto feo que ya se vio en esta máquina: si una migración falla, el
+  # proceso muere, `restart: unless-stopped` lo revive y el contenedor entra en
+  # bucle. Aquí, si fallan, este servicio sale con error, el backend NO
+  # arranca —depende de que termine bien— y el fallo se ve una vez, claro.
+  migraciones:
+    build:
+      context: ./backend
+      target: production
+    image: fleetfuel-backend:prod
+    container_name: fleetfuel_prod_migraciones
+    restart: "no"
+    env_file: .env.produccion
+    environment:
+      DATABASE_HOST: db
+      DATABASE_PORT: 5432
+    command: ["npm", "run", "migration:run:dist"]
+    depends_on:
+      db:
+        condition: service_healthy
+
+  backend:
+    build:
+      context: ./backend
+      target: production
+    image: fleetfuel-backend:prod
+    container_name: fleetfuel_prod_backend
+    restart: unless-stopped
+    env_file: .env.produccion
+    environment:
+      NODE_ENV: production
+      APP_ENV: production
+      DATABASE_HOST: db
+      DATABASE_PORT: 5432
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      # DENTRO del contenedor la API escucha SIEMPRE en 4100. BACKEND_PORT del
+      # .env es el puerto del HOST, y si llegara aquí la aplicación escucharía
+      # en él y el mapeo apuntaría a un puerto vacío. Mismo criterio que con
+      # DATABASE_PORT: interno fijo, externo configurable.
+      BACKEND_PORT: 4100
+    ports:
+      # Se publica en la LAN porque el proxy inverso vive en OTRA máquina
+      # (10.0.0.19). Si algún día el proxy corre aquí, esto debería pasar a
+      # `127.0.0.1:${BACKEND_PORT}:4100` y dejar de ser alcanzable de fuera.
+      - "${BACKEND_PORT:-4200}:4100"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migraciones:
+        condition: service_completed_successfully
+    healthcheck:
+      # El endpoint de salud comprueba Postgres y Redis, así que un backend
+      # «sano» aquí significa que la cadena entera responde.
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:4100/api/salud').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  frontend:
+    build:
+      context: ./frontend
+      target: production
+      args:
+        # Se hornea al construir: NEXT_PUBLIC_* se resuelve en compilación.
+        # Cambiarla exige reconstruir la imagen, no reiniciar el contenedor.
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    image: fleetfuel-frontend:prod
+    container_name: fleetfuel_prod_frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-3200}:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:3000/entrar').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  # Nombres propios: con `name: fleetfuel-prod` arriba, Compose los prefija y
+  # no pueden colisionar con los de desarrollo.
+  prod_db:
+  prod_redis:
