@@ -1,0 +1,55 @@
+.panel { display: flex; flex-direction: column; min-height: 0; height: 100%; }
+.barra {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--esp-3); padding: var(--esp-6) var(--esp-6) var(--esp-3);
+}
+.titulo {
+  font-family: var(--fuente-titulo);
+  font-size: var(--texto-display); line-height: var(--interlineado-display);
+  font-weight: var(--peso-semi); color: var(--fg-strong);
+}
+.cuerpo { flex: 1; min-height: 0; overflow-y: auto; padding: 0 var(--esp-6) var(--esp-6); }
+
+.tabla { width: 100%; border-collapse: collapse; font-size: var(--texto-md); }
+.tabla th {
+  text-align: left; font-weight: var(--peso-semi); color: var(--fg-muted);
+  font-size: var(--texto-xs); text-transform: uppercase; letter-spacing: .04em;
+  padding: 0 var(--esp-3) var(--esp-2); border-bottom: 1px solid var(--border-subtle);
+  white-space: nowrap;
+}
+.tabla td {
+  padding: var(--esp-3); border-bottom: 1px solid var(--border-subtle);
+  color: var(--fg-default); vertical-align: middle;
+}
+.tabla tbody tr:hover { background: var(--action-subtle); }
+.acciones { display: flex; gap: var(--esp-2); justify-content: flex-end; }
+.numerico { font-variant-numeric: tabular-nums; }
+
+.formulario {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--esp-4);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  padding: var(--esp-5);
+  margin-bottom: var(--esp-5);
+}
+.pieFormulario {
+  grid-column: 1 / -1;
+  display: flex; gap: var(--esp-2); justify-content: flex-end;
+  padding-top: var(--esp-2);
+}
+.aviso {
+  grid-column: 1 / -1;
+  border-left: 3px solid var(--color-error-500);
+  background: var(--bg-base); padding: var(--esp-3);
+  border-radius: var(--radius-sm); font-size: var(--texto-sm); color: var(--fg-default);
+}
+.vacio { color: var(--fg-muted); padding: var(--esp-6) 0; }
+.esqueleto {
+  height: 44px; border-radius: var(--radius-sm); margin-bottom: var(--esp-2);
+  background: linear-gradient(90deg, #E9EDF0 25%, #F4F6F7 50%, #E9EDF0 75%);
+  background-size: 200% 100%;
+  animation: brillo var(--duracion-shimmer) ease-in-out infinite;
+}
+@keyframes brillo { from { background-position: 200% 0; } to { background-position: -200% 0; } }

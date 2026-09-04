@@ -1,0 +1,30 @@
+/* Campo de formulario. No está en las 24 fichas —el spec cubre tracking, no
+   captura— pero UX-1 necesita CRUD. Se construye con los mismos tokens: radio
+   sm como los chips, mismo anillo de foco, misma escala tipográfica. */
+.campo { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.etiqueta {
+  font-size: var(--texto-xs); line-height: var(--interlineado-xs);
+  font-weight: var(--peso-semi);
+  color: var(--fg-default);
+}
+.requerido { color: var(--color-error-500); margin-left: 2px; }
+.control {
+  height: 36px; padding: 0 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  color: var(--fg-strong);
+  font-size: var(--texto-md); line-height: var(--interlineado-md);
+  width: 100%;
+  transition: border-color var(--transicion-rapida);
+}
+.control:hover:not(:disabled) { border-color: var(--fg-muted); }
+.control:focus-visible { outline: none; box-shadow: var(--anillo-foco); border-color: var(--action); }
+.control:disabled { background: var(--bg-base); color: var(--fg-muted); cursor: not-allowed; }
+.control::placeholder { color: var(--fg-muted); }
+.conError { border-color: var(--color-error-500); }
+.error {
+  font-size: var(--texto-xs); line-height: var(--interlineado-xs);
+  color: var(--color-error-500);
+}
+.ayuda { font-size: var(--texto-xs); color: var(--fg-muted); }

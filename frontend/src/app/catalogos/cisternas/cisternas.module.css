@@ -1,0 +1,29 @@
+.compartimentos {
+  grid-column: 1 / -1;
+  border-top: 1px solid var(--border-subtle);
+  padding-top: var(--esp-4);
+}
+.cabeceraComp {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: var(--esp-3);
+}
+.tituloComp {
+  font-size: var(--texto-lg); line-height: var(--interlineado-lg);
+  font-weight: var(--peso-semi); color: var(--fg-strong);
+}
+.suma { font-size: var(--texto-sm); color: var(--fg-muted); font-variant-numeric: tabular-nums; }
+.excedida { color: var(--color-error-500); font-weight: var(--peso-semi); }
+.filaComp {
+  display: grid;
+  grid-template-columns: 72px 1fr 1fr 1.2fr auto;
+  gap: var(--esp-3); align-items: end;
+  margin-bottom: var(--esp-3);
+}
+.listaComp { list-style: none; margin: 0; padding: 0; }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 24px; padding: 0 8px; border-radius: var(--radius-sm);
+  background: var(--action-subtle); color: var(--fg-default);
+  font-size: var(--texto-xs); font-variant-numeric: tabular-nums;
+}
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }

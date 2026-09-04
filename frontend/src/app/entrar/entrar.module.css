@@ -1,0 +1,38 @@
+.pantalla {
+  display: grid; place-items: center;
+  height: 100dvh; padding: var(--esp-4);
+  background: var(--bg-base);
+  overflow-y: auto;
+}
+.tarjeta {
+  width: 100%; max-width: 380px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  box-shadow: var(--sombra-card);
+  padding: var(--esp-8) var(--esp-6);
+}
+.marca { display: flex; align-items: center; gap: var(--esp-3); margin-bottom: var(--esp-6); }
+.circulo {
+  width: 40px; height: 40px; border-radius: var(--radius-pill);
+  background: var(--action); color: var(--fg-on-action);
+  display: grid; place-items: center;
+}
+.titulo {
+  font-family: var(--fuente-titulo);
+  font-size: var(--texto-titulo); line-height: var(--interlineado-titulo);
+  font-weight: var(--peso-semi); color: var(--fg-strong);
+}
+.subtitulo { font-size: var(--texto-xs); color: var(--fg-muted); }
+.formulario { display: flex; flex-direction: column; gap: var(--esp-4); }
+.acciones { margin-top: var(--esp-2); }
+.acciones button { width: 100%; }
+.aviso {
+  border-left: 3px solid var(--color-error-500);
+  background: var(--bg-base);
+  padding: var(--esp-3);
+  border-radius: var(--radius-sm);
+  font-size: var(--texto-sm); line-height: 1.45;
+  color: var(--fg-default);
+}
+.info { border-left-color: var(--action); }

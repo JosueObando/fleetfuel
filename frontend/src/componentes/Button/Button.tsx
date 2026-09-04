@@ -10,18 +10,21 @@ interface Props {
   deshabilitado?: boolean;
   cargando?: boolean;
   onClick?: () => void;
+  /** 'submit' para que el Enter en un formulario lo dispare, no solo el clic. */
+  tipo?: 'button' | 'submit';
 }
 
 /** Ficha 16 · Acciones. */
 export function Button({
   children, variante = 'primario', icono, deshabilitado, cargando, onClick,
+  tipo = 'button',
 }: Props) {
   const clases = [estilos.boton, estilos[variante], cargando && estilos.cargando]
     .filter(Boolean).join(' ');
 
   return (
     <button
-      type="button"
+      type={tipo}
       className={clases}
       disabled={deshabilitado || cargando}
       onClick={onClick}
