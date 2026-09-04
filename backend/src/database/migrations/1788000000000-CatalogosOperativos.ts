@@ -277,6 +277,25 @@ export class CatalogosOperativos1788000000000 implements MigrationInterface {
         );
       }
     }
+
+    // ── Asignación a los 12 roles del §5 ────────────────────────────────────
+    // Crear los permisos no basta: un permiso que ningún rol tiene es un
+    // endpoint que nadie puede llamar. Se reparten por responsabilidad, no
+    // dando todo a todos: el riesgo principal del sistema es el fraude
+    // interno (§7), y un rol con más permisos de los que su trabajo requiere
+    // es precisamente la superficie que hay que evitar.
+    for (const [rol, codigos] of Object.entries(REPARTO)) {
+      for (const codigo of codigos) {
+        await q.query(
+          `INSERT INTO roles_permisos (rol_id, permiso_id)
+             SELECT r.rol_id, p.permiso_id
+               FROM roles r, permisos p
+              WHERE r.nombre = $1 AND p.codigo = $2
+             ON CONFLICT DO NOTHING`,
+          [rol, codigo],
+        );
+      }
+    }
   }
 
   public async down(q: QueryRunner): Promise<void> {
@@ -293,6 +312,39 @@ export class CatalogosOperativos1788000000000 implements MigrationInterface {
  * Orden de creación —cada tabla solo referencia a las anteriores— con su
  * columna de clave primaria, que hace falta para localizar la secuencia.
  */
+const TODOS = (m: string) => [`${m}:leer`, `${m}:crear`, `${m}:actualizar`, `${m}:desactivar`];
+const SOLO_LECTURA = ['clientes:leer', 'estaciones:leer', 'productos:leer',
+                      'vehiculos:leer', 'cisternas:leer', 'conductores:leer'];
+
+/**
+ * Reparto de los permisos de 1A entre los 12 roles del §5.
+ *
+ * «Cliente externo» y «Conductor» no reciben ninguno a propósito: el primero
+ * ve solo sus propias órdenes (Fase 1B) y el segundo trabaja desde la app
+ * móvil contra endpoints de viaje, no contra los catálogos.
+ */
+const REPARTO: Record<string, string[]> = {
+  'Administrador': [...TODOS('clientes'), ...TODOS('estaciones'), ...TODOS('productos'),
+                    ...TODOS('vehiculos'), ...TODOS('cisternas'), ...TODOS('conductores')],
+  'Supervisor de operaciones': [...SOLO_LECTURA, 'vehiculos:actualizar', 'cisternas:actualizar',
+                                'conductores:actualizar'],
+  'Planificador de flota': [...SOLO_LECTURA, ...TODOS('vehiculos'), ...TODOS('cisternas')],
+  'Despachador': SOLO_LECTURA,
+  'Operador de órdenes': ['clientes:leer', 'clientes:crear', 'clientes:actualizar',
+                          'estaciones:leer', 'estaciones:crear', 'estaciones:actualizar',
+                          'productos:leer'],
+  'Mantenimiento': ['vehiculos:leer', 'vehiculos:actualizar', 'cisternas:leer', 'cisternas:actualizar'],
+  // El auditor lee todo y no modifica nada: si pudiera escribir, dejaría de
+  // ser independiente de lo que audita.
+  'Auditor': SOLO_LECTURA,
+  'Responsable de estación': ['estaciones:leer', 'productos:leer'],
+  'Operador de carga': ['cisternas:leer', 'productos:leer', 'conductores:leer'],
+  // Finanzas ve conductores por las tarifas que alimentan las liquidaciones.
+  'Finanzas': ['clientes:leer', 'conductores:leer'],
+  'Cliente externo': [],
+  'Conductor': [],
+};
+
 /** Módulos de permiso que introduce 1A, con su etiqueta para la descripción. */
 const RECURSOS: Array<[string, string]> = [
   ['clientes',    'clientes'],

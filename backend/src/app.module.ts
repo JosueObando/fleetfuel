@@ -19,9 +19,18 @@ import { EmpresasModule } from './modules/empresas/empresas.module';
 import { AuditoriaModule } from './modules/auditoria/auditoria.module';
 import { DispositivosModule } from './modules/dispositivos/dispositivos.module';
 import { SaludModule } from './modules/salud/salud.module';
+import { ClientesModule } from './modules/clientes/clientes.module';
+import { EstacionesModule } from './modules/estaciones/estaciones.module';
+import { ProductosModule } from './modules/productos/productos.module';
+import { VehiculosModule } from './modules/vehiculos/vehiculos.module';
+import { CisternasModule } from './modules/cisternas/cisternas.module';
+import { ConductoresModule } from './modules/conductores/conductores.module';
 
 @Module({
   imports: [
+    // Fase 1A · catálogos, flota y conductores
+    ClientesModule, EstacionesModule, ProductosModule,
+    VehiculosModule, CisternasModule, ConductoresModule,
     ConfigModule.forRoot({
       isGlobal: true,
       load: [configuration],
