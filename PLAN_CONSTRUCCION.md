@@ -114,9 +114,9 @@ uso enseña más sobre lo que falta que tres módulos a medio terminar.»*
 |---|---|---|---|
 | 0 · Cimientos | 30 d | 🟡 **4 de 5** | 0.7 cerrado. Falta 0.6, redefinido a un solo host |
 | UX-0 · Sistema de diseño | ~15 d | 🟢 **código completo** | 24/24 componentes, contraste AA en CI. Falta Noka y la revisión humana |
-| 1A · Catálogos | 25 d | 🟢 **código completo** | 7 tablas con RLS, 32 rutas, 22 pruebas de integración, CRUD en la UI |
+| 1A · Catálogos | 25 d | ✅ **cerrada** | Criterio de salida verificado DESDE LA UI: alta de cliente, conductor, vehículo y cisterna con compartimentos, las cuatro en auditoría |
 | UX-1 · Shell y catálogos | — | 🟢 **código completo** | 3 columnas, 5 breakpoints, estado en la URL, CRUD de los 6 catálogos |
-| 1B · Órdenes → viaje | 35 d | ⬜ | |
+| 1B · Órdenes → viaje | 35 d | 🟢 **código completo** | 5 tablas, exclusiones del §5.1, 14 rutas, 16 pruebas, pantallas. Falta la compuerta de producción |
 | 1C · Entregas, liquidación | 30 d | ⬜ | Después de producción |
 | 2A · App del conductor | 45 d | ⬜ | |
 | 2B · GPS, geocercas, alertas | 30 d | ⬜ | |
@@ -128,11 +128,15 @@ uso enseña más sobre lo que falta que tres módulos a medio terminar.»*
 Repositorio: `main` en `f85a183`, respaldado en
 `git@github.com:JosueObando/fleetfuel.git` (privado). Local y remoto idénticos.
 
-**Lo que queda de UX-0, 1A y UX-1 ya no es código.** Los tres necesitan una
-persona: los `.woff2` de Noka (los títulos caen en Montserrat), el recorrido
-del kit junto al spec, y el alta real de cliente, cisterna y conductor desde
-la interfaz — que es el criterio de salida literal de 1A y se verificó por
-API, no por pantalla.
+**1A queda cerrada el 2026-09-04.** Su criterio de salida se verificó donde
+lo pide el §26 —desde la interfaz, no por API— con el recorrido automatizado
+`frontend/e2e/recorrido.mjs`: entra por la pantalla de login y da de alta un
+cliente, un conductor, un vehículo y una cisterna con dos compartimentos. Las
+cuatro altas quedan en `auditoria` con autor y hora, y el navegador no reporta
+ningún error de consola.
+
+**De UX-0 sigue faltando lo que necesita una persona:** los `.woff2` de Noka
+(los títulos caen en Montserrat) y el recorrido del kit junto al spec.
 
 En marcha: `http://10.0.0.193:3100` (interfaz) · `:4100/api` (API) ·
 `:8000` (portal de documentos).
