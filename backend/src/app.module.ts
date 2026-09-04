@@ -25,12 +25,16 @@ import { ProductosModule } from './modules/productos/productos.module';
 import { VehiculosModule } from './modules/vehiculos/vehiculos.module';
 import { CisternasModule } from './modules/cisternas/cisternas.module';
 import { ConductoresModule } from './modules/conductores/conductores.module';
+import { OrdenesModule } from './modules/ordenes/ordenes.module';
+import { ViajesModule } from './modules/viajes/viajes.module';
 
 @Module({
   imports: [
     // Fase 1A · catálogos, flota y conductores
     ClientesModule, EstacionesModule, ProductosModule,
     VehiculosModule, CisternasModule, ConductoresModule,
+    // Fase 1B · órdenes, viajes y plan de carga
+    OrdenesModule, ViajesModule,
     ConfigModule.forRoot({
       isGlobal: true,
       load: [configuration],
