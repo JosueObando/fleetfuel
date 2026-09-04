@@ -30,12 +30,19 @@ export function Campo({
      persona oye la explicación general justo cuando necesita la corrección. */
   const describe = error ? idAyuda : ayuda ? idAyuda : undefined;
 
+  /* Envoltorio <div> y <label htmlFor>, NO un <label> que envuelva todo.
+     Envolviendo, el texto de ayuda y el de error quedan DENTRO de la etiqueta
+     y pasan a formar parte del nombre accesible del campo: un select de
+     «Estación» con la ayuda «Elige primero el cliente» acaba llamándose
+     «Estación … cliente», y un lector de pantalla lee la explicación entera
+     cada vez que el foco entra. La ayuda es una DESCRIPCIÓN —eso es lo que
+     hace aria-describedby— y va fuera. */
   return (
-    <label className={estilos.campo} htmlFor={id}>
-      <span className={estilos.etiqueta}>
+    <div className={estilos.campo}>
+      <label className={estilos.etiqueta} htmlFor={id}>
         {etiqueta}
         {requerido && <span className={estilos.requerido} aria-hidden>*</span>}
-      </span>
+      </label>
 
       {opciones ? (
         <select
@@ -61,6 +68,6 @@ export function Campo({
           estuviera descrito, quien ya pasó el campo no se enteraría. */}
       {error ? <span id={idAyuda} className={estilos.error} role="alert">{error}</span>
              : ayuda ? <span id={idAyuda} className={estilos.ayuda}>{ayuda}</span> : null}
-    </label>
+    </div>
   );
 }

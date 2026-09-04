@@ -116,7 +116,7 @@ uso enseña más sobre lo que falta que tres módulos a medio terminar.»*
 | UX-0 · Sistema de diseño | ~15 d | 🟢 **código completo** | 24/24 componentes, contraste AA en CI. Falta Noka y la revisión humana |
 | 1A · Catálogos | 25 d | ✅ **cerrada** | Criterio de salida verificado DESDE LA UI: alta de cliente, conductor, vehículo y cisterna con compartimentos, las cuatro en auditoría |
 | UX-1 · Shell y catálogos | — | 🟢 **código completo** | 3 columnas, 5 breakpoints, estado en la URL, CRUD de los 6 catálogos |
-| 1B · Órdenes → viaje | 35 d | 🟢 **código completo** | 5 tablas, exclusiones del §5.1, 14 rutas, 16 pruebas, pantallas. Falta la compuerta de producción |
+| 1B · Órdenes → viaje | 35 d | 🟢 **código verificado** | 5 tablas, exclusiones del §5.1, 14 rutas, 16 pruebas y el flujo completo recorrido desde la UI. Falta solo la compuerta de producción |
 | 1C · Entregas, liquidación | 30 d | ⬜ | Después de producción |
 | 2A · App del conductor | 45 d | ⬜ | |
 | 2B · GPS, geocercas, alertas | 30 d | ⬜ | |
