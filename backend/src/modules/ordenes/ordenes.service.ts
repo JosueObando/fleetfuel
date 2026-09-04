@@ -17,11 +17,19 @@ const DESDE = `FROM ordenes_abastecimiento o
 
 @Injectable()
 export class OrdenesService {
-  listar(estado?: string) {
-    return gestor().query(
+  /* La lista incluye las transiciones posibles de cada fila. Sin eso, la
+     interfaz tendría que pedir el detalle de cada orden solo para saber qué
+     botones pintar —una petición por fila— o duplicar la máquina de estados
+     en el cliente, que es peor: dos copias que divergen en cuanto cambie el
+     flujo. Se calcula aquí, donde vive la única definición. */
+  async listar(estado?: string) {
+    const filas = await gestor().query(
       `SELECT ${CAMPOS} ${DESDE}
         WHERE o.eliminado_en IS NULL AND ($1::text IS NULL OR o.estado = $1)
         ORDER BY o.fecha_requerida NULLS LAST, o.orden_id DESC`, [estado ?? null]);
+    return filas.map((f: { estado: string }) => ({
+      ...f, transicionesPosibles: FLUJO_ORDEN[f.estado] ?? [],
+    }));
   }
 
   async obtener(id: string) {

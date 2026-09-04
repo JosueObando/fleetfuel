@@ -33,7 +33,7 @@ export default function Entrar() {
         return;
       }
       guardarSesion(sesion);
-      router.push('/catalogos/clientes');
+      router.push('/operacion/ordenes');
     } catch (err) {
       setError(err instanceof ErrorApi ? err.message : 'No se pudo conectar con el servidor');
     } finally {

@@ -32,11 +32,14 @@ function traducirSolapamiento(e: unknown): never {
 
 @Injectable()
 export class ViajesService {
-  listar(estado?: string) {
-    return gestor().query(
+  async listar(estado?: string) {
+    const filas = await gestor().query(
       `SELECT ${CAMPOS} ${DESDE}
         WHERE ($1::text IS NULL OR v.estado = $1)
         ORDER BY v.fecha_programada DESC`, [estado ?? null]);
+    return filas.map((f: { estado: string }) => ({
+      ...f, transicionesPosibles: FLUJO_VIAJE[f.estado] ?? [],
+    }));
   }
 
   async obtener(id: string) {

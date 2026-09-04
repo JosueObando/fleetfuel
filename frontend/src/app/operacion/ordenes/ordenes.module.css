@@ -1,0 +1,11 @@
+.lineas { grid-column: 1 / -1; border-top: 1px solid var(--border-subtle); padding-top: var(--esp-4); }
+.cabeceraLineas { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--esp-3); }
+.tituloLineas { font-size: var(--texto-lg); font-weight: var(--peso-semi); color: var(--fg-strong); }
+.total { font-size: var(--texto-sm); color: var(--fg-muted); font-variant-numeric: tabular-nums; }
+.lista { list-style: none; margin: 0; padding: 0; }
+.filaLinea {
+  display: grid; grid-template-columns: 1.4fr 1fr 1fr auto;
+  gap: var(--esp-3); align-items: end; margin-bottom: var(--esp-3);
+}
+.estadoTexto { font-size: var(--texto-xs); color: var(--fg-muted); display: block; }
+.transiciones { display: flex; gap: var(--esp-2); flex-wrap: wrap; }

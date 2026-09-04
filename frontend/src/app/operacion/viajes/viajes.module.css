@@ -1,0 +1,47 @@
+/* Maestro/detalle dentro del área de contenido: la lista a la izquierda, el
+   viaje seleccionado a la derecha. Ninguno de los dos hace scroll a la
+   ventana; scrollean ellos. */
+.dos { display: grid; grid-template-columns: 420px 1fr; height: 100%; min-height: 0; }
+.lista { display: flex; flex-direction: column; min-height: 0;
+         border-right: 1px solid var(--border-subtle); background: var(--bg-surface); }
+.listaCuerpo { flex: 1; min-height: 0; overflow-y: auto; padding: 0 var(--esp-4) var(--esp-4); }
+.detalle { min-width: 0; min-height: 0; overflow-y: auto; }
+
+.tarjeta {
+  display: block; width: 100%; text-align: left;
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+  background: var(--bg-surface); padding: var(--esp-3); margin-bottom: var(--esp-2);
+  transition: border-color var(--transicion-rapida), box-shadow var(--transicion-rapida);
+}
+.tarjeta:hover:not(.activa) { border-color: var(--fg-muted); box-shadow: var(--sombra-card); }
+.tarjeta:focus-visible { outline: none; box-shadow: var(--anillo-foco); }
+.activa { border-color: var(--action); box-shadow: inset 0 0 0 1px rgba(6,96,255,.35), var(--sombra-card); }
+.codigo { font-family: var(--fuente-titulo); font-weight: var(--peso-semi); color: var(--fg-strong); }
+.activa .codigo { color: var(--action); }
+.meta { font-size: var(--texto-xs); color: var(--fg-muted); font-variant-numeric: tabular-nums; }
+.pastilla {
+  display: inline-block; margin-top: 4px; padding: 1px 8px;
+  border-radius: var(--radius-pill); background: var(--action-subtle);
+  font-size: var(--texto-2xs); color: var(--fg-default);
+}
+
+.seccion { padding: 0 var(--esp-6) var(--esp-5); }
+.tituloSeccion {
+  font-size: var(--texto-lg); font-weight: var(--peso-semi); color: var(--fg-strong);
+  margin: var(--esp-5) 0 var(--esp-3);
+}
+.acciones { display: flex; gap: var(--esp-2); flex-wrap: wrap; }
+.tablaMini { width: 100%; border-collapse: collapse; font-size: var(--texto-sm); }
+.tablaMini th {
+  text-align: left; font-size: var(--texto-2xs); text-transform: uppercase; letter-spacing: .04em;
+  color: var(--fg-muted); padding: 0 var(--esp-2) var(--esp-1); border-bottom: 1px solid var(--border-subtle);
+}
+.tablaMini td { padding: var(--esp-2); border-bottom: 1px solid var(--border-subtle); }
+.num { font-variant-numeric: tabular-nums; }
+.formLinea {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--esp-3); align-items: end; margin-top: var(--esp-3);
+  background: var(--bg-surface); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card); padding: var(--esp-4);
+}
+.vacio { color: var(--fg-muted); font-size: var(--texto-sm); padding: var(--esp-4) 0; }
