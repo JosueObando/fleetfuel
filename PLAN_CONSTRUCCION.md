@@ -524,7 +524,14 @@ descubrirlo cuando `RequestList` ya esté maquetado.
 
 Ninguno es código. Los dos necesitan una decisión antes de que arranque 1A.
 
-1. **Cómo se respaldan los datos.** Decidido el 2026-09-03 que desarrollo y
+1. **Cómo se respaldan los datos.** *(parcial al 2026-09-04)* Ya existe el
+   mecanismo: `ops/respaldo-postgres.sh`, diario a las 02:00 por timer de
+   systemd, con verificación por restauración real y rotación 7+4. Lo que
+   falta es el **destino fuera de este host**. El CT de nginx (10.0.0.19)
+   comparte disco físico con esta VM, así que no sirve: una falla de ese
+   disco se lleva original y copia. Queda aplazado por decisión del
+   2026-09-04.
+   Detalle original: Decidido el 2026-09-03 que desarrollo y
    producción vivirán en esta misma máquina, con sólo desarrollo por ahora. Eso
    resuelve el "dónde" del 0.6, pero traslada el peso al respaldo: hoy no existe
    ninguno de Postgres —sin cron, sin timer, sin dumps— y `db_data` es un volumen
