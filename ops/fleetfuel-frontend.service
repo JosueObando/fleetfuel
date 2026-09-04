@@ -1,0 +1,16 @@
+[Unit]
+Description=FleetFuel Control · frontend (Next.js, produccion)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/app/fleetfuel/frontend
+# `next start` y no `next dev`: el servidor de desarrollo recompila en cada
+# peticion, expone el mapa de fuentes y no debe quedar detras de un proxy.
+ExecStart=/usr/bin/npx next start -p 3100 -H 0.0.0.0
+Restart=on-failure
+RestartSec=5
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=default.target

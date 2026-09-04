@@ -1,6 +1,9 @@
 export default () => ({
   env: process.env.APP_ENV || 'development',
   port: parseInt(process.env.BACKEND_PORT || '4100', 10),
+  // Lista separada por comas de proxies inversos de confianza (IP o CIDR).
+  // Vacío = no hay proxy delante y se usa la IP del socket.
+  proxiesDeConfianza: process.env.PROXIES_DE_CONFIANZA ?? '',
   database: {
     host: process.env.DATABASE_HOST || 'localhost',
     port: parseInt(process.env.DATABASE_PORT || '5433', 10),
