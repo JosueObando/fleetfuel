@@ -41,3 +41,14 @@
 .cargando .etiqueta { width: 96px; height: 12px; }
 
 @keyframes brillo { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+
+/* Colapsado (1024-1279): 72 px de sidebar, solo icono. El ítem se centra y
+   la etiqueta se oculta VISUALMENTE pero sigue en el árbol de accesibilidad
+   —clase .solo-lectores— porque un botón sin nombre es inservible con
+   lector de pantalla, aunque en pantalla se entienda por el icono. */
+.colapsado { justify-content: center; padding: 0; }
+.colapsado .etiqueta {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip-path: inset(50%); white-space: nowrap;
+}

@@ -1,0 +1,115 @@
+/*
+ * Shell de tres columnas (#/spec/ux-layout y #/spec/ux-responsive).
+ *
+ * La ventana NO scrollea: scrollean los dos paneles. Por eso el shell es una
+ * rejilla de alto 100dvh con `min-height: 0` en las columnas — sin ese
+ * min-height una celda de rejilla se niega a encoger por debajo de su
+ * contenido y el scroll interno nunca aparece.
+ */
+.shell {
+  display: grid;
+  grid-template-columns: var(--ancho-sidebar) var(--ancho-panel-tracking) 1fr;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.sidebar {
+  grid-column: 1;
+  display: flex; flex-direction: column;
+  background: var(--bg-inverse);
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 var(--esp-3) var(--esp-3);
+}
+.navegacion { display: flex; flex-direction: column; gap: 2px; flex: 1; min-height: 0; }
+.pieSidebar { display: flex; flex-direction: column; gap: var(--esp-3); padding-top: var(--esp-3); }
+
+.tracking {
+  grid-column: 2;
+  display: flex; flex-direction: column;
+  min-height: 0;
+  background: var(--bg-surface);
+  border-right: 1px solid var(--border-subtle);
+}
+.listaTarjetas {
+  flex: 1; min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(2, 246px);
+  gap: var(--esp-4);
+  padding: 0 var(--esp-6) var(--esp-6);
+  align-content: start;
+}
+
+.detalle {
+  grid-column: 3;
+  min-width: var(--ancho-min-detalle);
+  min-height: 0;
+  overflow-y: auto;
+  background: var(--bg-base);
+}
+.marcaColapsada { display: none; }
+.volver { display: none; }
+.tabBar { display: none; }
+.vacio {
+  display: grid; place-items: center;
+  height: 100%; padding: var(--esp-8);
+  color: var(--fg-muted);
+  font-size: var(--texto-md);
+  text-align: center;
+}
+
+/* ≥1600 · el detalle crece; si el panel supera 720 px, 3 columnas. */
+@media (min-width: 1600px) {
+  .listaTarjetas { grid-template-columns: repeat(2, 246px); }
+}
+
+/* 1024–1279 · sidebar colapsado a 72 px + 2 paneles, tarjetas a 1 columna. */
+@media (max-width: 1279px) {
+  .shell { grid-template-columns: var(--ancho-sidebar-colapsado) var(--ancho-panel-tracking) 1fr; }
+  .sidebar { padding: 0 var(--esp-2) var(--esp-2); align-items: center; }
+  .marcaCompleta { display: none; }
+  .marcaColapsada { display: block; }
+  .listaTarjetas { grid-template-columns: 246px; }
+  .detalle { min-width: 0; }
+}
+
+/* 768–1023 · maestro/detalle conmutado. La lista ocupa el ancho; al
+   seleccionar, entra el detalle con botón «Volver». Sidebar en drawer. */
+@media (max-width: 1023px) {
+  .shell { grid-template-columns: 1fr; }
+  .sidebar { display: none; }
+  .tracking { grid-column: 1; border-right: none; }
+  .detalle  { grid-column: 1; }
+  /* Solo uno de los dos paneles se muestra a la vez. */
+  .shell[data-vista='lista']   .detalle  { display: none; }
+  .shell[data-vista='detalle'] .tracking { display: none; }
+  .volver { display: inline-flex; }
+  .listaTarjetas { grid-template-columns: repeat(auto-fill, minmax(246px, 1fr)); }
+}
+
+/* <768 · una vista por pantalla + tab bar inferior de 5 destinos, alto 56,
+   objetivos ≥44 px. Tipografía mínima 12 px. */
+@media (max-width: 767px) {
+  .shell { grid-template-rows: 1fr 56px; }
+  .tabBar {
+    display: flex; align-items: stretch;
+    grid-column: 1; grid-row: 2;
+    height: 56px;
+    background: var(--bg-inverse);
+  }
+  .tracking, .detalle { grid-row: 1; }
+  .destino {
+    flex: 1;
+    min-height: 44px;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 2px;
+    border: none; background: transparent;
+    color: var(--nav-fg);
+    font-size: var(--texto-sm);   /* 12 px, el mínimo del spec */
+    line-height: var(--interlineado-sm);
+  }
+  .destino[aria-current='page'] { color: var(--fg-on-action); font-weight: var(--peso-semi); }
+  .destino:focus-visible { outline: none; box-shadow: var(--anillo-foco-nav); }
+  .listaTarjetas { grid-template-columns: 1fr; padding: 0 var(--esp-4) var(--esp-4); }
+}
