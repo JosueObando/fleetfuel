@@ -1,0 +1,46 @@
+/* Ficha 16: padding-x 14, gap interno 8, alto 36, icono 16 + label 12.5.
+   Los botones MUPA son PASTILLA, no radio 8: es la diferencia visual más
+   citada del spec frente al original. */
+.boton {
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: var(--esp-2);
+  height: 36px; padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  font-size: 0.78125rem; line-height: 1rem;   /* 12.5 */
+  font-weight: var(--peso-semi);
+  white-space: nowrap;
+  transition: background var(--transicion-rapida), border-color var(--transicion-rapida),
+              color var(--transicion-rapida), transform var(--transicion-rapida);
+}
+.boton:focus-visible { outline: none; box-shadow: var(--anillo-foco); }
+.boton:disabled { cursor: not-allowed; }
+
+.primario { background: var(--action); color: var(--fg-on-action); }
+.primario:hover:not(:disabled)  { background: var(--action-hover); }
+.primario:active:not(:disabled) { background: var(--action-active); transform: scale(0.98); }
+.primario:disabled { background: var(--action-subtle); color: var(--fg-muted); }
+
+/* El original pinta el secundario con surface-4, un gris oscuro. En tema
+   claro ese gris no existe: el equivalente es --action-subtle, el azul muy
+   claro al que el spec mapea surface-4. */
+.secundario {
+  background: var(--action-subtle);
+  border-color: var(--border-subtle);
+  color: var(--fg-strong);
+}
+.secundario:hover:not(:disabled)  { border-color: var(--action); color: var(--action); }
+.secundario:active:not(:disabled) { transform: scale(0.98); }
+.secundario:disabled { color: var(--fg-muted); opacity: 0.4; }
+
+.cargando { pointer-events: none; }
+.girador {
+  width: 14px; height: 14px;
+  border: 2px solid currentColor; border-right-color: transparent;
+  border-radius: var(--radius-pill);
+  animation: girar 0.7s linear infinite;
+}
+/* Con movimiento reducido el girador se queda quieto en vez de desaparecer:
+   sigue indicando «ocupado» sin animación. */
+@media (prefers-reduced-motion: reduce) { .girador { animation: none; } }
+@keyframes girar { to { transform: rotate(360deg); } }

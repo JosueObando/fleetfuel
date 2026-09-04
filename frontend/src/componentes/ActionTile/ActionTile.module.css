@@ -1,0 +1,20 @@
+/* Ficha 22: última celda de la tira, 88×88, borde discontinuo 1.5 px,
+   icono cámara 20 + label 10.5. */
+.celda {
+  flex: 0 0 88px; width: 88px; height: 88px;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 6px;
+  border: 1.5px dashed var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--fg-muted);
+  font-size: var(--texto-2xs); line-height: var(--interlineado-2xs);
+  font-weight: var(--peso-medio);
+  text-align: center;
+  transition: border-color var(--transicion-rapida), color var(--transicion-rapida),
+              background var(--transicion-rapida);
+}
+.celda:hover:not(:disabled) { border-color: var(--action); color: var(--action); background: var(--action-subtle); }
+.celda:active:not(:disabled) { transform: scale(0.97); }
+.celda:focus-visible { outline: none; box-shadow: var(--anillo-foco); }
+.celda:disabled { opacity: 0.4; cursor: not-allowed; }

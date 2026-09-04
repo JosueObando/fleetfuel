@@ -16,7 +16,14 @@
 }
 .tarjeta:active:not(:disabled) { box-shadow: var(--sombra-sutil); }
 .tarjeta:focus-visible { outline: none; box-shadow: var(--anillo-foco); }
-.seleccionada { border-color: var(--action); box-shadow: var(--sombra-card); }
+/* Ficha 14: borde 2 px + halo interior de 1 px. Se hace con un inset
+   box-shadow y NO subiendo el border-width a 2, porque cambiar el grosor del
+   borde movería el contenido 1 px al seleccionar. */
+.seleccionada {
+  border-color: var(--action);
+  box-shadow: inset 0 0 0 1px rgba(6, 96, 255, 0.35), var(--sombra-card);
+}
+.seleccionada .identificador { color: var(--action); }
 .tarjeta:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .encabezado {

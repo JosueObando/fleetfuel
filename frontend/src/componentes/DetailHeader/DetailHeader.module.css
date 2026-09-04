@@ -1,0 +1,16 @@
+/* Ficha 15: ID 22/26 semibold + StatusBadge; a la derecha los dos botones. */
+.cabecera {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--esp-4);
+  padding: var(--esp-5) var(--esp-6);
+  flex-wrap: wrap;
+}
+.izquierda { display: flex; align-items: center; gap: var(--esp-3); min-width: 0; }
+.identificador {
+  font-family: var(--fuente-titulo);
+  font-size: var(--texto-titulo); line-height: var(--interlineado-titulo);
+  font-weight: var(--peso-semi);
+  color: var(--fg-strong);
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.acciones { display: flex; align-items: center; gap: var(--esp-2); }

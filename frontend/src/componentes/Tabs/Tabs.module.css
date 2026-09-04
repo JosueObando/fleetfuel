@@ -1,0 +1,32 @@
+/* Ficha 17: 5 pestañas, alto 44, gap 28, label 13/16 medium.
+   Activa: subrayado 2 px. Divisor inferior 1 px a todo el ancho. */
+.lista {
+  display: flex; align-items: stretch; gap: 28px;
+  padding: 0 var(--esp-6);
+  border-bottom: 1px solid var(--border-subtle);
+  overflow-x: auto;
+}
+.pestana {
+  position: relative;
+  height: 44px; padding: 0;
+  border: none; background: transparent;
+  color: var(--fg-muted);
+  font-size: var(--texto-md); line-height: var(--interlineado-md);
+  font-weight: var(--peso-medio);
+  white-space: nowrap;
+  transition: color var(--transicion-rapida);
+}
+.pestana:hover:not(:disabled):not(.activa) { color: var(--fg-default); }
+.pestana:focus-visible { outline: none; box-shadow: var(--anillo-foco); border-radius: var(--radius-sm); }
+.pestana:disabled { color: var(--fg-muted); opacity: 0.4; cursor: not-allowed; }
+
+.activa { color: var(--fg-strong); font-weight: var(--peso-semi); }
+/* El subrayado se dibuja SIEMPRE, transparente cuando no está activa. Si
+   apareciera y desapareciera, el texto se movería 2 px al cambiar de pestaña. */
+.pestana::after {
+  content: ''; position: absolute;
+  left: 0; right: 0; bottom: -1px; height: 2px;
+  background: transparent;
+  transition: background var(--transicion-rapida);
+}
+.activa::after { background: var(--action); }

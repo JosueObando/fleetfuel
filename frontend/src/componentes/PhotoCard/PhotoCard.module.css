@@ -1,0 +1,44 @@
+/* Ficha 21: tarjeta 88 px de ancho; foto 88×58 radio 8, punto de estado,
+   título 10.5/13, dirección y hora 10/13. */
+.tarjeta {
+  flex: 0 0 88px; width: 88px;
+  border: none; background: transparent; padding: 0;
+  text-align: left;
+  border-radius: var(--radius-sm);
+}
+.tarjeta:focus-visible { outline: none; box-shadow: var(--anillo-foco); }
+.tarjeta:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.marco {
+  position: relative;
+  width: 88px; height: 58px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--bg-base);
+  border: 1px solid var(--border-subtle);
+  display: grid; place-items: center;
+  color: var(--fg-muted);
+  transition: border-color var(--transicion-rapida);
+}
+.tarjeta:hover:not(:disabled) .marco { border-color: var(--action); }
+.punto {
+  position: absolute; top: 5px; right: 5px;
+  width: 6px; height: 6px; border-radius: var(--radius-pill);
+  box-shadow: 0 0 0 1.5px var(--bg-surface);
+}
+.ok       { background: var(--color-success-500); }
+.pendiente{ background: var(--color-warning-500); }
+.problema { background: var(--color-error-500); }
+
+.titulo {
+  margin-top: var(--esp-1);
+  font-size: var(--texto-2xs); line-height: var(--interlineado-2xs);
+  font-weight: var(--peso-semi);
+  color: var(--fg-strong);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.meta {
+  font-size: var(--texto-3xs); line-height: var(--interlineado-3xs);
+  color: var(--fg-muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}

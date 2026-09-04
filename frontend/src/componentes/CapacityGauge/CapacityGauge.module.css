@@ -1,0 +1,50 @@
+/* Ficha 18: caja de carga como pista; relleno proporcional con trama
+   diagonal 6 px; porcentaje bold centrado en el relleno. */
+.bloque { padding: 0 var(--esp-6) var(--esp-4); }
+.titulo {
+  font-size: var(--texto-lg); line-height: var(--interlineado-lg);
+  font-weight: var(--peso-semi);
+  color: var(--fg-strong);
+  margin-bottom: var(--esp-3);
+}
+.pista {
+  position: relative;
+  height: 44px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-base);
+  overflow: hidden;
+}
+.relleno {
+  position: absolute; inset: 0 auto 0 0;
+  /* Trama diagonal de 6 px: el spec la pide para que el relleno se distinga
+     de un bloque de color plano incluso en captura en blanco y negro. */
+  background-image: repeating-linear-gradient(
+    45deg, transparent 0 3px, rgba(255,255,255,0.22) 3px 6px);
+  transition: width var(--transicion-media), background-color var(--transicion-media);
+}
+.bajo   { background-color: var(--fg-muted); }
+.normal { background-color: var(--action); }
+.alto   { background-color: var(--color-warning-500); }
+
+.porcentaje {
+  position: absolute; inset: 0;
+  display: grid; place-items: center;
+  font-size: 1.0625rem; line-height: 1;
+  font-weight: var(--peso-fuerte);
+  color: var(--fg-on-action);
+  font-variant-numeric: tabular-nums;
+  /* Sombra de texto: el número se lee tanto sobre el relleno como sobre la
+     pista vacía cuando el porcentaje es bajo y queda fuera del relleno. */
+  text-shadow: 0 1px 2px rgba(33, 55, 88, 0.45);
+}
+/* Por debajo de 40 % el relleno es claro y el blanco no se leería. */
+.bajo ~ .porcentaje { color: var(--fg-strong); text-shadow: none; }
+
+.aviso {
+  margin-top: var(--esp-2);
+  font-size: var(--texto-xs); line-height: var(--interlineado-xs);
+  font-weight: var(--peso-semi);
+  color: var(--color-warning-500);
+}
+.sobrepeso { color: var(--color-error-500); }

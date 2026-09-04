@@ -1,0 +1,17 @@
+/* Parte de la ficha 20: controles 28×28, radio 8. */
+.grupo { display: flex; flex-direction: column; gap: var(--esp-1); }
+.control {
+  width: 28px; height: 28px;
+  display: grid; place-items: center;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: rgba(252, 253, 253, 0.92);
+  color: var(--fg-strong);
+  transition: background var(--transicion-rapida), color var(--transicion-rapida);
+}
+.control:hover:not(:disabled) { background: var(--bg-surface); color: var(--action); }
+.control:active:not(:disabled) { transform: scale(0.94); }
+/* Anillo blanco: estos botones flotan sobre un mapa oscuro, donde un anillo
+   azul se pierde. */
+.control:focus-visible { outline: none; box-shadow: 0 0 0 2px #12161C, 0 0 0 4px #FFFFFF; }
+.control:disabled { color: var(--fg-muted); opacity: 0.5; cursor: not-allowed; }

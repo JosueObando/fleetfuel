@@ -1,0 +1,13 @@
+/* Ficha 21: tira horizontal desplazable, gap 12. */
+.tira {
+  display: flex; align-items: flex-start; gap: var(--esp-3);
+  padding: 0 var(--esp-6) var(--esp-4);
+  overflow-x: auto;
+  /* Sin esto, en móvil el desplazamiento horizontal se siente pegajoso. */
+  scroll-snap-type: x proximity;
+}
+.tira > * { scroll-snap-align: start; }
+.vacio {
+  padding: 0 var(--esp-6) var(--esp-4);
+  font-size: var(--texto-sm); color: var(--fg-muted);
+}

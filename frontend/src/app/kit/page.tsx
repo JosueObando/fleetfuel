@@ -1,6 +1,7 @@
 import estilos from './page.module.css';
 import { Chrome } from './Chrome';
 import { Tracking } from './Tracking';
+import { Detalle } from './Detalle';
 
 /*
  * Kit del sistema de diseño. Es el «equivalente a Storybook» del plan: una
@@ -106,6 +107,13 @@ export default function Kit() {
             Panel de tracking · 8 de 24
           </h2>
           <Tracking />
+        </section>
+
+        <section className={estilos.seccion}>
+          <h2 className={estilos.seccionTitulo}>
+            Panel de detalle · 11 de 24
+          </h2>
+          <Detalle />
         </section>
 
         <section className={estilos.seccion}>

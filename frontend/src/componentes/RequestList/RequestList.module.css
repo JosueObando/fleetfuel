@@ -1,0 +1,33 @@
+/* Ficha 23: filas de 56 px con solicitud, solicitante, hora y acciones.
+   Encabezado 15/20 semibold, margen superior 24. */
+.bloque { padding: 0 var(--esp-6) var(--esp-6); margin-top: var(--esp-6); }
+.titulo {
+  font-size: var(--texto-lg); line-height: var(--interlineado-lg);
+  font-weight: var(--peso-semi);
+  color: var(--fg-strong);
+  margin-bottom: var(--esp-3);
+}
+.lista { list-style: none; margin: 0; padding: 0; }
+.fila {
+  display: flex; align-items: center; gap: var(--esp-3);
+  height: 56px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.fila:last-child { border-bottom: none; }
+.textos { flex: 1; min-width: 0; }
+.solicitud {
+  font-size: var(--texto-md); line-height: var(--interlineado-md);
+  font-weight: var(--peso-medio);
+  color: var(--fg-strong);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.meta {
+  font-size: var(--texto-xs); line-height: var(--interlineado-xs);
+  color: var(--fg-muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.acciones { display: flex; gap: var(--esp-2); flex: 0 0 auto; }
+.resuelta { font-size: var(--texto-xs); font-weight: var(--peso-semi); }
+.aprobada { color: var(--color-success-500); }
+.rechazada { color: var(--color-error-500); }
+.vacio { font-size: var(--texto-sm); color: var(--fg-muted); }

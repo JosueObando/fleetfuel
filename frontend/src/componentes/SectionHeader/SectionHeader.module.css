@@ -1,0 +1,18 @@
+/* Ficha 19: título a la izquierda; a la derecha meta en línea y acción. */
+.barra {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--esp-3);
+  padding: var(--esp-6) var(--esp-6) var(--esp-3);
+  flex-wrap: wrap;
+}
+.titulo {
+  font-size: var(--texto-lg); line-height: var(--interlineado-lg);
+  font-weight: var(--peso-semi);
+  color: var(--fg-strong);
+}
+.derecha { display: flex; align-items: center; gap: var(--esp-3); }
+.meta {
+  font-size: var(--texto-sm); line-height: var(--interlineado-sm);
+  color: var(--fg-muted);
+  font-variant-numeric: tabular-nums;
+}
