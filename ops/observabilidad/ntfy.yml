@@ -1,0 +1,19 @@
+# ntfy autoalojado: el canal por donde salen las alertas.
+#
+# Se elige sobre Sentry/Better Stack y sobre ntfy.sh público por la MISMA razón
+# por la que la observabilidad es autoalojada: el texto de una alerta dice qué
+# sistema es, qué le pasa y cuándo. Aquí no sale de la red.
+base-url: http://10.0.0.193:3450
+listen-http: ":80"
+
+# Sin cuentas: quien conozca el nombre del tema recibe y publica. Es aceptable
+# porque el servidor NO está en internet —sólo en la LAN— y el tema lleva un
+# sufijo aleatorio. Si algún día se publica por el proxy, hay que activar
+# `auth-file` y `auth-default-access: deny-all`.
+behind-proxy: true
+
+# Los mensajes viven en disco para que un móvil que estaba apagado los reciba al
+# volver. Sin esto, una alerta de madrugada se pierde.
+cache-file: /var/lib/ntfy/cache.db
+cache-duration: 72h
+attachment-cache-dir: /var/lib/ntfy/adjuntos

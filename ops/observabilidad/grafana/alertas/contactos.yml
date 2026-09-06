@@ -1,0 +1,36 @@
+# Por dónde salen las alertas.
+#
+# Aprovisionado por fichero y no creado en la interfaz: un punto de contacto
+# hecho a mano vive sólo en el volumen de Grafana y se pierde al recrear el
+# contenedor — y con él, silenciosamente, la única vía por la que alguien se
+# entera de que producción se cayó.
+#
+# Apunta al traductor, no a ntfy directamente: Grafana manda SIEMPRE su JSON
+# completo y ntfy lo tomaría tal cual como texto de la notificación. Medido — el
+# móvil recibía `{"receiver":"ntfy","status":"firing","alerts":[{…`. El
+# traductor son treinta líneas en `ops/observabilidad/aviso/`.
+apiVersion: 1
+
+contactPoints:
+  - orgId: 1
+    name: ntfy
+    receivers:
+      - uid: ntfy-fleetfuel
+        type: webhook
+        settings:
+          url: http://aviso:8080
+          httpMethod: POST
+
+policies:
+  - orgId: 1
+    receiver: ntfy
+    # Se agrupa por alerta y severidad: ocho reglas distintas no pueden llegar
+    # como ocho avisos idénticos, y dos disparos de la MISMA regla sí deben
+    # juntarse en uno.
+    group_by: ['alertname', 'severidad']
+    # 30 s para que la primera llegue pronto; 5 min entre avisos del mismo
+    # grupo; 4 h antes de repetir algo que sigue igual. Repetir cada minuto es
+    # cómo se consigue que la gente silencie el canal.
+    group_wait: 30s
+    group_interval: 5m
+    repeat_interval: 4h

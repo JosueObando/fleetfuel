@@ -157,24 +157,60 @@ sabemos» sobre si el sitio está en pie no puede pasar por «bien». En las dem
 sin datos se trata como normal para no despertar a nadie porque un raspado se
 saltó.
 
-### Y esto es lo que falta: que te lleguen
+### Por dónde salen: ntfy autoalojado
 
-**Las alertas se disparan y quedan en Grafana, pero hoy no salen de ahí.** Se
-ven en *Alerting → Alert rules* y como anotaciones en el panel. Nadie recibe
-nada.
+**<http://10.0.0.193:3450>**, tema en `NTFY_TEMA` de `.env.observabilidad`.
 
-No está configurado porque las dos formas de arreglarlo necesitan una decisión
-que no es técnica:
+Se suscribe uno desde el navegador o desde la app de ntfy (Android/iOS) apuntando
+a ese servidor y ese tema. Los mensajes se guardan 72 h, así que un móvil apagado
+los recibe al volver: una alerta de madrugada no se pierde.
 
-- **Correo**, si tienes una cuenta SMTP. Es lo que no sale de tu control.
-  Grafana necesita `GF_SMTP_ENABLED`, servidor, usuario y clave en
-  `.env.observabilidad`, y un `contactPoints` aprovisionado al lado de las
-  reglas.
-- **Push a un servicio externo** (ntfy, Telegram, Gotify). Llega al móvil en
-  segundos y no necesita servidor de correo, pero el texto de la alerta sale de
-  la red — el mismo motivo por el que se descartó Sentry para los registros,
-  aunque aquí lo que sale es mucho menos: un título y un número.
+Se eligió autoalojado por lo mismo que la observabilidad entera —el texto de una
+alerta dice qué sistema es y qué le pasa— y porque los tipos de contacto nativos
+de Grafana que llegan a un móvil (Telegram, Discord, Slack, Pushover) son todos
+de terceros, y el de correo necesita un SMTP que este sistema no tiene.
 
-Mientras tanto, la alerta más útil de todas —«producción no responde»— es
-precisamente la que menos sirve sin canal: si el sitio está caído, nadie va a
-tener Grafana abierto para verlo.
+**El servidor no pide credenciales.** Es aceptable porque sólo está en la LAN y
+el tema lleva un sufijo aleatorio. Si algún día se publica por el proxy, hay que
+activar `auth-file` y `auth-default-access: deny-all` en `ntfy.yml`.
+
+### Las treinta líneas que hay en medio
+
+`ops/observabilidad/aviso/` traduce el aviso de Grafana a una notificación
+legible. Existe porque **Grafana no deja dar forma al cuerpo de un webhook**:
+manda siempre su JSON completo, y ntfy toma el cuerpo tal cual. Conectados
+directamente, al móvil llegaba esto —medido antes de escribir el traductor—:
+
+    {"receiver":"ntfy","status":"firing","alerts":[{"status":"firing",…
+
+Ahora llega un título, un cuerpo de una a cinco líneas y una prioridad: **5 para
+las críticas** —suena aunque el móvil esté en silencio—, 3 para los avisos y 2
+para las resoluciones, que nunca despiertan a nadie.
+
+Si ntfy falla, el traductor responde error a Grafana para que reintente y quede
+en SU registro. Una alerta que no sale no puede desaparecer en silencio, que es
+justo lo que este canal existe para impedir.
+
+**Publica con el tema dentro de un cuerpo JSON**, no con las cabeceras
+`Title`/`Priority`/`Tags` que ntfy también acepta. La primera versión usaba las
+cabeceras y seis de las ocho alertas llegaban con el título roto:
+
+    «Producci<?>n no responde»
+
+Los valores de cabecera HTTP no son UTF-8: Node los emite como bytes latin-1,
+ntfy los lee como UTF-8 y sustituye lo que no puede descodificar. Lo peor no es
+el destrozo sino que **ntfy respondía 200**, así que Grafana daba el envío por
+bueno y no había nada que mirar en ningún registro; sólo se veía en la pantalla
+del móvil. El cuerpo sí es UTF-8 por definición.
+
+Se encontró porque la alerta que se usó para probar el canal —«Un entorno
+interno no responde»— es una de las dos únicas sin tilde. Una prueba que pasa
+por el único caso sano no prueba nada, así que antes de darlo por bueno se
+mandó un título con tildes a propósito.
+
+### Agrupación
+
+Se agrupa por `alertname` y `severidad`, con 30 s de espera, 5 min entre avisos
+del mismo grupo y 4 h antes de repetir algo que sigue igual. Repetir cada minuto
+es cómo se consigue que alguien silencie el canal — y un canal silenciado es
+peor que no tenerlo, porque parece que está.

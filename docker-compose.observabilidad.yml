@@ -121,6 +121,44 @@ services:
       - ./ops/observabilidad/blackbox.yml:/etc/blackbox/blackbox.yml:ro
     networks: [observabilidad]
 
+  # El canal por donde salen las alertas. Autoalojado, como todo lo demás: el
+  # texto de una alerta dice qué sistema es y qué le pasa.
+  ntfy:
+    image: binwiederhier/ntfy:v2.11.0
+    container_name: fleetfuel_obs_ntfy
+    restart: unless-stopped
+    command: serve
+    volumes:
+      - ./ops/observabilidad/ntfy.yml:/etc/ntfy/server.yml:ro
+      - ntfy_data:/var/lib/ntfy
+    ports:
+      # En la LAN, para poder suscribirse desde el móvil o el navegador.
+      - "${NTFY_PUERTO:-3450}:80"
+    networks: [observabilidad]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://localhost/v1/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+
+  # Treinta líneas entre Grafana y ntfy. Grafana no deja dar forma al cuerpo de
+  # un webhook y ntfy toma el cuerpo tal cual, así que sin esto la notificación
+  # que llega al móvil es el JSON completo de Grafana. Medido.
+  aviso:
+    image: node:22-alpine
+    container_name: fleetfuel_obs_aviso
+    restart: unless-stopped
+    command: node /app/servidor.mjs
+    volumes:
+      - ./ops/observabilidad/aviso:/app:ro
+    environment:
+      NTFY_URL: http://ntfy
+      NTFY_TEMA: ${NTFY_TEMA:?Hay que definir NTFY_TEMA en .env.observabilidad}
+    depends_on:
+      ntfy:
+        condition: service_healthy
+    networks: [observabilidad]
+
   grafana:
     image: grafana/grafana:11.3.1
     container_name: fleetfuel_obs_grafana
@@ -134,6 +172,9 @@ services:
       GF_AUTH_ANONYMOUS_ENABLED: 'false'
       GF_ANALYTICS_REPORTING_ENABLED: 'false'
       GF_ANALYTICS_CHECK_FOR_UPDATES: 'false'
+      # El tema de ntfy llega por entorno para que el fichero aprovisionado
+      # —que sí se versiona— no lo lleve dentro.
+      NTFY_TEMA: ${NTFY_TEMA:?Hay que definir NTFY_TEMA en .env.observabilidad}
     volumes:
       - ./ops/observabilidad/grafana/fuentes:/etc/grafana/provisioning/datasources:ro
       - ./ops/observabilidad/grafana/paneles:/etc/grafana/provisioning/dashboards:ro
@@ -147,6 +188,8 @@ services:
     depends_on:
       loki:
         condition: service_healthy
+      ntfy:
+        condition: service_healthy
     networks: [observabilidad]
 
 networks:
@@ -154,6 +197,7 @@ networks:
     name: fleetfuel_observabilidad
 
 volumes:
+  ntfy_data:
   loki_data:
   promtail_data:
   prometheus_data:

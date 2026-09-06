@@ -332,9 +332,22 @@ curl -s localhost:4100/api/salud | jq
 > registros — la ausencia también se produce con el timer parado o la máquina
 > caída, y en los tres casos parece que todo va bien.
 >
-> **Lo que falta, y es lo único:** un canal por donde lleguen. Hoy se disparan y
-> se quedan en Grafana. Necesita una cuenta SMTP o aceptar un servicio de push
-> externo, y las dos son decisiones del usuario, no técnicas.
+> **El canal, cerrado** (2026-09-06): ntfy autoalojado en el 3450, con un
+> traductor de treinta líneas en medio porque Grafana no deja dar forma al
+> cuerpo de un webhook y, conectado directo, al móvil llegaba su JSON en crudo.
+> Se descartó el correo (no hay SMTP) y los tipos de contacto nativos que llegan
+> a un móvil (Telegram, Discord, Slack, Pushover) por ser todos de terceros — el
+> mismo motivo por el que la observabilidad entera es autoalojada.
+>
+> Verificado extremo a extremo parando el backend de desarrollo: disparó a los
+> 5 min y la notificación llegó a los 6 con título, causa y qué mirar; al
+> restaurarlo llegó la resolución con prioridad baja, que no despierta a nadie.
+>
+> Por el camino apareció un fallo que la propia prueba habría tapado: el título
+> viajaba en una cabecera HTTP, que no es UTF-8, y las seis alertas con tilde
+> llegaban como «Producci<?>n no responde» — con ntfy respondiendo 200, así que
+> no había rastro en ningún registro. La alerta elegida para probar era una de
+> las dos sin tilde. Se arregló publicando por cuerpo JSON.
 
 ### 0.7 · Respaldo del repositorio — ✅ (2026-09-03)
 
