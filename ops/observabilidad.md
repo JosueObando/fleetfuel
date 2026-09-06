@@ -208,6 +208,34 @@ interno no responde»— es una de las dos únicas sin tilde. Una prueba que pas
 por el único caso sano no prueba nada, así que antes de darlo por bueno se
 mandó un título con tildes a propósito.
 
+### Cómo se prueba todo esto
+
+    node --test ops/observabilidad/aviso/servidor.test.mjs ops/observabilidad/reglas.test.mjs
+
+24 pruebas, sin dependencias —el runner que trae Node— y en menos de medio
+segundo. Corren en CI en el trabajo `observabilidad`, con un trinquete de
+cobertura del 90 % de líneas y 85 % de ramas sobre lo medido (98 % y 92 %).
+
+Hasta el 2026-09-06 `ops/` era el único código del repositorio fuera de todo
+informe de cobertura: 690 líneas cuyo 0 % no aparecía en ningún porcentaje y por
+tanto no se echaba de menos. El traductor se desplegó sin una sola prueba y con
+el fallo del UTF-8 dentro.
+
+Las de `servidor.test.mjs` cubren lo que sólo ocurre cuando algo va mal, que es
+donde vive el traductor entero: resolución, grupos de más de cinco, alertas sin
+`summary`, cuerpos que no son JSON, y ntfy devolviendo error —donde lo que se
+afirma es que el traductor responde 502 y NO 204, para que Grafana reintente en
+vez de dar el aviso por entregado.
+
+`reglas.test.mjs` ata las reglas al traductor: que toda `severidad` declarada
+sea una que sepa leer, que ninguna regla se quede sin `summary` ni
+`description`, que los títulos reales con tilde sobrevivan el viaje, y que el
+punto de contacto siga apuntando al traductor y no directo a ntfy.
+
+**Una severidad que el traductor no reconoce escala a crítica**, no cae a aviso.
+Ante una etiqueta ilegible los dos errores no cuestan lo mismo: escalar de más
+molesta una vez; escalar de menos silencia una caída.
+
 ### Agrupación
 
 Se agrupa por `alertname` y `severidad`, con 30 s de espera, 5 min entre avisos

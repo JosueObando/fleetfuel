@@ -106,6 +106,34 @@ jobs:
       - name: Build
         run: npm run build
 
+  # ── Observabilidad: el canal de alertas ───────────────────────────────────
+  #
+  # Existe porque `ops/` era el único código del repositorio fuera de todo
+  # informe de cobertura: 690 líneas cuyo 0 % no aparecía en ningún porcentaje
+  # y por tanto no se echaba de menos. El traductor de avisos se desplegó el
+  # 2026-09-06 sin una sola prueba y con un fallo dentro —el título viajaba en
+  # una cabecera HTTP, que no es UTF-8, y las seis alertas con tilde llegaban
+  # rotas mientras ntfy respondía 200—. Se encontró a mano, mirando el móvil.
+  #
+  # No necesita `npm ci`: el traductor no tiene dependencias y estas pruebas
+  # usan el runner que trae Node. Por eso el trabajo tarda segundos, y por eso
+  # no hay excusa para no tenerlo.
+  observabilidad:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+
+      # El umbral está por debajo de lo medido (98/92/86) a propósito: es un
+      # suelo que impide borrar las pruebas, no una meta que perseguir.
+      - name: Pruebas del traductor de avisos y contrato de las reglas
+        run: >
+          node --test --experimental-test-coverage
+          --test-coverage-exclude='**/*.test.mjs'
+          --test-coverage-lines=90 --test-coverage-branches=85 --test-coverage-functions=80
+          ops/observabilidad/aviso/servidor.test.mjs ops/observabilidad/reglas.test.mjs
+
   # ── Recorridos de extremo a extremo ──────────────────────────────────────
   #
   # Estuvieron fuera de CI hasta el 2026-09-06, y no por el entorno: en Actions
