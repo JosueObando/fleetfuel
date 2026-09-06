@@ -88,7 +88,7 @@ export function crearServidor({ ntfy = NTFY, tema = TEMA } = {}) {
            Title/Priority/Tags que ntfy también acepta, por una razón medida: los
            valores de cabecera HTTP no son UTF-8. Node los emite como bytes
            latin-1, ntfy los lee como UTF-8 y sustituye lo que no puede
-           descodificar. Seis de las ocho alertas tienen tilde en el título, y por
+           descodificar. Seis de las ocho alertas de entonces tenían tilde, y por
            cabecera llegaban así:
                «Producci\uFFFDn no responde»
            ntfy respondía 200 y Grafana daba el envío por bueno: el destrozo sólo

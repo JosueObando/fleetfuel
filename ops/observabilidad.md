@@ -193,7 +193,7 @@ justo lo que este canal existe para impedir.
 
 **Publica con el tema dentro de un cuerpo JSON**, no con las cabeceras
 `Title`/`Priority`/`Tags` que ntfy también acepta. La primera versión usaba las
-cabeceras y seis de las ocho alertas llegaban con el título roto:
+cabeceras y seis de las ocho alertas que había entonces llegaban con el título roto:
 
     «Producci<?>n no responde»
 
@@ -227,7 +227,9 @@ donde vive el traductor entero: resolución, grupos de más de cinco, alertas si
 afirma es que el traductor responde 502 y NO 204, para que Grafana reintente en
 vez de dar el aviso por entregado.
 
-`reglas.test.mjs` ata las reglas al traductor: que toda `severidad` declarada
+`reglas.test.mjs` ata las reglas al traductor: que sigan siendo nueve —añadir
+una hace fallar la prueba a propósito, que es el aviso de que hay una alerta que
+nadie ha mirado—, que toda `severidad` declarada
 sea una que sepa leer, que ninguna regla se quede sin `summary` ni
 `description`, que los títulos reales con tilde sobrevivan el viaje, y que el
 punto de contacto siga apuntando al traductor y no directo a ntfy.

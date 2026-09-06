@@ -182,6 +182,56 @@ groups:
     labels:
       severidad: critico
       sistema: fleetfuel
+  - uid: ff-respaldo-fallo
+    title: El último respaldo terminó mal
+    condition: C
+    # El valor sólo cambia una vez al día, cuando corre el timer. Los 5 minutos
+    # no esperan a confirmar nada: cubren el hueco entre que el guion escribe el
+    # fichero y node-exporter lo sirve.
+    for: 5m
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: A
+        expr: min(fleetfuel_respaldo_exito)
+        instant: true
+    - refId: B
+      datasourceUid: __expr__
+      model:
+        refId: B
+        type: reduce
+        expression: A
+        reducer: last
+        settings:
+          mode: dropNN
+    - refId: C
+      datasourceUid: __expr__
+      model:
+        refId: C
+        type: threshold
+        expression: B
+        conditions:
+        - evaluator:
+            type: lt
+            params:
+            - 1
+    # OK y no Alerting: la ausencia del dato ya la cubre ff-respaldo-viejo por
+    # antigüedad. Poner Alerting aquí haría que las dos saltaran por lo mismo.
+    noDataState: OK
+    execErrState: Error
+    annotations:
+      summary: El intento de respaldo de esta noche no terminó bien
+      description: 'Avisa la misma noche, en vez de esperar a las 26 horas de ff-respaldo-viejo. El paso
+        exacto que falló está en el registro: journalctl --user -u respaldo-fleetfuel.service -n 40, o
+        en Loki filtrando por «el respaldo falló en el paso». Si mañana sigue roto saltará además la
+        crítica por antigüedad.'
+    labels:
+      severidad: aviso
+      sistema: fleetfuel
   - uid: ff-disco-lleno
     title: El disco raíz se está llenando
     condition: C

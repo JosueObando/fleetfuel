@@ -318,11 +318,17 @@ curl -s localhost:4100/api/salud | jq
 > etiquetadas con el cgroup en crudo en vez del nombre — datos correctos e
 > ilegibles. Detalle completo en `ops/observabilidad.md`.
 >
-> **Ocho alertas** (2026-09-06), aprovisionadas por fichero: producción caída,
-> un entorno interno caído, certificado a menos de 21 días, respaldo sin
-> terminar bien en 26 h, disco >85 %, memoria <10 %, 5xx sostenidos y el freno
-> del login mordiendo. Verificadas parando el backend de desarrollo: disparó a
-> los 6 minutos y se resolvió sola al restaurarlo.
+> **Nueve alertas** (2026-09-06), aprovisionadas por fichero: producción caída,
+> un entorno interno caído, certificado a menos de 21 días, respaldo fallido
+> esta noche, respaldo sin terminar bien en 26 h, disco >85 %, memoria <10 %,
+> 5xx sostenidos y el freno del login mordiendo. Verificadas parando el backend
+> de desarrollo: disparó a los 6 minutos y se resolvió sola al restaurarlo.
+>
+> Las dos del respaldo forman escalera a propósito: aviso la misma noche por
+> `fleetfuel_respaldo_exito`, y crítica al día siguiente por antigüedad. La
+> segunda cubre además lo que la primera no puede —el timer parado o la máquina
+> apagada—, porque en esos dos casos la métrica no se escribe y no hay fallo que
+> detectar, sólo una ausencia.
 >
 > Dos decisiones que las sostienen. Las **sondas van desde fuera**, por la misma
 > URL que usa un usuario, y recorren DNS, proxy, TLS, cortafuegos y aplicación:

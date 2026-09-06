@@ -71,13 +71,24 @@ limpiar() {
 trap limpiar EXIT
 
 # ── Manejo de fallos ─────────────────────────────────────────────────────────
-# TODO(josue): implementar. Ver la nota al final del archivo.
-notificar_fallo() {
+#
+# Esto era un cuerpo vacío con un TODO que remitía a «la nota al final del
+# archivo», nota que tampoco existía. El trap llamaba a una función que no hacía
+# nada, así que el guion SE LEÍA como si los fallos se notificaran. Una ausencia
+# visible es mejor que una presencia falsa: lo segundo es confianza mal puesta.
+#
+# No notifica por su cuenta a propósito. Ya existe un canal —Grafana → ntfy— con
+# agrupación, silenciado y prioridades; una segunda vía por curl desde aquí se
+# lo saltaría entero y no habría forma de callarla salvo editando este fichero.
+# El aviso sale por la métrica que publica el bloque final, sobre la que alerta
+# `ff-respaldo-fallo`. Lo que aporta esta función es lo único que la métrica no
+# puede llevar: EN QUÉ PASO se rompió, al registro, donde promtail lo recoge.
+registrar_fallo() {
     local paso="$1" codigo="$2"
-    :
+    log "ERROR: el respaldo falló en el paso «$paso» (código $codigo)"
 }
 
-trap 'notificar_fallo "${PASO_ACTUAL:-desconocido}" "$?"' ERR
+trap 'registrar_fallo "${PASO_ACTUAL:-desconocido}" "$?"' ERR
 
 # ── 1 · Volcado ──────────────────────────────────────────────────────────────
 volcar() {

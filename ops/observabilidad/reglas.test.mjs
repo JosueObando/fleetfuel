@@ -40,12 +40,19 @@ function reglas() {
 }
 
 describe('las reglas de alerta y el traductor hablan el mismo idioma', () => {
-  test('se leen las ocho reglas (si esto falla, el resto del fichero miente)', () => {
+  test('se leen las nueve reglas (si esto falla, el resto del fichero miente)', () => {
     // La red bajo la extracción a mano: cualquier cambio de forma del YAML que
     // deje de encajar aparece aquí y no como una suite que pasa sin mirar nada.
+    // Añadir una regla hace fallar esta prueba a propósito: es el aviso de que
+    // hay una alerta nueva que nadie ha mirado.
     const encontradas = reglas();
-    assert.equal(encontradas.length, 8);
-    assert.equal(encontradas.length, yaml('grafana/alertas/reglas.yml').match(/\n {2}- uid: /g).length);
+    assert.equal(encontradas.length, 9);
+    // El contraste se hace contra los `title:`, que es una marca INDEPENDIENTE
+    // de los `- uid:` sobre los que se parte. Compararlo contra otro recuento
+    // de `- uid:` —como hacía la primera versión— es contarse a uno mismo: si
+    // el separador dejara de encajar, ambos lados darían cero y pasaría.
+    const titulos = yaml('grafana/alertas/reglas.yml').match(/\n {4}title: /g) ?? [];
+    assert.equal(encontradas.length, titulos.length);
   });
 
   test('toda regla declara una severidad que el traductor entiende', () => {
