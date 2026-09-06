@@ -170,22 +170,23 @@ Contra NPM ya configurado, sobre `https://fleetfuel.jop.lat`. Y que el puerto
 
 ## El límite del login
 
-`rate=10r/m`, `burst=30 nodelay`, respuesta `429`. Ráfaga generosa y ritmo
+`rate=10r/m`, `burst=10 nodelay`, respuesta `429`. Ráfaga generosa y ritmo
 corto, porque el pico legítimo (entrar, teclear mal el TOTP que rota cada 30
 segundos, reintentar, recargar — y varios usuarios tras un mismo NAT contados
 como **una** dirección) tiene forma de ráfaga, mientras que el ataque tiene
 forma de ritmo sostenido.
 
-Con pocos usuarios, `burst=30` sobra: bajarlo a 10 no molestaría a nadie y
-regalaría menos intentos. Pendiente de decidir.
+Empezó en `burst=30`, razonando sobre un pico de veinte personas entrando a la
+vez. Esa premisa era falsa —el sistema tiene pocos usuarios—, así que bajó a
+**10** el 2026-09-06: no molesta a nadie y regala tres veces menos intentos.
+Si algún día el pico real se queda corto, lo que se sube es el burst, no el
+rate.
 
 Importa porque `POST /auth/login` lleva **los dos factores** en el mismo
 cuerpo, y no hay nada más detrás: ni `@nestjs/throttler`, ni bloqueo por
 intentos, ni marca de código ya usado en el `authenticator.check` de otplib.
 
-Probado: 40 peticiones seguidas dan 32 pasos y 429 el resto, sin afectar a
-`/api/salud` ni a `/entrar`. Si 30 se queda corto en el pico real, se sube el
-**burst**, no el rate.
+Probado con el nginx desechable, sin afectar a `/api/salud` ni a `/entrar`.
 
 `/auth/refrescar` queda fuera a propósito: cada sesión lo llama cada 15
 minutos, un límite ahí no para a nadie y expulsaría a la gente a media jornada.

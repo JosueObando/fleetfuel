@@ -135,7 +135,7 @@ CUERPO=$(jq -nc \
     forward_scheme: "http",
     forward_host: $h,
     forward_port: $pa,
-    advanced_config: "limit_req zone=login burst=30 nodelay;\nlimit_req_status 429;"
+    advanced_config: "limit_req zone=login burst=10 nodelay;\nlimit_req_status 429;"
   }]
 }')
 
