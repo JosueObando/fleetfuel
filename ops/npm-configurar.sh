@@ -95,11 +95,20 @@ if [[ ${1:-} == --quitar-limite ]]; then
 
   # Se reenvia el objeto entero sin los campos de solo lectura, con el
   # advanced_config de cada location vaciado.
-  NUEVO=$(jq -c '{
+  # `b` normaliza los booleanos: NPM los guarda como tinyint y, segun version,
+  # puede devolverlos como 0/1. El esquema del PUT espera booleanos, asi que
+  # reenviar el 1 tal cual se llevaria un 400 por un detalle invisible.
+  NUEVO=$(jq -c 'def b: if type=="number" then . != 0 else . end;
+  {
     domain_names, forward_scheme, forward_host, forward_port,
-    caching_enabled, block_exploits, allow_websocket_upgrade,
-    access_list_id, certificate_id, ssl_forced, http2_support,
-    hsts_enabled, hsts_subdomains,
+    access_list_id, certificate_id,
+    caching_enabled:         (.caching_enabled|b),
+    block_exploits:          (.block_exploits|b),
+    allow_websocket_upgrade: (.allow_websocket_upgrade|b),
+    ssl_forced:              (.ssl_forced|b),
+    http2_support:           (.http2_support|b),
+    hsts_enabled:            (.hsts_enabled|b),
+    hsts_subdomains:         (.hsts_subdomains|b),
     advanced_config: "",
     locations: [ .locations[] | .advanced_config = "" ],
     meta
