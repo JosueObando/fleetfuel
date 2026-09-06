@@ -44,3 +44,24 @@ scrape_configs:
       - labels:
           nivel:
           tipo:
+
+  # El journal del sistema. Sin esto hay un agujero concreto: el respaldo diario
+  # de Postgres corre por un timer de systemd, NO en un contenedor, así que sus
+  # líneas no pasaban por aquí. Un respaldo que deja de correr en silencio es el
+  # peor de los fallos silenciosos: se descubre el día que hace falta restaurar.
+  - job_name: journal
+    journal:
+      path: /var/log/journal
+      max_age: 24h
+      labels:
+        tipo: journal
+    relabel_configs:
+      # Las unidades de sistema y las de usuario van en campos distintos; el
+      # respaldo es de USUARIO (`systemctl --user`), que es justo el que se
+      # olvida al configurar esto.
+      - source_labels: ['__journal__systemd_unit']
+        target_label: unidad
+      - source_labels: ['__journal__systemd_user_unit']
+        target_label: unidad
+      - source_labels: ['__journal_syslog_identifier']
+        target_label: programa

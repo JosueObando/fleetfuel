@@ -22,3 +22,29 @@ scrape_configs:
   - job_name: prometheus
     static_configs:
       - targets: ['localhost:9090']
+
+  # Sondas desde fuera, por la MISMA URL que usa un usuario. Recorren la cadena
+  # entera —DNS, proxy, TLS, cortafuegos, aplicación— y por eso ven cosas que
+  # ningún healthcheck interno ve: esta mañana el backend estaba sano y el sitio
+  # colgado, porque el cortafuegos se comía las respuestas del proxy.
+  #
+  # Producción SÓLO por su URL pública: los puertos 4200/3200 están cerrados a
+  # todo lo que no sea el proxy, así que sondearlos directamente daría un fallo
+  # permanente y falso.
+  - job_name: sondas
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+          - https://fleetfuel.jop.lat/api/salud
+          - https://fleetfuel.jop.lat/entrar
+          - http://10.0.0.193:4300/api/salud
+          - http://10.0.0.193:4100/api/salud
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: destino
+      - target_label: __address__
+        replacement: blackbox:9115

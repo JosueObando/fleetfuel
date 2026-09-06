@@ -90,9 +90,7 @@ en la máquina», que es la pregunta que de verdad importa aquí. Para el «cuá
 `docker stats` sigue respondiendo en el momento. Revisar cuando cAdvisor
 soporte el snapshotter de Docker.
 
-**Alertas.** Grafana las trae y no hay ninguna configurada. Los dos primeros
-candidatos, cuando haga falta: disco raíz por encima del 85 % y 5xx sostenidos
-en producción.
+**Un canal por donde te lleguen las alertas.** Ver más abajo.
 
 ## Si el disco empieza a crecer
 
@@ -107,3 +105,76 @@ Para acortar la retención, `limits_config.retention_period` en
 `ops/observabilidad/loki.yml`. **`compactor.retention_enabled` tiene que seguir
 en `true`**: sin eso la retención marca pero no borra, y el disco se llena
 meses después de dar el asunto por resuelto.
+
+## Alertas
+
+Ocho reglas, aprovisionadas por fichero en
+`ops/observabilidad/grafana/alertas/reglas.yml`. Se evalúan cada minuto; lo que
+evita el ruido no es el intervalo sino la **espera** de cada una: una alerta que
+salta con un pico de un minuto se aprende a ignorar, y una alerta que se ignora
+no es una alerta.
+
+| Alerta | Salta cuando | Espera |
+|---|---|---|
+| **Producción no responde** | la sonda contra `fleetfuel.jop.lat` falla | 3 min |
+| **Un entorno interno no responde** | desarrollo o prueba caídos | 5 min |
+| **El certificado TLS caduca pronto** | quedan menos de 21 días | 1 h |
+| **El respaldo no termina bien** | más de 26 h del último verificado | 10 min |
+| **El disco raíz se está llenando** | por encima del 85 % | 15 min |
+| **Queda poca memoria** | menos del 10 % disponible | 15 min |
+| **5xx en producción** | más de 5 en 10 minutos | 5 min |
+| **El freno del login está mordiendo** | más de 20 respuestas 429 en 10 minutos | 5 min |
+
+Cada una lleva en su descripción el comando concreto por donde empezar a mirar.
+
+### Las tres decisiones que no son obvias
+
+**Las sondas van desde fuera, por la misma URL que usa un usuario.** Recorren la
+cadena entera —DNS, proxy, TLS, cortafuegos, aplicación— y por eso ven lo que
+ningún healthcheck interno ve: la mañana del 2026-09-06 el backend estaba sano y
+el sitio colgado, porque la regla del cortafuegos se comía las respuestas del
+proxy. Un healthcheck que pregunta «¿estoy vivo?» habría dicho que sí.
+
+Producción se sondea **sólo** por su URL pública. Sus puertos 4200/3200 están
+cerrados a todo lo que no sea el proxy, así que sondearlos directo daría un
+fallo permanente y falso.
+
+**El respaldo afirma su éxito; no se busca la ausencia de un error.** Vigilar un
+trabajo por lotes buscando que no aparezca un error en los registros falla en
+tres casos que parecen iguales: que el trabajo falle, que el timer esté parado y
+que la máquina estuviera caída a esa hora. Por eso `respaldo-postgres.sh`
+escribe `fleetfuel_respaldo_ultimo_exito_timestamp` en
+`~/respaldos/metricas/respaldo.prom`, que node-exporter publica por su colector
+*textfile*. La alerta pregunta «¿cuánto hace del último respaldo **bueno**?» —
+una afirmación positiva, que sólo puede envejecer. Se escribe con `mv` porque
+node-exporter lee ese directorio en cada raspado y un fichero a medio escribir
+daría una métrica truncada.
+
+**«Sin datos» es alerta en dos reglas, no silencio.** En «Producción no
+responde» y en «El respaldo no termina bien», que Prometheus deje de recibir la
+métrica no significa que todo vaya bien: significa que no lo sabemos. Y «no lo
+sabemos» sobre si el sitio está en pie no puede pasar por «bien». En las demás,
+sin datos se trata como normal para no despertar a nadie porque un raspado se
+saltó.
+
+### Y esto es lo que falta: que te lleguen
+
+**Las alertas se disparan y quedan en Grafana, pero hoy no salen de ahí.** Se
+ven en *Alerting → Alert rules* y como anotaciones en el panel. Nadie recibe
+nada.
+
+No está configurado porque las dos formas de arreglarlo necesitan una decisión
+que no es técnica:
+
+- **Correo**, si tienes una cuenta SMTP. Es lo que no sale de tu control.
+  Grafana necesita `GF_SMTP_ENABLED`, servidor, usuario y clave en
+  `.env.observabilidad`, y un `contactPoints` aprovisionado al lado de las
+  reglas.
+- **Push a un servicio externo** (ntfy, Telegram, Gotify). Llega al móvil en
+  segundos y no necesita servidor de correo, pero el texto de la alerta sale de
+  la red — el mismo motivo por el que se descartó Sentry para los registros,
+  aunque aquí lo que sale es mucho menos: un título y un número.
+
+Mientras tanto, la alerta más útil de todas —«producción no responde»— es
+precisamente la que menos sirve sin canal: si el sitio está caído, nadie va a
+tener Grafana abierto para verlo.

@@ -1,0 +1,14 @@
+# Sondas desde FUERA de la aplicación. Es la diferencia entre «el proceso está
+# vivo» y «el sitio funciona»: lo que se cayó esta mañana no fue el backend
+# —seguía sano— sino el camino hasta él, y ningún healthcheck interno lo vio.
+modules:
+  http_2xx:
+    prober: http
+    timeout: 10s
+    http:
+      valid_status_codes: [200]
+      method: GET
+      # Sigue redirecciones: la raíz de producción responde 307 hacia /tablero,
+      # y sin esto la sonda lo tomaría por un fallo.
+      follow_redirects: true
+      preferred_ip_protocol: ip4

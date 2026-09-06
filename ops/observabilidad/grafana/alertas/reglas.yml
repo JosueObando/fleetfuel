@@ -1,0 +1,364 @@
+apiVersion: 1
+groups:
+- orgId: 1
+  name: FleetFuel
+  folder: FleetFuel
+  interval: 1m
+  rules:
+  - uid: ff-produccion-caida
+    title: Producción no responde
+    condition: C
+    for: 3m
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: A
+        expr: min(probe_success{destino=~"https://fleetfuel.jop.lat.*"})
+        instant: true
+    - refId: B
+      datasourceUid: __expr__
+      model:
+        refId: B
+        type: reduce
+        expression: A
+        reducer: last
+        settings:
+          mode: dropNN
+    - refId: C
+      datasourceUid: __expr__
+      model:
+        refId: C
+        type: threshold
+        expression: B
+        conditions:
+        - evaluator:
+            type: lt
+            params:
+            - 1
+    noDataState: Alerting
+    execErrState: Error
+    annotations:
+      summary: El sitio público no responde
+      description: 'La sonda contra https://fleetfuel.jop.lat falla. Recorre la cadena entera —DNS, proxy,
+        TLS, cortafuegos, aplicación—, así que el fallo puede estar en cualquiera de los cinco. Empezar
+        por: curl -sf https://fleetfuel.jop.lat/api/salud, y si cuelga sin error, mirar las reglas de
+        DOCKER-USER (ops/cerrar-puertos-produccion.sh --revisar).'
+    labels:
+      severidad: critico
+      sistema: fleetfuel
+  - uid: ff-entorno-interno-caido
+    title: Un entorno interno no responde
+    condition: C
+    for: 5m
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: A
+        expr: min(probe_success{destino=~"http://10.0.0.193.*"})
+        instant: true
+    - refId: B
+      datasourceUid: __expr__
+      model:
+        refId: B
+        type: reduce
+        expression: A
+        reducer: last
+        settings:
+          mode: dropNN
+    - refId: C
+      datasourceUid: __expr__
+      model:
+        refId: C
+        type: threshold
+        expression: B
+        conditions:
+        - evaluator:
+            type: lt
+            params:
+            - 1
+    noDataState: OK
+    execErrState: Error
+    annotations:
+      summary: Desarrollo o prueba no responde
+      description: No corta la operación, pero prueba caído significa que el próximo despliegue se ensayaría
+        directamente en producción.
+    labels:
+      severidad: aviso
+      sistema: fleetfuel
+  - uid: ff-certificado-caduca
+    title: El certificado TLS caduca pronto
+    condition: C
+    for: 1h
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: A
+        expr: min((probe_ssl_earliest_cert_expiry - time()) / 86400)
+        instant: true
+    - refId: B
+      datasourceUid: __expr__
+      model:
+        refId: B
+        type: reduce
+        expression: A
+        reducer: last
+        settings:
+          mode: dropNN
+    - refId: C
+      datasourceUid: __expr__
+      model:
+        refId: C
+        type: threshold
+        expression: B
+        conditions:
+        - evaluator:
+            type: lt
+            params:
+            - 21
+    noDataState: OK
+    execErrState: Error
+    annotations:
+      summary: Quedan menos de 21 días de certificado
+      description: El comodín *.jop.lat lo renueva solo el Nginx Proxy Manager de 10.0.0.19 por reto DNS-01.
+        Que esto salte significa que la renovación automática dejó de funcionar, y quedan tres semanas
+        para arreglarlo antes de que el sitio deje de cargar en cualquier navegador.
+    labels:
+      severidad: aviso
+      sistema: fleetfuel
+  - uid: ff-respaldo-viejo
+    title: El respaldo no termina bien desde hace más de un día
+    condition: C
+    for: 10m
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: A
+        expr: (time() - max(fleetfuel_respaldo_ultimo_exito_timestamp)) / 3600
+        instant: true
+    - refId: B
+      datasourceUid: __expr__
+      model:
+        refId: B
+        type: reduce
+        expression: A
+        reducer: last
+        settings:
+          mode: dropNN
+    - refId: C
+      datasourceUid: __expr__
+      model:
+        refId: C
+        type: threshold
+        expression: B
+        conditions:
+        - evaluator:
+            type: gt
+            params:
+            - 26
+    noDataState: Alerting
+    execErrState: Error
+    annotations:
+      summary: Hace más de 26 horas del último respaldo verificado
+      description: 'El timer corre a las 02:00; 26 horas dan margen para un arranque tardío. Cubre los
+        tres fallos a la vez: que el respaldo falle, que el timer esté parado y que la máquina estuviera
+        caída a esa hora. Revisar con: systemctl --user status respaldo-fleetfuel.timer y journalctl --user
+        -u respaldo-fleetfuel.service -n 30'
+    labels:
+      severidad: critico
+      sistema: fleetfuel
+  - uid: ff-disco-lleno
+    title: El disco raíz se está llenando
+    condition: C
+    for: 15m
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: A
+        expr: 100 - (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}
+          * 100)
+        instant: true
+    - refId: B
+      datasourceUid: __expr__
+      model:
+        refId: B
+        type: reduce
+        expression: A
+        reducer: last
+        settings:
+          mode: dropNN
+    - refId: C
+      datasourceUid: __expr__
+      model:
+        refId: C
+        type: threshold
+        expression: B
+        conditions:
+        - evaluator:
+            type: gt
+            params:
+            - 85
+    noDataState: OK
+    execErrState: Error
+    annotations:
+      summary: Disco raíz por encima del 85 %
+      description: Aquí escriben Postgres, los respaldos, Loki y Prometheus. Loki y Prometheus retienen
+        30 días; Prometheus además tiene tope de 2 GB, Loki no. Ver ops/observabilidad.md, sección «Si
+        el disco empieza a crecer».
+    labels:
+      severidad: aviso
+      sistema: fleetfuel
+  - uid: ff-memoria-baja
+    title: Queda poca memoria en la máquina
+    condition: C
+    for: 15m
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: A
+        expr: node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes * 100
+        instant: true
+    - refId: B
+      datasourceUid: __expr__
+      model:
+        refId: B
+        type: reduce
+        expression: A
+        reducer: last
+        settings:
+          mode: dropNN
+    - refId: C
+      datasourceUid: __expr__
+      model:
+        refId: C
+        type: threshold
+        expression: B
+        conditions:
+        - evaluator:
+            type: lt
+            params:
+            - 10
+    noDataState: OK
+    execErrState: Error
+    annotations:
+      summary: Menos del 10 % de memoria disponible
+      description: Tres entornos y el stack de observabilidad conviven en esta máquina. Si esto salta
+        de forma sostenida, la salida no es apagar la observabilidad —es subirle RAM a la VM o retirar
+        el entorno de prueba, que es el prescindible.
+    labels:
+      severidad: aviso
+      sistema: fleetfuel
+  - uid: ff-errores-5xx
+    title: Producción está devolviendo errores de servidor
+    condition: C
+    for: 5m
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 900
+        to: 0
+      datasourceUid: loki
+      model:
+        refId: A
+        expr: sum(count_over_time({tipo="peticion", nivel="error", entorno="fleetfuel-prod"}[10m]))
+        instant: false
+        queryType: range
+    - refId: B
+      datasourceUid: __expr__
+      model:
+        refId: B
+        type: reduce
+        expression: A
+        reducer: last
+        settings:
+          mode: dropNN
+    - refId: C
+      datasourceUid: __expr__
+      model:
+        refId: C
+        type: threshold
+        expression: B
+        conditions:
+        - evaluator:
+            type: gt
+            params:
+            - 5
+    noDataState: OK
+    execErrState: Error
+    annotations:
+      summary: Más de 5 respuestas 5xx en 10 minutos
+      description: 'Un 5xx es un fallo del servidor, no del cliente. Para ver cuáles: {tipo="peticion",
+        nivel="error", entorno="fleetfuel-prod"} en Grafana. Cada línea trae su idPeticion, que también
+        viajó al cliente en la cabecera X-Request-Id.'
+    labels:
+      severidad: critico
+      sistema: fleetfuel
+  - uid: ff-login-atacado
+    title: El freno del login está mordiendo
+    condition: C
+    for: 5m
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 900
+        to: 0
+      datasourceUid: loki
+      model:
+        refId: A
+        expr: sum(count_over_time({tipo="peticion"} | json | ruta="/api/auth/login" | estado=429 [10m]))
+        instant: false
+        queryType: range
+    - refId: B
+      datasourceUid: __expr__
+      model:
+        refId: B
+        type: reduce
+        expression: A
+        reducer: last
+        settings:
+          mode: dropNN
+    - refId: C
+      datasourceUid: __expr__
+      model:
+        refId: C
+        type: threshold
+        expression: B
+        conditions:
+        - evaluator:
+            type: gt
+            params:
+            - 20
+    noDataState: OK
+    execErrState: Error
+    annotations:
+      summary: Más de 20 intentos de login frenados en 10 minutos
+      description: 'Un 429 significa que el freno de fuerza bruta cortó. Unos pocos son alguien que se
+        equivocó de clave varias veces; veinte sostenidos no. Quién y contra qué cuenta, en la tabla intentos_login:
+        SELECT correo, motivo, host(ip), count(*) FROM intentos_login WHERE ocurrido_en > now() - interval
+        ''1 hour'' GROUP BY 1,2,3 ORDER BY 4 DESC;'
+    labels:
+      severidad: critico
+      sistema: fleetfuel

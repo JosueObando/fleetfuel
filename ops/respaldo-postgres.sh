@@ -21,6 +21,13 @@ DESTINO="${DESTINO:-/home/app/respaldos}"
 
 RETENCION_DIARIOS="${RETENCION_DIARIOS:-7}"
 RETENCION_SEMANALES="${RETENCION_SEMANALES:-4}"
+# Directorio de metricas para el colector textfile de node-exporter. Es como se
+# vigila un trabajo POR LOTES: en vez de buscar la ausencia de un error en los
+# registros, el propio trabajo AFIRMA su exito escribiendo cuando termino bien.
+# La diferencia importa: la ausencia de un error tambien se produce cuando el
+# timer esta apagado, cuando la maquina estuvo caida o cuando alguien rompio el
+# envio de registros — y en los tres casos parece que todo va bien.
+METRICAS="${METRICAS:-/home/app/respaldos/metricas}"
 
 # Equipo de la red MUPA al que se envía la copia. Vacío = solo respaldo local,
 # que NO protege contra la pérdida de esta máquina: hay un solo disco físico.
@@ -164,6 +171,36 @@ enviar() {
     log "Enviado"
 }
 
+# ── Métrica de vigilancia ────────────────────────────────────────────────────
+# Se escribe con `mv` y no directamente: node-exporter lee este directorio cada
+# vez que le raspan, y un fichero a medio escribir le daria una metrica truncada.
+# `mv` dentro del mismo sistema de ficheros es atomico.
+publicar_metrica() {
+    local exito="$1"
+    mkdir -p "$METRICAS" || return 0
+    local tmp; tmp="$(mktemp "$METRICAS/.respaldo.XXXXXX")" || return 0
+    {
+        echo "# HELP fleetfuel_respaldo_ultimo_intento_timestamp Ultimo intento de respaldo (epoch)."
+        echo "# TYPE fleetfuel_respaldo_ultimo_intento_timestamp gauge"
+        echo "fleetfuel_respaldo_ultimo_intento_timestamp $(date +%s)"
+        echo "# HELP fleetfuel_respaldo_ultimo_exito_timestamp Ultimo respaldo VERIFICADO por restauracion (epoch)."
+        echo "# TYPE fleetfuel_respaldo_ultimo_exito_timestamp gauge"
+        if [[ "$exito" == "1" ]]; then
+            echo "fleetfuel_respaldo_ultimo_exito_timestamp $(date +%s)"
+        else
+            # Se conserva el valor anterior: si este intento fallo, lo que hay
+            # que saber es cuanto hace del ultimo BUENO, no que hubo un fallo.
+            grep -h '^fleetfuel_respaldo_ultimo_exito_timestamp ' "$METRICAS/respaldo.prom" 2>/dev/null \
+                || echo "fleetfuel_respaldo_ultimo_exito_timestamp 0"
+        fi
+        echo "# HELP fleetfuel_respaldo_exito Si el ultimo intento termino bien."
+        echo "# TYPE fleetfuel_respaldo_exito gauge"
+        echo "fleetfuel_respaldo_exito $exito"
+    } > "$tmp"
+    chmod 644 "$tmp"
+    mv -f "$tmp" "$METRICAS/respaldo.prom"
+}
+
 # ── Orquestación ─────────────────────────────────────────────────────────────
 main() {
     log "═══ Respaldo FleetFuel ═══"
@@ -178,7 +215,16 @@ main() {
 
     rotar
     enviar
+    publicar_metrica 1
     log "═══ Respaldo correcto ═══"
 }
 
-main "$@"
+# Si algo falla, la metrica tambien tiene que reflejarlo: un respaldo que se
+# rompe y no lo cuenta es identico a uno que nunca se intento.
+if main "$@"; then
+    exit 0
+else
+    codigo=$?
+    publicar_metrica 0
+    exit "$codigo"
+fi

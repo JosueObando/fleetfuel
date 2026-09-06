@@ -316,8 +316,25 @@ curl -s localhost:4100/api/salud | jq
 > **Queda fuera, con motivo:** las métricas por contenedor. cAdvisor es
 > incompatible con el almacenamiento de Docker 29 y producía métricas
 > etiquetadas con el cgroup en crudo en vez del nombre — datos correctos e
-> ilegibles. Detalle completo en `ops/observabilidad.md`. Tampoco hay alertas
-> configuradas todavía.
+> ilegibles. Detalle completo en `ops/observabilidad.md`.
+>
+> **Ocho alertas** (2026-09-06), aprovisionadas por fichero: producción caída,
+> un entorno interno caído, certificado a menos de 21 días, respaldo sin
+> terminar bien en 26 h, disco >85 %, memoria <10 %, 5xx sostenidos y el freno
+> del login mordiendo. Verificadas parando el backend de desarrollo: disparó a
+> los 6 minutos y se resolvió sola al restaurarlo.
+>
+> Dos decisiones que las sostienen. Las **sondas van desde fuera**, por la misma
+> URL que usa un usuario, y recorren DNS, proxy, TLS, cortafuegos y aplicación:
+> es lo que habría visto el cuelgue de esta mañana, que ningún healthcheck
+> interno vio porque el backend estaba sano. Y el **respaldo afirma su éxito**
+> con una métrica en vez de que se busque la ausencia de un error en los
+> registros — la ausencia también se produce con el timer parado o la máquina
+> caída, y en los tres casos parece que todo va bien.
+>
+> **Lo que falta, y es lo único:** un canal por donde lleguen. Hoy se disparan y
+> se quedan en Grafana. Necesita una cuenta SMTP o aceptar un servicio de push
+> externo, y las dos son decisiones del usuario, no técnicas.
 
 ### 0.7 · Respaldo del repositorio — ✅ (2026-09-03)
 

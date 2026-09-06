@@ -46,6 +46,11 @@ services:
       # escribir, y el socket de Docker es equivalente a root en esta máquina.
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      # El journal, para ver las unidades de systemd —entre ellas el respaldo,
+      # que no es un contenedor y por tanto no lo alcanza el descubrimiento de
+      # Docker.
+      - /var/log/journal:/var/log/journal:ro
+      - /etc/machine-id:/etc/machine-id:ro
       - promtail_data:/tmp
     depends_on:
       loki:
@@ -75,9 +80,15 @@ services:
     command:
       - --path.rootfs=/host
       - --collector.filesystem.mount-points-exclude=^/(dev|proc|sys|var/lib/docker/.+)($$|/)
+      # El colector textfile: node-exporter publica lo que encuentre en ese
+      # directorio como si fuera suyo. Es el enganche por donde entran las
+      # métricas de cosas que no son servicios —aquí, el respaldo nocturno, que
+      # corre por un timer de systemd y no tiene puerto que raspar.
+      - --collector.textfile.directory=/textfile
     pid: host
     volumes:
       - /:/host:ro,rslave
+      - /home/app/respaldos/metricas:/textfile:ro
     networks: [observabilidad]
 
   # cAdvisor (métricas POR CONTENEDOR) queda FUERA, y no por olvido.
@@ -101,6 +112,15 @@ services:
   #
   # Revisar cuando cAdvisor soporte el snapshotter de Docker.
 
+  blackbox:
+    image: prom/blackbox-exporter:v0.25.0
+    container_name: fleetfuel_obs_blackbox
+    restart: unless-stopped
+    command: --config.file=/etc/blackbox/blackbox.yml
+    volumes:
+      - ./ops/observabilidad/blackbox.yml:/etc/blackbox/blackbox.yml:ro
+    networks: [observabilidad]
+
   grafana:
     image: grafana/grafana:11.3.1
     container_name: fleetfuel_obs_grafana
@@ -118,6 +138,7 @@ services:
       - ./ops/observabilidad/grafana/fuentes:/etc/grafana/provisioning/datasources:ro
       - ./ops/observabilidad/grafana/paneles:/etc/grafana/provisioning/dashboards:ro
       - ./ops/observabilidad/grafana/json:/etc/grafana/paneles:ro
+      - ./ops/observabilidad/grafana/alertas:/etc/grafana/provisioning/alerting:ro
       - grafana_data:/var/lib/grafana
     ports:
       # El único puerto publicado del stack, y sólo en la LAN. No pasa por el
