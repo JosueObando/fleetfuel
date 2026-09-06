@@ -11,9 +11,17 @@
 # lee sin eco y no se escribe en ningun sitio: ni en disco, ni en el historial
 # —por eso se pide en vez de pasarla como argumento—.
 #
-# Lo que NO hace: el `limit_req_zone`. Va en contexto http, fuera de cualquier
-# host, y la API de NPM no lo expone. Ese paso sigue siendo manual y esta al
-# final del script.
+# ORDEN IMPORTANTE. El limit_req del login usa una zona declarada en contexto
+# http, que la API de NPM no expone: hay que crearla A MANO en el CT, ANTES de
+# crear el host. Si se crea el host primero, nginx no conoce la zona, la
+# configuracion es invalida y el reload FALLA. Los demas hosts siguen sirviendo
+# con lo que ya tienen en memoria... hasta que alguien reinicie el contenedor:
+# entonces nginx no arranca y se caen TODOS.
+#
+# Si no hay acceso al CT para crear la zona, usar SIN_LIMITE=1: crea el host sin
+# el freno del login, que es seguro de aplicar, y el limite se anade despues.
+#
+#   SIN_LIMITE=1 ./ops/npm-configurar.sh
 
 set -euo pipefail
 
@@ -33,6 +41,22 @@ PUERTO_FRONTEND=3200
 PUERTO_API=4200
 
 command -v jq >/dev/null || { echo "Hace falta jq: sudo apt install jq" >&2; exit 1; }
+
+# Vacio = sin limit_req. Es el valor SEGURO por defecto para un NPM donde la
+# zona todavia no se ha declarado.
+if [[ ${SIN_LIMITE:-} == 1 ]]; then
+  LIMITE=""
+  echo "SIN_LIMITE=1: el host se crea sin el freno del login."
+  echo "  Recuerda anadirlo despues, cuando la zona exista."
+else
+  LIMITE=$'limit_req zone=login burst=10 nodelay;\nlimit_req_status 429;'
+  echo "El host llevara limit_req. La zona 'login' TIENE que existir ya en el CT:"
+  echo "  grep -r limit_req_zone /data/nginx/custom/  (dentro de 10.0.0.19)"
+  echo "Si no existe, corta con Ctrl-C y relanza con SIN_LIMITE=1."
+  echo
+  read -rp "Continuar? [s/N] " r
+  [[ $r == [sS] ]] || { echo "Cancelado."; exit 1; }
+fi
 
 leer_credenciales() {
   : "${NPM_USUARIO:=}" "${NPM_CLAVE:=}"
@@ -96,7 +120,7 @@ EXISTE=$(api "$NPM/api/nginx/proxy-hosts" \
 CUERPO=$(jq -nc \
   --arg d "$DOMINIO" --arg h "$APP" \
   --argjson pf "$PUERTO_FRONTEND" --argjson pa "$PUERTO_API" \
-  --argjson cert "$CERT" --argjson ssl "$SSL" '{
+  --argjson cert "$CERT" --argjson ssl "$SSL" --arg lim "$LIMITE" '{
   domain_names: [$d],
   forward_scheme: "http",
   forward_host: $h,
@@ -135,7 +159,7 @@ CUERPO=$(jq -nc \
     forward_scheme: "http",
     forward_host: $h,
     forward_port: $pa,
-    advanced_config: "limit_req zone=login burst=10 nodelay;\nlimit_req_status 429;"
+    advanced_config: $lim
   }]
 }')
 

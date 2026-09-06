@@ -195,8 +195,29 @@ minutos, un límite ahí no para a nadie y expulsaría a la gente a media jornad
 
 `ops/npm-configurar.sh` hace por la API de NPM lo mismo que la tabla de arriba
 a mano, sin duplicar el host si ya existe. Pide las credenciales sin eco y no
-las guarda. El `limit_req_zone` sigue siendo manual —va en contexto http y la
-API de NPM no lo expone—; el propio script imprime el comando al terminar.
+las guarda.
+
+> ⚠ **El orden importa, y equivocarse puede tirar el proxy entero.** El
+> `limit_req` del login usa una zona declarada en contexto `http`, que la API
+> de NPM no expone: hay que crearla **a mano en el CT, antes** de crear el
+> host. Si se crea el host primero, nginx no conoce la zona, la configuración
+> queda inválida y el reload falla. Los otros hosts siguen sirviendo con lo que
+> tienen en memoria… hasta que alguien reinicie el contenedor: entonces nginx
+> no arranca y **se caen todos**.
+
+Orden seguro, con acceso al CT de 10.0.0.19:
+
+    # 1. dentro del CT
+    echo 'limit_req_zone $binary_remote_addr zone=login:10m rate=10r/m;' \
+      >> /data/nginx/custom/http_top.conf
+    docker restart nginx-proxy-manager
+
+    # 2. desde esta máquina
+    ./ops/npm-configurar.sh
+
+Sin acceso al CT, se crea el host sin el freno y se añade después:
+
+    SIN_LIMITE=1 ./ops/npm-configurar.sh
 
 ## Lo que no he verificado
 
