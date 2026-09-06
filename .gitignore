@@ -10,5 +10,9 @@ frontend/.next/
 frontend/out/
 frontend/next-env.d.ts
 
-# Secretos de produccion
-.env.produccion
+# Secretos de produccion. El comodin es a proposito: ".env.produccion" a secas
+# es un patron EXACTO y dejaria fuera ".env.produccion.bak", ".old", ".2"...
+# —justo los nombres que uno crea antes de tocar algo delicado—. El ejemplo,
+# que no lleva secretos, se vuelve a incluir a mano.
+.env.produccion*
+!.env.produccion.example

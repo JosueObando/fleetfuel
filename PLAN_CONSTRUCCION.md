@@ -108,11 +108,11 @@ uso enseña más sobre lo que falta que tres módulos a medio terminar.»*
 
 ---
 
-## Estado al 2026-09-04
+## Estado al 2026-09-06
 
 | Fase | Duración §19 | Estado | Comentario |
 |---|---|---|---|
-| 0 · Cimientos | 30 d | 🟡 **4 de 5** | 0.7 cerrado. Falta 0.6, redefinido a un solo host |
+| 0 · Cimientos | 30 d | 🟡 **4 de 5** | 0.7 cerrado. Del 0.6 quedan Nginx en NPM y la observabilidad |
 | UX-0 · Sistema de diseño | ~15 d | 🟢 **código completo** | 24/24 componentes, contraste AA en CI. Falta Noka y la revisión humana |
 | 1A · Catálogos | 25 d | ✅ **cerrada** | Criterio de salida verificado DESDE LA UI: alta de cliente, conductor, vehículo y cisterna con compartimentos, las cuatro en auditoría |
 | UX-1 · Shell y catálogos | — | 🟢 **código completo** | 3 columnas, 5 breakpoints, estado en la URL, CRUD de los 6 catálogos |
@@ -125,8 +125,12 @@ uso enseña más sobre lo que falta que tres módulos a medio terminar.»*
 | 4 · Integraciones | 45 d | ⬜ | |
 | 5 · Analítica | 40 d | ⬜ | |
 
-Repositorio: `main` en `f85a183`, respaldado en
+Repositorio: `main` en `2de1dff`, respaldado en
 `git@github.com:JosueObando/fleetfuel.git` (privado). Local y remoto idénticos.
+
+**Producción está levantada** en esta misma máquina desde el 2026-09-04, con
+sus cuatro servicios sanos y separados de desarrollo en nombre, volúmenes, red
+y puertos (4200/3200 frente a 4100/3100). La base y Redis no se publican.
 
 **1A queda cerrada el 2026-09-04.** Su criterio de salida se verificó donde
 lo pide el §26 —desde la interfaz, no por API— con el recorrido automatizado
@@ -204,19 +208,39 @@ curl -s localhost:4100/api/salud | jq
 - [x] `.github/workflows/ci.yml` ejecutado paso a paso en clúster limpio,
       incluido `migration:revert`
 
-### 0.6 · Los tres entornos — 🚧 **BLOQUEANTE**
+### 0.6 · Los tres entornos — 🟡 **3 de 5**
 
 - [ ] Servidor de **prueba** provisionado
-- [ ] Servidor de **producción** provisionado
-- [ ] Nginx + Let's Encrypt como reverse proxy (§8: «nuevo»)
-- [ ] Respaldo automático de Postgres, con restauración **probada**
+- [x] Servidor de **producción** — redefinido el 2026-09-04 a esta misma
+      máquina; compose propio levantado y verificado de extremo a extremo
+- [x] **Respaldo** automático de Postgres con restauración probada —
+      `ops/respaldo-postgres.sh`, diario a las 02:00 por timer de systemd,
+      rotación 7+4. Falta el destino fuera de este host (ver los bloqueos)
+- [ ] Nginx + Let's Encrypt como reverse proxy (§8: «nuevo») — 🟡 **parcial**
 - [ ] Observabilidad: Grafana+Loki+Prometheus, o Sentry+Better Stack (§8)
 
-> Hoy sólo existe **desarrollo**, en esta máquina (10.0.0.193). El §19 pide
-> textualmente «CI/CD con pruebas de integración contra Postgres real, **y los
-> tres entornos**». Es lo único que impide dar la Fase 0 por cerrada, y es una
-> decisión de infraestructura —dónde alojar— que no se resuelve escribiendo
-> código.
+> **Nginx, al 2026-09-06.** Decidida la topología de **un solo origen**: el
+> frontend en `/` y la API en `/api` bajo el mismo host. `NEXT_PUBLIC_API_URL`
+> pasó de `http://10.0.0.193:4200/api` a `/api` y el frontend se reconstruyó:
+> verificado que la IP absoluta ya no aparece en el bundle. Sin eso el proxy
+> habría sido decorativo, porque esa URL se hornea en el JavaScript del
+> navegador y el cliente habría seguido llamando al 4200 directamente.
+>
+> La configuración está escrita y **probada** en `ops/nginx-fleetfuel.conf`
+> (nginx desechable en el 8081: `/entrar` 200, `/api/salud` 200, login POST
+> 200 con la puerta de MFA activa). `ops/proxy-inverso.md` especifica lo que
+> hay que crear en el NPM de 10.0.0.19. **Queda por aplicar allí**, y falta
+> decidir la política de límite del login.
+>
+> **Let's Encrypt sigue imposible:** 10.0.0.19 es IP privada sin dominio
+> público y la validación exige un nombre resoluble desde Internet. Mientras
+> tanto las credenciales viajan en claro por la LAN municipal.
+>
+> **Puerta trasera abierta:** 3200 y 4200 escuchan en `0.0.0.0`, así que hoy se
+> puede llamar a la API saltándose el proxy. Se cierra con `ufw` restringiendo
+> a 10.0.0.19; requiere `sudo`, o sea una persona.
+>
+> El servidor de **prueba** es lo único del §19 que esta máquina no da.
 
 ### 0.7 · Respaldo del repositorio — ✅ (2026-09-03)
 
