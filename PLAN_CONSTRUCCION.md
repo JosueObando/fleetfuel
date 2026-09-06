@@ -216,7 +216,7 @@ curl -s localhost:4100/api/salud | jq
 - [x] **Respaldo** automático de Postgres con restauración probada —
       `ops/respaldo-postgres.sh`, diario a las 02:00 por timer de systemd,
       rotación 7+4. Falta el destino fuera de este host (ver los bloqueos)
-- [ ] Nginx + Let's Encrypt como reverse proxy (§8: «nuevo») — 🟡 **parcial**
+- [ ] Nginx + Let's Encrypt como reverse proxy (§8: «nuevo») — 🟡 **parcial**, solo falta crear el host en NPM
 - [ ] Observabilidad: Grafana+Loki+Prometheus, o Sentry+Better Stack (§8)
 
 > **Nginx, al 2026-09-06.** Decidida la topología de **un solo origen**: el
@@ -232,9 +232,13 @@ curl -s localhost:4100/api/salud | jq
 > hay que crear en el NPM de 10.0.0.19. **Queda por aplicar allí**, y falta
 > decidir la política de límite del login.
 >
-> **Let's Encrypt sigue imposible:** 10.0.0.19 es IP privada sin dominio
-> público y la validación exige un nombre resoluble desde Internet. Mientras
-> tanto las credenciales viajan en claro por la LAN municipal.
+> **Let's Encrypt sí es posible, y ya está en marcha.** Corregido el
+> 2026-09-06: en el NPM hay un comodín `*.jop.lat` de Let's Encrypt válido
+> hasta el 8 de noviembre de 2026, emitido por reto **DNS-01** —que solo
+> comprueba un TXT en el DNS y nunca visita el servidor, así que la IP privada
+> no estorba—. `fleetfuel.jop.lat` ya resuelve y queda cubierto sin emitir
+> nada. El descarte anterior razonaba sobre el reto HTTP-01, que sí exige
+> alcanzabilidad; era un error.
 >
 > **Puerta trasera abierta:** 3200 y 4200 escuchan en `0.0.0.0`, así que hoy se
 > puede llamar a la API saltándose el proxy. Se cierra con `ufw` restringiendo

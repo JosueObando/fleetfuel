@@ -18,7 +18,16 @@
 set -euo pipefail
 
 NPM=http://10.0.0.19:81
-DOMINIO=${DOMINIO:-10.0.0.19}
+
+# fleetfuel.jop.lat y no la IP pelada: jop.lat es un dominio real en Cloudflare
+# y ya tiene un comodin *.jop.lat de Let's Encrypt instalado en este NPM, asi
+# que este nombre YA resuelve y YA esta cubierto. Cero DNS, cero emision, y las
+# credenciales dejan de viajar en claro por la LAN municipal.
+#
+# (El reto HTTP-01 no serviria aqui —LE no puede alcanzar una IP privada—, pero
+# el certificado existente se emitio por DNS-01, que solo mira un TXT en el DNS
+# y nunca se conecta al servidor.)
+DOMINIO=${DOMINIO:-fleetfuel.jop.lat}
 APP=10.0.0.193
 PUERTO_FRONTEND=3200
 PUERTO_API=4200
@@ -48,8 +57,31 @@ autenticar
 if [[ ${1:-} == --revisar ]]; then
   echo "Hosts que ya existen en NPM:"
   api "$NPM/api/nginx/proxy-hosts" \
-    | jq -r '.[] | "  id=\(.id)  \(.domain_names|join(","))  ->  \(.forward_host):\(.forward_port)  locations=\(.locations|length)"'
+    | jq -r '.[] | "  id=\(.id)  \(.domain_names|join(","))  ->  \(.forward_host):\(.forward_port)  locations=\(.locations|length)  ssl=\(if .certificate_id > 0 then "si" else "no" end)"'
+  echo
+  echo "Certificados disponibles:"
+  api "$NPM/api/nginx/certificates" \
+    | jq -r '.[] | "  id=\(.id)  \(.domain_names|join(","))  vence \(.expires_on)"'
   exit 0
+fi
+
+# Busca un certificado que cubra el dominio: o lo nombra exacto, o es un
+# comodin del padre. Sin esto habria que copiar el id a mano y el paso mas
+# facil de olvidar seria justo el que deja el trafico sin cifrar.
+PADRE=${DOMINIO#*.}
+CERT=$(api "$NPM/api/nginx/certificates" | jq -r --arg d "$DOMINIO" --arg p "$PADRE" '
+  map(select(
+    (.domain_names | index($d)) != null or
+    (.domain_names | map(select(startswith("*."))) | map(.[2:]) | index($p)) != null
+  )) | .[0].id // 0')
+
+if [[ $CERT == 0 ]]; then
+  echo "AVISO: ningun certificado cubre $DOMINIO. Se crea SIN TLS." >&2
+  echo "       Las credenciales viajarian en claro. Revisa --revisar." >&2
+  SSL=false
+else
+  echo "Certificado encontrado (id=$CERT): se activa TLS y se fuerza HTTPS."
+  SSL=true
 fi
 
 # Si ya existe un host para este dominio, no se duplica: NPM lo aceptaria y
@@ -63,7 +95,8 @@ EXISTE=$(api "$NPM/api/nginx/proxy-hosts" \
 
 CUERPO=$(jq -nc \
   --arg d "$DOMINIO" --arg h "$APP" \
-  --argjson pf "$PUERTO_FRONTEND" --argjson pa "$PUERTO_API" '{
+  --argjson pf "$PUERTO_FRONTEND" --argjson pa "$PUERTO_API" \
+  --argjson cert "$CERT" --argjson ssl "$SSL" '{
   domain_names: [$d],
   forward_scheme: "http",
   forward_host: $h,
@@ -80,9 +113,16 @@ CUERPO=$(jq -nc \
   allow_websocket_upgrade: true,
 
   access_list_id: 0,
-  certificate_id: 0,
-  ssl_forced: false,
-  http2_support: false,
+  certificate_id: $cert,
+  # ssl_forced redirige http -> https. Sin esto el puerto 80 seguiria sirviendo
+  # la aplicacion en claro y bastaria teclear la direccion sin "s".
+  ssl_forced: $ssl,
+  http2_support: $ssl,
+
+  # HSTS queda APAGADO a proposito. Le diria al navegador "para este nombre,
+  # solo https, durante meses", y esa orden se queda pegada en el cliente: si
+  # el certificado caduca o hay que depurar en claro, no hay forma de volver
+  # atras desde el servidor. Se enciende cuando esto lleve tiempo estable.
   hsts_enabled: false,
   hsts_subdomains: false,
   advanced_config: "",
@@ -115,6 +155,7 @@ NPM no expone. Dentro del CT 10.0.0.19:
   docker restart nginx-proxy-manager      # o el nombre que tenga el contenedor
 
 Comprobacion:
-  curl -s http://$DOMINIO/api/salud                       # {"estado":"ok",...}
-  curl -s -o /dev/null -w '%{http_code}\\n' http://$DOMINIO/entrar   # 200
+  curl -s https://$DOMINIO/api/salud                        # {"estado":"ok",...}
+  curl -s -o /dev/null -w '%{http_code}\\n' https://$DOMINIO/entrar   # 200
+  curl -s -o /dev/null -w '%{http_code}\\n' http://$DOMINIO/entrar    # 301 a https
 FIN

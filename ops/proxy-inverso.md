@@ -40,7 +40,7 @@ Ahora vale `/api`, relativa. Consecuencias:
 
 | Campo | Valor | Por qué |
 |---|---|---|
-| Domain Names | `10.0.0.19` | Sirve tal cual, sin DNS: el navegador manda `Host: 10.0.0.19` y NPM lo usa como `server_name`. Cuando haya dominio interno, se añade aquí. |
+| Domain Names | `fleetfuel.jop.lat` | Ya resuelve: `jop.lat` está en Cloudflare con un comodín `*.jop.lat` apuntando a 10.0.0.19. No hay que crear ningún registro. |
 | Scheme | `http` | El tramo proxy→aplicación va por la LAN sin cifrar; el TLS termina en NPM. |
 | Forward Hostname / IP | `10.0.0.193` | |
 | Forward Port | `3200` | El **frontend**. La API entra por Custom Location. |
@@ -73,15 +73,27 @@ Una sola, y es la que hace que `/api` signifique algo:
 > Comprobación: `curl http://10.0.0.19/api/salud` tiene que devolver el JSON
 > con `"estado":"ok"`, no un 404.
 
-### Pestaña «SSL» — pendiente
+### Pestaña «SSL» — resuelta
 
-Let's Encrypt **no es posible hoy**: `10.0.0.19` es una IP privada sin dominio
-público, y la validación de LE exige un nombre resoluble desde Internet. Queda
-abierto: o un dominio interno con certificado propio de la Alcaldía, o un
-certificado autofirmado (que hace que cada navegador muestre un aviso).
+**Hay un comodín `*.jop.lat` de Let's Encrypt ya instalado en este NPM**, válido
+del 10 de agosto al 8 de noviembre de 2026, y `https://proxy.jop.lat` responde
+con la cadena verificada. `fleetfuel.jop.lat` queda cubierto por el comodín sin
+emitir nada.
 
-Mientras no haya TLS, las credenciales viajan en claro por la LAN municipal.
-Es una limitación conocida, no un descuido.
+> Yo mismo había dado Let's Encrypt por imposible aquí, razonando que una IP
+> privada no es alcanzable desde Internet. Eso solo vale para el reto
+> **HTTP-01**, donde LE se conecta al servidor. El comodín se emitió por
+> **DNS-01**, que únicamente comprueba un registro TXT contra los servidores
+> autoritativos y nunca visita la máquina: a LE le da igual que el registro A
+> apunte a 10.0.0.19.
+
+Se selecciona ese certificado y se activa **Force SSL** (redirige `http` a
+`https`; sin eso el puerto 80 seguiría sirviendo en claro) y **HTTP/2**.
+
+**HSTS queda apagado a propósito.** Le diría al navegador «para este nombre,
+solo https, durante meses», y esa orden se queda pegada en el cliente: si el
+certificado caduca o hay que depurar en claro, no se puede deshacer desde el
+servidor. Se enciende cuando esto lleve tiempo estable.
 
 ## La IP real en la auditoría
 
@@ -153,7 +165,8 @@ Con el nginx de prueba, sin tocar NPM:
     curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8081/entrar   # 200
     curl -s http://localhost:8081/api/salud                                 # {"estado":"ok",...}
 
-Contra NPM ya configurado, lo mismo sobre `http://10.0.0.19`.
+Contra NPM ya configurado, sobre `https://fleetfuel.jop.lat`. Y que el puerto
+80 redirija: `curl -sI http://fleetfuel.jop.lat/entrar` debe dar `301`.
 
 ## El límite del login
 
