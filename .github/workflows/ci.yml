@@ -58,14 +58,20 @@ jobs:
       - run: npm ci
       - name: Compilación de tipos
         run: npm run typecheck
-      - name: Pruebas unitarias
-        run: npm test
+      # Las migraciones van ANTES de las pruebas: la mitad de la suite corre
+      # contra el motor de verdad y necesita las tablas puestas.
       - name: Migraciones contra Postgres real
         run: npm run migration:run
       - name: Seed
         run: npm run seed
-      - name: Pruebas de integración (RLS, idempotencia, auditoría)
-        run: npm run test:integracion
+      # Unitarias e integración en UNA sola pasada, con umbral de cobertura.
+      # Separadas medían mentiras: las unitarias daban 9 % porque les faltaba
+      # media suite, y las de integración 100 % porque sin `collectCoverageFrom`
+      # sólo instrumentaban los siete enunciados que llegaban a importar.
+      # El umbral es un trinquete puesto justo por debajo de lo que había.
+      # Ver backend/test/COBERTURA.md antes de tocarlo.
+      - name: Pruebas y cobertura
+        run: npm run test:cobertura
       - name: La migración se puede revertir
         run: npm run migration:revert
 
@@ -92,5 +98,10 @@ jobs:
       # cuando nadie recuerde por qué --fg-muted tenía ese valor exacto.
       - name: Auditoría de contraste AA
         run: npm run auditar:contraste
+      # El frontend no tenía NINGUNA prueba hasta el 2026-09-06. El umbral es un
+      # suelo bajísimo a propósito: impide que estas tres suites se borren o se
+      # dejen pudrir, no pretende ser una meta. Ver frontend/PRUEBAS.md.
+      - name: Pruebas y cobertura
+        run: npm run test:cov
       - name: Build
         run: npm run build

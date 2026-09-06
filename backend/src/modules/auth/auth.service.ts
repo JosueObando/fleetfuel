@@ -5,7 +5,8 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
-import { compare } from 'bcryptjs';
+import { compare, hashSync } from 'bcryptjs';
+import { randomBytes } from 'crypto';
 import { authenticator } from 'otplib';
 import { CifradoService } from './cifrado.service';
 import { TokensService } from './tokens.service';
@@ -34,6 +35,23 @@ export interface SesionEmitida {
   expiraEn: string;
   usuario: { id: string; nombre: string; correo: string; empresaId: string; roles: string[]; permisos: string[] };
 }
+
+/**
+ * Hash contra el que se compara cuando el correo NO existe, para que ese camino
+ * cueste lo mismo que el bueno y el tiempo de respuesta no diga quién está
+ * registrado.
+ *
+ * Tiene que ser un bcrypt VÁLIDO. Antes había una constante inventada
+ * (`$2a$10$invalidinvalid…`) y no servía de nada: bcrypt la rechaza al parsear,
+ * sin hacer ni una ronda. Medido: 0,15 ms contra los 85 ms de una comparación
+ * de verdad. Esas dos cifras, a 550x de distancia, son un directorio de correos
+ * legible desde fuera con un cronómetro — y el código parecía protegido,
+ * porque la llamada a `compare` estaba ahí.
+ *
+ * Se genera al arrancar sobre bytes aleatorios: cuesta un bcrypt una sola vez y
+ * garantiza a la vez que es válido y que nadie conoce su preimagen.
+ */
+const HASH_DE_DESCARTE = hashSync(randomBytes(32).toString('hex'), 10);
 
 interface FilaLogin {
   empresa_id: string;
@@ -66,9 +84,10 @@ export class AuthService {
     // convierte el login en un oráculo de qué correos están registrados.
     const generico = new UnauthorizedException('Credenciales inválidas');
     if (!fila) {
-      // Se compara igual contra un hash de descarte para no filtrar por tiempo
-      // de respuesta que el correo no existe.
-      await compare(dto.clave, '$2a$10$invalidinvalidinvalidinvalidinvalidinvalidinvalidinvalidinv');
+      // Se compara igual contra un hash de descarte para que este camino cueste
+      // lo mismo que el bueno. Ver HASH_DE_DESCARTE: la constante que había
+      // aquí no era un bcrypt válido y la protección no existía.
+      await compare(dto.clave, HASH_DE_DESCARTE);
       await this.anotarFallo(dto, ip, 'correo_desconocido');
       throw generico;
     }

@@ -17,7 +17,8 @@
     "seed": "ts-node src/database/seeds/seed.ts",
     "test": "jest --config test/jest.unit.json",
     "test:integracion": "jest --config test/jest.integracion.json --runInBand",
-    "test:cov": "jest --config test/jest.unit.json --coverage"
+    "test:cov": "jest --config test/jest.cobertura.json --runInBand --coverage",
+    "test:cobertura": "jest --config test/jest.cobertura.json --runInBand --coverage"
   },
   "dependencies": {
     "@nestjs/common": "^10.4.4",

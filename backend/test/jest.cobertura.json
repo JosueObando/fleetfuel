@@ -1,0 +1,36 @@
+{
+  "rootDir": "..",
+  "testEnvironment": "node",
+  "testRegex": "\\.(spec|integracion)\\.ts$",
+  "transform": {
+    "^.+\\.ts$": [
+      "ts-jest",
+      {
+        "tsconfig": "tsconfig.json"
+      }
+    ]
+  },
+  "moduleFileExtensions": [
+    "ts",
+    "js",
+    "json"
+  ],
+  "testTimeout": 60000,
+  "collectCoverageFrom": [
+    "src/**/*.ts",
+    "!src/**/*.module.ts",
+    "!src/main.ts",
+    "!src/database/migrations/**",
+    "!src/database/seeds/**",
+    "!src/**/dto/**",
+    "!src/**/entidades/**"
+  ],
+  "coverageThreshold": {
+    "global": {
+      "statements": 62,
+      "branches": 41,
+      "functions": 45,
+      "lines": 65
+    }
+  }
+}
