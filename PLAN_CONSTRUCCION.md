@@ -129,7 +129,8 @@ Repositorio: `main` en `67acab8`, respaldado en
 `git@github.com:JosueObando/fleetfuel.git` (privado).
 
 **FleetFuel se sirve en <https://fleetfuel.jop.lat>** desde el 2026-09-06, con
-TLS válido y un solo origen. Verificado de extremo a extremo: `/entrar` 200 en
+TLS válido, un solo origen y el login con freno de fuerza bruta y registro de
+intentos fallidos. Verificado de extremo a extremo: `/entrar` 200 en
 25 ms, `/api/salud` con `postgres: ok` y `redis: ok`, los chunks del bundle
 200, el 80 redirigiendo con 301, y `POST /api/auth/login` devolviendo 401 con
 credenciales falsas. Los puertos 4200 y 3200 ya **no** son alcanzables desde la
@@ -265,16 +266,16 @@ curl -s localhost:4100/api/salud | jq
 > de ida; el script purga la regla vieja antes de instalar la nueva, porque
 > dejarla puesta anula el arreglo.
 >
-> ⚠ **El freno de fuerza bruta del login se quedó fuera.** Para que el host
-> cargara hubo que correr `npm-configurar.sh --quitar-limite`, porque la zona
-> `login` de `limit_req` se declara **dentro** del CT 10.0.0.19 y eso pide un
-> `ssh root@` que desde aquí no autentica. Verificado el 2026-09-06: **42
-> intentos seguidos contra `POST /api/auth/login`, 42 respuestas 401, ni un
-> 429, y ni una línea en `auditoria`.** Detrás no hay nada: sin `Throttler`,
-> sin bloqueo por intentos y sin marca de código TOTP consumido. Y el cuerpo
-> del login lleva **los dos factores juntos**, así que quien acierte la clave
-> puede recorrer los 10⁶ códigos TOTP sin que nada lo detenga ni lo registre.
-> Ver el bloqueo 3.
+> **El freno del login, resuelto en el backend** (2026-09-06). El `limit_req`
+> del proxy se había quitado con `--quitar-limite` para que el host de NPM
+> cargara —la zona se declara dentro del CT y eso pide un `ssh root@` que desde
+> aquí no autentica—, y detrás no había nada. Verificado entonces: **42
+> intentos seguidos, 42 respuestas 401, ni un 429, ni una línea en ningún
+> registro.**
+>
+> Se eligió resolverlo en el backend y no en el proxy: es más lento que nginx,
+> pero no depende del acceso al CT y no se pierde al recrear el host en NPM.
+> Ver el bloqueo 3, cerrado.
 >
 > El servidor de **prueba** es lo único del §19 que esta máquina no da.
 
@@ -594,11 +595,11 @@ descubrirlo cuando `RequestList` ya esté maquetado.
 
 ---
 
-## Los tres bloqueos abiertos hoy
+## Los bloqueos: dos abiertos, uno cerrado
 
-Los dos primeros son decisiones, no código. El tercero apareció el 2026-09-06
-al verificar el proxy, y es el único que corre prisa: el sistema ya está
-publicado.
+Los dos que quedan son decisiones, no código. El tercero apareció el 2026-09-06
+al verificar el proxy y se cerró el mismo día, porque el sistema ya estaba
+publicado y no podía esperar.
 
 1. **Cómo se respaldan los datos.** *(parcial al 2026-09-04)* Ya existe el
    mecanismo: `ops/respaldo-postgres.sh`, diario a las 02:00 por timer de
@@ -618,25 +619,33 @@ publicado.
 2. **Si `RouteRequest` y el chat entran al alcance.** Bloquea a UX-2, pero se
    decide ahora porque cambia el modelo de datos de la Fase 2.
 
-3. **`POST /auth/login` no tiene ningún freno.** *(abierto el 2026-09-06)*
-   Las tres defensas que faltan son en realidad una sola, y por eso el hueco es
-   mayor que sus partes: sin auditoría no se puede **ver** el ataque, sin
-   límite no se puede **frenar**, y como los dos factores viajan en el mismo
-   cuerpo, el segundo factor sin freno de peticiones no es un segundo factor.
-   Dos caminos, y hay que elegir uno:
-   - **En el proxy**, que es donde se decidió (`rate=10r/m`, `burst=10 nodelay`,
-     `429`): declarar la zona en `/data/nginx/custom/http_top.conf` del CT
-     10.0.0.19, reiniciar su contenedor y volver a correr
-     `ops/npm-configurar.sh` **sin** `--quitar-limite`. Necesita acceso al CT.
-   - **En el backend**, con un `Throttler`: más lento que nginx, pero no
-     depende de nadie y no se pierde al recrear el host en NPM.
+3. ~~**`POST /auth/login` no tiene ningún freno.**~~ **Cerrado el 2026-09-06**,
+   las dos mitades. Se eligió el **backend** sobre el proxy: más lento que
+   nginx, pero no depende del acceso al CT ni se pierde al recrear el host.
 
-   Y en los dos casos falta **auditar los intentos fallidos**, que hoy no dejan
-   rastro: `registrarAcceso` sólo corre en el camino de éxito
-   (`backend/src/modules/auth/auth.service.ts:224`). Decisión previa: la tabla
-   `auditoria` exige `empresa_id` y `usuario_id`, y un intento contra un correo
-   que no existe no tiene ninguno de los dos — que es justo el caso que más
-   interesa ver.
+   - **Frenar** (`bb9ccbf`) — dos frenos con nombre, contados en Redis con un
+     script Lua: `login-cuenta` 5/min por (IP, cuenta) y `login-ip` 30/min por
+     IP, con bloqueo de 5 minutos. Son dos porque uno solo no vale: por IP a
+     secas deja fuera a una oficina entera detrás de NAT, y por cuenta a secas
+     se le escapa el barrido. En memoria tampoco valdría —el contador moriría
+     con el proceso y el compose reinicia solo—, y en Lua porque
+     `GET`+`INCR` desde Node deja huecos por los que pasan las peticiones
+     concurrentes, que es la forma exacta del ataque.
+   - **Ver** (`3d01520`) — tabla `intentos_login`, aparte de `auditoria` y por
+     dos razones: `auditoria.empresa_id` es `NOT NULL` con RLS y un intento
+     contra un correo inexistente no pertenece a ninguna empresa; y la
+     auditoría se escribe *dentro* de la transacción de la petición para que se
+     revierta si falla, que aquí es justo lo contrario de lo que hace falta. El
+     rol de la aplicación tiene `INSERT` y **no** `SELECT`: escribe y no lee, y
+     tampoco puede borrar.
+
+   Verificado en producción por la URL pública: el intento queda registrado con
+   la IP del **cliente** (10.0.0.193), no la del proxy — que es la prueba de
+   que la cadena `trust proxy` → freno → registro está entera.
+
+   Queda para cuando exista la pantalla: **cómo se consulta** el registro, con
+   qué permiso y con qué visibilidad entre empresas. Hoy se lee con `psql`, que
+   es lo que hace un operador mirando un ataque.
 
 > **Cerrado:** el respaldo del repositorio (0.7), el 2026-09-03. El proxy
 > inverso con TLS (0.6), el 2026-09-06.
