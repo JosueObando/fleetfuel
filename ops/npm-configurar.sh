@@ -44,17 +44,23 @@ command -v jq >/dev/null || { echo "Hace falta jq: sudo apt install jq" >&2; exi
 
 # Vacio = sin limit_req. Es el valor SEGURO por defecto para un NPM donde la
 # zona todavia no se ha declarado.
-if [[ ${SIN_LIMITE:-} == 1 ]]; then
+if [[ ${1:-} == --quitar-limite || ${1:-} == --revisar ]]; then
+  LIMITE=""
+elif [[ ${SIN_LIMITE:-} == 1 ]]; then
   LIMITE=""
   echo "SIN_LIMITE=1: el host se crea sin el freno del login."
   echo "  Recuerda anadirlo despues, cuando la zona exista."
 else
   LIMITE=$'limit_req zone=login burst=10 nodelay;\nlimit_req_status 429;'
-  echo "El host llevara limit_req. La zona 'login' TIENE que existir ya en el CT:"
-  echo "  grep -r limit_req_zone /data/nginx/custom/  (dentro de 10.0.0.19)"
-  echo "Si no existe, corta con Ctrl-C y relanza con SIN_LIMITE=1."
+  echo "El host llevara limit_req, que necesita la zona 'login' declarada DENTRO"
+  echo "del CT 10.0.0.19. NO en esta maquina: aqui esos comandos no hacen nada."
   echo
-  read -rp "Continuar? [s/N] " r
+  echo "  ssh root@10.0.0.19  ->  grep -r limit_req_zone /data/nginx/custom/"
+  echo
+  echo "Si no la has creado ALLI, corta con Ctrl-C y usa SIN_LIMITE=1."
+  echo "Si sigues sin la zona, el host se creara pero NPM no podra cargarlo."
+  echo
+  read -rp "Confirmas que la zona existe en 10.0.0.19? [s/N] " r
   [[ $r == [sS] ]] || { echo "Cancelado."; exit 1; }
 fi
 
@@ -77,6 +83,35 @@ api() { curl -sS -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application
 
 leer_credenciales
 autenticar
+
+# Repara un host que se creo con limit_req antes de que la zona existiera:
+# le quita el advanced_config, con lo que la configuracion vuelve a ser valida
+# y NPM la carga. No borra el host ni toca nada mas.
+if [[ ${1:-} == --quitar-limite ]]; then
+  H=$(api "$NPM/api/nginx/proxy-hosts" | jq -c --arg d "$DOMINIO" \
+        'map(select(.domain_names|index($d)))|.[0] // empty')
+  [[ -n $H ]] || { echo "No hay ningun host para $DOMINIO." >&2; exit 1; }
+  ID=$(jq -r '.id' <<<"$H")
+
+  # Se reenvia el objeto entero sin los campos de solo lectura, con el
+  # advanced_config de cada location vaciado.
+  NUEVO=$(jq -c '{
+    domain_names, forward_scheme, forward_host, forward_port,
+    caching_enabled, block_exploits, allow_websocket_upgrade,
+    access_list_id, certificate_id, ssl_forced, http2_support,
+    hsts_enabled, hsts_subdomains,
+    advanced_config: "",
+    locations: [ .locations[] | .advanced_config = "" ],
+    meta
+  }' <<<"$H")
+
+  R=$(api -X PUT "$NPM/api/nginx/proxy-hosts/$ID" -d "$NUEVO")
+  jq -e '.id' >/dev/null <<<"$R" \
+    || { echo "No se pudo actualizar: $R" >&2; exit 1; }
+  echo "Host $ID ($DOMINIO): limit_req retirado. NPM deberia cargarlo ya."
+  echo "Comprueba:  curl -s https://$DOMINIO/api/salud"
+  exit 0
+fi
 
 if [[ ${1:-} == --revisar ]]; then
   echo "Hosts que ya existen en NPM:"
@@ -170,13 +205,17 @@ echo "Host creado en NPM: id=$ID  $DOMINIO -> $APP:$PUERTO_FRONTEND  (+ /api -> 
 
 cat <<FIN
 
-FALTA UN PASO A MANO, y sin el nginx NO recarga: el limit_req de arriba usa una
-zona que todavia no existe. La declaracion va en contexto http, que la API de
-NPM no expone. Dentro del CT 10.0.0.19:
+FALTA UN PASO A MANO, DENTRO DEL CT 10.0.0.19 — no en esta maquina, donde
+estos comandos solo dan "No such file or directory":
 
+  ssh root@10.0.0.19
   echo 'limit_req_zone \$binary_remote_addr zone=login:10m rate=10r/m;' \\
     >> /data/nginx/custom/http_top.conf
-  docker restart nginx-proxy-manager      # o el nombre que tenga el contenedor
+  docker ps                               # ver el nombre real del contenedor
+  docker restart <ese-nombre>
+
+Hasta que la zona exista, NPM no puede cargar este host. Si prefieres dejarlo
+para luego:  ./ops/npm-configurar.sh --quitar-limite
 
 Comprobacion:
   curl -s https://$DOMINIO/api/salud                        # {"estado":"ok",...}
