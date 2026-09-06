@@ -14,21 +14,19 @@
  * Uso:  node e2e/recorrido.mjs
  */
 import { chromium } from '@playwright/test';
-import { readFileSync } from 'node:fs';
-import crypto from 'node:crypto';
+import { entorno, totp, asegurarSegundoFactor } from './entorno.mjs';
 
-const env = Object.fromEntries(readFileSync('../.env','utf8').split('\n')
-  .filter(l=>l.includes('=')).map(l=>[l.slice(0,l.indexOf('=')).trim(), l.slice(l.indexOf('=')+1).trim()]));
+const env = entorno();
+const API = env.E2E_API ?? 'http://localhost:4100/api';
+const APP = env.E2E_APP ?? 'http://localhost:3100';
+const CORREO = env.SEED_ADMIN_CORREO ?? 'admin@mupa.gob.pa';
 
-function totp(secreto){
-  const clave = Buffer.from(secreto.replace(/=+$/,'').split('').reduce((b,c)=>
-    b + 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'.indexOf(c).toString(2).padStart(5,'0'),'')
-    .match(/.{8}/g).map(b=>parseInt(b,2)));
-  const cont = Buffer.alloc(8); cont.writeBigUInt64BE(BigInt(Math.floor(Date.now()/1000/30)));
-  const h = crypto.createHmac('sha1', clave).update(cont).digest();
-  const o = h[h.length-1] & 0x0f;
-  return String((h.readUInt32BE(o) & 0x7fffffff) % 1e6).padStart(6,'0');
-}
+/* En una base recién sembrada el administrador no tiene TOTP: se inscribe aquí,
+   como haría el primer usuario real, y el recorrido entra con ese secreto. */
+const SECRETO = await asegurarSegundoFactor({
+  api: API, correo: CORREO, clave: env.SEED_ADMIN_CLAVE,
+  secretoConocido: env.E2E_TOTP_SECRETO ?? 'E45TSC3SDQSGOW2U',
+});
 
 const nav = await chromium.launch();
 const pag = await nav.newPage({ viewport:{width:1440,height:900} });
@@ -41,12 +39,12 @@ const paso = async (n, fn) => { try { await fn(); console.log('  ✅', n); } cat
 
 console.log('\n── 1 · Entrar ──');
 await paso('carga la pantalla de entrada', async () => {
-  await pag.goto('http://localhost:3100/entrar', { waitUntil:'networkidle' });
+  await pag.goto(`${APP}/entrar`, { waitUntil:'networkidle' });
 });
 await paso('rellenar y enviar el formulario', async () => {
-  await pag.getByLabel('Correo').fill('admin@mupa.gob.pa');
+  await pag.getByLabel('Correo').fill(CORREO);
   await pag.getByLabel('Contraseña').fill(env.SEED_ADMIN_CLAVE);
-  await pag.getByLabel('Código de verificación').fill(totp('E45TSC3SDQSGOW2U'));
+  await pag.getByLabel('Código de verificación').fill(totp(SECRETO));
   await pag.getByRole('button', { name:'Entrar' }).click();
   await pag.waitForURL('**/operacion/ordenes', { timeout: 15000 });
 });
@@ -54,7 +52,7 @@ console.log('     → llegó a', new URL(pag.url()).pathname);
 
 console.log('\n── 2 · Alta de cliente ──');
 await paso('crear cliente desde la UI', async () => {
-  await pag.goto('http://localhost:3100/catalogos/clientes', { waitUntil:'networkidle' });
+  await pag.goto(`${APP}/catalogos/clientes`, { waitUntil:'networkidle' });
   await pag.getByRole('button', { name:/Nuevo cliente/ }).click();
   await pag.getByLabel('Nombre comercial').fill(`Cliente UI ${sello}`);
   await pag.getByLabel('RUC').fill(`RUC-UI-${sello}`);
@@ -65,7 +63,7 @@ await paso('crear cliente desde la UI', async () => {
 
 console.log('\n── 3 · Alta de conductor ──');
 await paso('crear conductor desde la UI', async () => {
-  await pag.goto('http://localhost:3100/catalogos/conductores', { waitUntil:'networkidle' });
+  await pag.goto(`${APP}/catalogos/conductores`, { waitUntil:'networkidle' });
   await pag.getByRole('button', { name:/Nuevo conductor/ }).click();
   await pag.getByLabel('Nombre completo').fill(`Chofer UI ${sello}`);
   await pag.getByLabel('Documento').fill(`DOC-UI-${sello}`);
@@ -76,7 +74,7 @@ await paso('crear conductor desde la UI', async () => {
 
 console.log('\n── 4 · Alta de vehículo ──');
 await paso('crear vehículo tipo cisterna', async () => {
-  await pag.goto('http://localhost:3100/catalogos/vehiculos', { waitUntil:'networkidle' });
+  await pag.goto(`${APP}/catalogos/vehiculos`, { waitUntil:'networkidle' });
   await pag.getByRole('button', { name:/Nuevo vehículo/ }).click();
   await pag.getByLabel('Tipo').selectOption('cisterna');
   await pag.getByLabel('Placa').fill(`UI-${sello}`);
@@ -87,7 +85,7 @@ await paso('crear vehículo tipo cisterna', async () => {
 
 console.log('\n── 5 · Alta de cisterna con compartimentos ──');
 await paso('crear cisterna con 2 compartimentos', async () => {
-  await pag.goto('http://localhost:3100/catalogos/cisternas', { waitUntil:'networkidle' });
+  await pag.goto(`${APP}/catalogos/cisternas`, { waitUntil:'networkidle' });
   await pag.getByRole('button', { name:/Nueva cisterna/ }).click();
   // selectOption no acepta expresiones regulares: se busca la opción cuyo
   // texto contiene la placa y se selecciona por su valor.

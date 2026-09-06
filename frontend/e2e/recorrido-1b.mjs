@@ -9,21 +9,28 @@
  * Uso:  node e2e/recorrido-1b.mjs
  */
 import { chromium } from '@playwright/test';
-import { readFileSync } from 'node:fs';
-import crypto from 'node:crypto';
+import { entorno, totp, asegurarSegundoFactor, sesionCompleta, asegurarDatosDe1B }
+  from './entorno.mjs';
 
-const env = Object.fromEntries(readFileSync('../.env','utf8').split('\n')
-  .filter(l=>l.includes('=')).map(l=>[l.slice(0,l.indexOf('=')).trim(), l.slice(l.indexOf('=')+1).trim()]));
+const env = entorno();
+const API = env.E2E_API ?? 'http://localhost:4100/api';
+const APP = env.E2E_APP ?? 'http://localhost:3100';
+const CORREO = env.SEED_ADMIN_CORREO ?? 'admin@mupa.gob.pa';
 
-function totp(secreto){
-  const clave = Buffer.from(secreto.replace(/=+$/,'').split('').reduce((b,c)=>
-    b + 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'.indexOf(c).toString(2).padStart(5,'0'),'')
-    .match(/.{8}/g).map(b=>parseInt(b,2)));
-  const cont = Buffer.alloc(8); cont.writeBigUInt64BE(BigInt(Math.floor(Date.now()/1000/30)));
-  const h = crypto.createHmac('sha1', clave).update(cont).digest();
-  const o = h[h.length-1] & 0x0f;
-  return String((h.readUInt32BE(o) & 0x7fffffff) % 1e6).padStart(6,'0');
-}
+/* En una base recién sembrada el administrador no tiene TOTP: se inscribe aquí,
+   como haría el primer usuario real, y el recorrido entra con ese secreto. */
+const SECRETO = await asegurarSegundoFactor({
+  api: API, correo: CORREO, clave: env.SEED_ADMIN_CLAVE,
+  secretoConocido: env.E2E_TOTP_SECRETO ?? 'E45TSC3SDQSGOW2U',
+});
+
+/* 1B necesita un cliente CON estación y un producto, y no los crea: en una base
+   recién sembrada no existen y el recorrido moría con «ningún cliente tiene
+   estaciones dadas de alta», que parece un fallo de la aplicación y no lo es. */
+await asegurarDatosDe1B({
+  api: API,
+  token: await sesionCompleta({ api: API, correo: CORREO, clave: env.SEED_ADMIN_CLAVE, secreto: SECRETO }),
+});
 
 /** Elige la opción de un select cuyo texto contenga `aguja`. selectOption no
  *  admite expresiones regulares, así que se busca el valor a mano. */
@@ -68,10 +75,10 @@ console.log(`\nsello ${sello} · viaje programado para ${dia}`);
 
 console.log('\n── 1 · Entrar ──');
 await paso('entrar en el sistema', async () => {
-  await pag.goto('http://localhost:3100/entrar', { waitUntil:'networkidle' });
-  await pag.getByLabel('Correo').fill('admin@mupa.gob.pa');
+  await pag.goto(`${APP}/entrar`, { waitUntil:'networkidle' });
+  await pag.getByLabel('Correo').fill(CORREO);
   await pag.getByLabel('Contraseña').fill(env.SEED_ADMIN_CLAVE);
-  await pag.getByLabel('Código de verificación').fill(totp('E45TSC3SDQSGOW2U'));
+  await pag.getByLabel('Código de verificación').fill(totp(SECRETO));
   await pag.getByRole('button', { name:'Entrar' }).click();
   await pag.waitForURL('**/operacion/ordenes', { timeout:15000 });
 });
@@ -129,7 +136,7 @@ await paso('pulsar la transición «validada»', async () => {
 
 console.log('\n── 4 · Crear el viaje ──');
 await paso('alta de viaje con cisterna y conductor', async () => {
-  await pag.goto('http://localhost:3100/operacion/viajes', { waitUntil:'networkidle' });
+  await pag.goto(`${APP}/operacion/viajes`, { waitUntil:'networkidle' });
   await pag.getByRole('button', { name:/Nuevo/ }).click();
   await pag.getByLabel('Código del viaje').fill(`E2E-V-${sello}`);
   await pag.getByLabel('Programado para').fill(dia);

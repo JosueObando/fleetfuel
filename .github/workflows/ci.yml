@@ -105,3 +105,124 @@ jobs:
         run: npm run test:cov
       - name: Build
         run: npm run build
+
+  # ── Recorridos de extremo a extremo ──────────────────────────────────────
+  #
+  # Estuvieron fuera de CI hasta el 2026-09-06, y no por el entorno: en Actions
+  # basta `playwright install --with-deps`. Lo que faltaba era levantar la
+  # aplicación ENTERA dentro del trabajo, que es lo que hace este.
+  #
+  # Es el único sitio donde se comprueba lo que el §26 pide literalmente —«un
+  # operador da de alta … DESDE LA UI»— y también el único que recorre la cadena
+  # completa: navegador → Next → API → Postgres. Ni las pruebas de componente ni
+  # las de la API lo cubren; cada una prueba su lado del cable.
+  e2e:
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_DB: fleetfuel_e2e
+          POSTGRES_USER: fleetfuel_owner
+          POSTGRES_PASSWORD: ci_password
+        ports: ["5433:5432"]
+        options: >-
+          --health-cmd "pg_isready -U fleetfuel_owner -d fleetfuel_e2e"
+          --health-interval 10s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6380:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s --health-timeout 5s --health-retries 10
+
+    env:
+      APP_ENV: test
+      DATABASE_HOST: localhost
+      DATABASE_PORT: 5433
+      DATABASE_NAME: fleetfuel_e2e
+      DATABASE_USER: fleetfuel_owner
+      DATABASE_PASSWORD: ci_password
+      DATABASE_APP_USER: fleetfuel_app
+      DATABASE_APP_PASSWORD: ci_password_app
+      JWT_SECRET: ci_secret_de_pruebas_no_usar_en_produccion
+      REFRESH_TOKEN_SECRET: ci_refresh_de_pruebas_no_usar_en_produccion
+      REDIS_HOST: localhost
+      REDIS_PORT: 6380
+      BACKEND_PORT: 4100
+      SEED_ADMIN_CORREO: admin@mupa.gob.pa
+      SEED_ADMIN_CLAVE: ClaveDeCI12345
+      # El freno del login se afloja SOLO en este trabajo. Los dos recorridos
+      # inician sesión varias veces cada uno —la sonda de inscripción y la
+      # entrada por la interfaz— y con el límite de producción (5 por minuto y
+      # cuenta) un reintento del trabajo se topa con un 429 que no tiene nada
+      # que ver con lo que se está probando. Aflojarlo aquí no lo debilita en
+      # ningún sitio real: su comportamiento se prueba en `api.integracion.ts`,
+      # que sí comprueba que corta a la sexta.
+      LOGIN_LIMITE_CUENTA: 60
+      LOGIN_LIMITE_IP: 300
+      # El administrador nace SIN segundo factor: el recorrido lo inscribe por
+      # la API antes de entrar, igual que haría el primer usuario real. Por eso
+      # no hace falta un secreto conocido aquí.
+      E2E_TOTP_SECRETO: ''
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+
+      - name: Preparar la base de datos
+        run: |
+          npm ci
+          npm run build
+          npm run migration:run:dist
+          npm run seed:dist
+        working-directory: backend
+
+      - name: Arrancar la API
+        run: |
+          node dist/main.js &
+          # Se espera a que RESPONDA, no un tiempo fijo: en un runner cargado
+          # cualquier `sleep` es o demasiado corto o desperdicio.
+          for i in $(seq 1 60); do
+            curl -sf http://localhost:4100/api/salud > /dev/null && exit 0
+            sleep 1
+          done
+          echo "La API no respondió en 60 s"; exit 1
+        working-directory: backend
+
+      - name: Construir y arrancar la interfaz
+        run: |
+          npm ci
+          npm run build
+          PORT=3100 npm start &
+          for i in $(seq 1 60); do
+            curl -sf http://localhost:3100/entrar > /dev/null && exit 0
+            sleep 1
+          done
+          echo "La interfaz no respondió en 60 s"; exit 1
+        working-directory: frontend
+        env:
+          # Se hornea en el bundle al construir: aquí no hay proxy inverso
+          # delante, así que la URL tiene que ser absoluta.
+          NEXT_PUBLIC_API_URL: http://localhost:4100/api
+
+      - name: Instalar Chromium
+        run: npx playwright install --with-deps chromium
+        working-directory: frontend
+
+      - name: 1A · alta de catálogos desde la UI
+        run: node e2e/recorrido.mjs
+        working-directory: frontend
+
+      - name: 1B · orden → plan de carga → viaje autorizado
+        run: node e2e/recorrido-1b.mjs
+        working-directory: frontend
+
+      - name: Capturas del recorrido
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: recorridos
+          path: frontend/e2e/ultimo-recorrido*.png
+          if-no-files-found: ignore
