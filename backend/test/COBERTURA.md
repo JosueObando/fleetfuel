@@ -12,12 +12,14 @@ muere y se lleva por delante la costumbre.
 
 Así que es un **trinquete**: se puso justo por debajo de lo que ya había.
 
-| | al ponerlo | umbral |
-|---|---|---|
-| Sentencias | 63,47 % | 62 |
-| Ramas | 42,52 % | 41 |
-| Funciones | 46,48 % | 45 |
-| Líneas | 66,18 % | 65 |
+| | 2026-09-06, al ponerlo | tras cubrir los catálogos | umbral |
+|---|---|---|---|
+| Sentencias | 63,47 % | **74,36 %** | 73 |
+| Ramas | 42,52 % | **60,24 %** | 59 |
+| Funciones | 46,48 % | **59,66 %** | 58 |
+| Líneas | 66,18 % | **77,55 %** | 76 |
+
+El trinquete ya ha subido una vez, que es exactamente para lo que está.
 
 **La regla de uso: cuando la cobertura suba, súbelo.** Nunca al revés. Bajarlo
 para que pase un commit es exactamente el fallo que el trinquete existe para

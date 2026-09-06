@@ -71,7 +71,8 @@ beforeAll(async () => {
   for (const [empresa, correo] of [[empresaA, 'ana@a.test'], [empresaB, 'beto@b.test']] as const) {
     await dueño.query(
       `INSERT INTO usuarios (empresa_id, nombre, correo, hash_clave)
-       VALUES ($1,$2,$3,'x') ON CONFLICT (empresa_id, correo) DO NOTHING`,
+       VALUES ($1,$2,$3,'x')
+       ON CONFLICT (empresa_id, correo) WHERE eliminado_en IS NULL DO NOTHING`,
       [empresa, correo.split('@')[0], correo]);
   }
 });

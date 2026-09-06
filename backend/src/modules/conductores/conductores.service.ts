@@ -1,5 +1,6 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { auditar, contextoActual, gestor } from '../../common/contexto/contexto-peticion';
+import { unaFila } from '../../common/una-fila';
 import { CrearConductorDto, ActualizarConductorDto } from './dto/conductores.dto';
 
 /*
@@ -88,9 +89,10 @@ export class ConductoresService {
 
     if (!asignaciones.length) return antes;
 
-    const [despues] = await gestor().query(
+    const despues = unaFila(await gestor().query(
+
       `UPDATE conductores SET ${asignaciones.join(', ')}, actualizado_en = now()
-        WHERE conductor_id = $1 RETURNING ${CAMPOS}`, [id, ...valores]);
+        WHERE conductor_id = $1 RETURNING ${CAMPOS}`, [id, ...valores]));
     auditar({ entidad: 'conductores', entidadId: String(id), valorAnterior: antes, valorNuevo: despues });
     return despues;
   }
@@ -99,9 +101,9 @@ export class ConductoresService {
     const antes = await this.obtener(id);
     if (antes.estado === 'en_viaje')
       throw new ConflictException('El conductor está en viaje; no se puede dar de baja');
-    const [despues] = await gestor().query(
+    const despues = unaFila(await gestor().query(
       `UPDATE conductores SET eliminado_en = now(), estado = 'suspendido', actualizado_en = now()
-        WHERE conductor_id = $1 RETURNING ${CAMPOS}`, [id]);
+        WHERE conductor_id = $1 RETURNING ${CAMPOS}`, [id]));
     auditar({ entidad: 'conductores', entidadId: String(id), valorAnterior: antes, valorNuevo: despues });
     return despues;
   }

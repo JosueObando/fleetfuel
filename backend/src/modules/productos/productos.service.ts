@@ -1,5 +1,6 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { auditar, contextoActual, gestor } from '../../common/contexto/contexto-peticion';
+import { unaFila } from '../../common/una-fila';
 import { CrearProductoDto, ActualizarProductoDto } from './dto/productos.dto';
 
 const CAMPOS = `producto_id AS id, codigo, nombre, unidad_medida AS "unidadMedida",
@@ -65,9 +66,9 @@ export class ProductosService {
       `SELECT 1 FROM compartimentos_cisterna WHERE producto_permitido = $1 LIMIT 1`, [id]);
     if (enUso) throw new ConflictException(
       'El producto está asignado a compartimentos; quítalo de ellos antes de darlo de baja');
-    const [despues] = await gestor().query(
+    const despues = unaFila(await gestor().query(
       `UPDATE productos_combustible SET eliminado_en = now(), estado = 'inactivo', actualizado_en = now()
-        WHERE producto_id = $1 RETURNING ${CAMPOS}`, [id]);
+        WHERE producto_id = $1 RETURNING ${CAMPOS}`, [id]));
     auditar({ entidad: 'productos_combustible', entidadId: String(id), valorAnterior: antes, valorNuevo: despues });
     return despues;
   }

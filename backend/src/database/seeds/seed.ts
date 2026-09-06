@@ -88,7 +88,13 @@ async function sembrar() {
   const [admin] = await q.query(
     `INSERT INTO usuarios (empresa_id, nombre, correo, hash_clave)
      VALUES ($1,$2,$3,$4)
-     ON CONFLICT (empresa_id, correo) DO UPDATE SET nombre = EXCLUDED.nombre
+     -- El predicado es OBLIGATORIO desde que uq_usuarios_empresa_correo es un
+     -- indice PARCIAL: un indice con WHERE solo sirve de arbitro de ON CONFLICT
+     -- si la sentencia repite su condicion. Sin el, Postgres responde «there is
+     -- no unique or exclusion constraint matching the ON CONFLICT
+     -- specification» y la semilla entera falla.
+     ON CONFLICT (empresa_id, correo) WHERE eliminado_en IS NULL
+       DO UPDATE SET nombre = EXCLUDED.nombre
      RETURNING usuario_id`,
     [empresaId, 'Administrador inicial', correo, await hash(clave, COSTO_BCRYPT)],
   );

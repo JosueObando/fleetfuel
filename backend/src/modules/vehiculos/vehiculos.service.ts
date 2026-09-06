@@ -1,5 +1,6 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { auditar, contextoActual, gestor } from '../../common/contexto/contexto-peticion';
+import { unaFila } from '../../common/una-fila';
 import { CrearVehiculoDto, ActualizarVehiculoDto } from './dto/vehiculos.dto';
 
 const CAMPOS = `vehiculo_id AS id, tipo_vehiculo AS "tipoVehiculo", placa,
@@ -74,9 +75,9 @@ export class VehiculosService {
       `SELECT 1 FROM cisternas WHERE vehiculo_id = $1 AND eliminado_en IS NULL LIMIT 1`, [id]);
     if (cisterna) throw new ConflictException(
       'El vehículo tiene una cisterna asociada; da de baja la cisterna primero');
-    const [despues] = await gestor().query(
+    const despues = unaFila(await gestor().query(
       `UPDATE vehiculos SET eliminado_en = now(), estado_operativo = 'bloqueado', actualizado_en = now()
-        WHERE vehiculo_id = $1 RETURNING ${CAMPOS}`, [id]);
+        WHERE vehiculo_id = $1 RETURNING ${CAMPOS}`, [id]));
     auditar({ entidad: 'vehiculos', entidadId: String(id), valorAnterior: antes, valorNuevo: despues });
     return despues;
   }

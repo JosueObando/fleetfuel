@@ -266,3 +266,82 @@ describe('la auditoría se escribe sola', () => {
     expect(String(a.usuario_id)).toBe(usuario.id);
   });
 });
+
+describe('la API contesta con la misma forma en las tres operaciones', () => {
+  it('POST, PATCH y DELETE devuelven un OBJETO, no un array de uno', async () => {
+    // Regresión. TypeORM devuelve `[filas]` en un INSERT … RETURNING pero
+    // `[[filas], contador]` en un UPDATE … RETURNING, así que el mismo
+    // `const [x] = await query(...)` que acierta en el alta capturaba el ARRAY
+    // en la edición y en la baja. Resultado medido: POST respondía
+    // `{"id":"288",…}` y PATCH y DELETE `[{"id":"288",…}]`.
+    //
+    // No rompía nada visible —el frontend descarta esos valores y recarga la
+    // lista— pero la API contestaba con dos formas para la misma entidad, y la
+    // auditoría guardaba el array como `valor_nuevo` en una tabla append-only
+    // que después no se puede corregir.
+    const alta = await api().post('/api/clientes')
+      .set('Authorization', `Bearer ${token}`).set('Idempotency-Key', nuevaClave())
+      .send({ nombre: `Forma ${Date.now()}` }).expect(201);
+    expect(Array.isArray(alta.body)).toBe(false);
+
+    const edicion = await api().patch(`/api/clientes/${alta.body.id}`)
+      .set('Authorization', `Bearer ${token}`).send({ nombre: 'Forma editada' }).expect(200);
+    expect(Array.isArray(edicion.body)).toBe(false);
+    expect(edicion.body.nombre).toBe('Forma editada');
+
+    const baja = await api().delete(`/api/clientes/${alta.body.id}`)
+      .set('Authorization', `Bearer ${token}`).expect(200);
+    expect(Array.isArray(baja.body)).toBe(false);
+    expect(baja.body.estado).toBe('inactivo');
+  });
+
+  it('la auditoría guarda un OBJETO en valor_nuevo, no un array', async () => {
+    const alta = await api().post('/api/clientes')
+      .set('Authorization', `Bearer ${token}`).set('Idempotency-Key', nuevaClave())
+      .send({ nombre: `Auditada ${Date.now()}` }).expect(201);
+    await api().patch(`/api/clientes/${alta.body.id}`)
+      .set('Authorization', `Bearer ${token}`).send({ nombre: 'Auditada y editada' }).expect(200);
+
+    const [a] = await dueño.query(
+      `SELECT jsonb_typeof(valor_nuevo) AS tipo FROM auditoria
+        WHERE empresa_id = $1 AND entidad_id = $2 ORDER BY auditoria_id DESC LIMIT 1`,
+      [empresa, String(alta.body.id)]);
+    expect(a.tipo).toBe('object');
+  });
+});
+
+describe('dar de baja libera el identificador, y no con un 500', () => {
+  it('el RUC de un cliente dado de baja se puede volver a registrar', async () => {
+    // Regresión de un desajuste entre el código y el esquema: los servicios
+    // comprobaban la unicidad con `eliminado_en IS NULL` —su intención era que
+    // la baja liberase el RUC— y los índices no llevaban esa condición, porque
+    // en PostgreSQL una UNIQUE constraint no puede ser parcial y estos estaban
+    // declarados como constraint. El servicio dejaba pasar el alta y el INSERT
+    // chocaba después; como nadie traduce el 23505 en los catálogos, el usuario
+    // recibía **500 «Internal server error»**.
+    const ruc = `RUC-${Date.now()}`;
+    const alta = await api().post('/api/clientes')
+      .set('Authorization', `Bearer ${token}`).set('Idempotency-Key', nuevaClave())
+      .send({ nombre: 'Original', ruc }).expect(201);
+    await api().delete(`/api/clientes/${alta.body.id}`)
+      .set('Authorization', `Bearer ${token}`).expect(200);
+
+    const reintento = await api().post('/api/clientes')
+      .set('Authorization', `Bearer ${token}`).set('Idempotency-Key', nuevaClave())
+      .send({ nombre: 'Reintento tras la baja', ruc });
+    expect(reintento.status).toBe(201);
+  });
+
+  it('pero con el cliente VIVO sigue dando 409, no 500', async () => {
+    // El otro lado de la misma regla: liberar el identificador al dar de baja
+    // no puede convertirse en «ya no se comprueba nada».
+    const ruc = `RUC-${Date.now()}-vivo`;
+    await api().post('/api/clientes')
+      .set('Authorization', `Bearer ${token}`).set('Idempotency-Key', nuevaClave())
+      .send({ nombre: 'Vivo', ruc }).expect(201);
+    const choque = await api().post('/api/clientes')
+      .set('Authorization', `Bearer ${token}`).set('Idempotency-Key', nuevaClave())
+      .send({ nombre: 'Duplicado', ruc });
+    expect(choque.status).toBe(409);
+  });
+});

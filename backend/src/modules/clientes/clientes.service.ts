@@ -1,5 +1,6 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { auditar, contextoActual, gestor } from '../../common/contexto/contexto-peticion';
+import { unaFila } from '../../common/una-fila';
 import { CrearClienteDto, ActualizarClienteDto } from './dto/clientes.dto';
 
 const CAMPOS = `cliente_id AS id, nombre, razon_social AS "razonSocial", ruc,
@@ -50,10 +51,10 @@ export class ClientesService {
     if (presentes.length === 0) return antes;
 
     const asignaciones = presentes.map(([c], i) => `${c} = $${i + 2}`).join(', ');
-    const [despues] = await gestor().query(
+    const despues = unaFila(await gestor().query(
       `UPDATE clientes SET ${asignaciones}, actualizado_en = now()
         WHERE cliente_id = $1 RETURNING ${CAMPOS}`,
-      [id, ...presentes.map(([, v]) => v)]);
+      [id, ...presentes.map(([, v]) => v)]));
 
     auditar({ entidad: 'clientes', entidadId: String(id), valorAnterior: antes, valorNuevo: despues });
     return despues;
@@ -63,9 +64,9 @@ export class ClientesService {
      verdad dejaría huérfanas las órdenes y los viajes que ya lo referencian. */
   async desactivar(id: string) {
     const antes = await this.obtener(id);
-    const [despues] = await gestor().query(
+    const despues = unaFila(await gestor().query(
       `UPDATE clientes SET eliminado_en = now(), estado = 'inactivo', actualizado_en = now()
-        WHERE cliente_id = $1 RETURNING ${CAMPOS}`, [id]);
+        WHERE cliente_id = $1 RETURNING ${CAMPOS}`, [id]));
     auditar({ entidad: 'clientes', entidadId: String(id), valorAnterior: antes, valorNuevo: despues });
     return despues;
   }

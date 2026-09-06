@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { auditar, contextoActual, gestor } from '../../common/contexto/contexto-peticion';
+import { unaFila } from '../../common/una-fila';
 import { CrearEstacionDto, ActualizarEstacionDto } from './dto/estaciones.dto';
 
 /* La ubicación sale descompuesta otra vez en latitud/longitud: el cliente no
@@ -74,18 +75,19 @@ export class EstacionesService {
     }
     if (!asignaciones.length) return antes;
 
-    const [despues] = await gestor().query(
+    const despues = unaFila(await gestor().query(
+
       `UPDATE estaciones_servicio SET ${asignaciones.join(', ')}, actualizado_en = now()
-        WHERE estacion_id = $1 RETURNING ${CAMPOS}`, [id, ...valores]);
+        WHERE estacion_id = $1 RETURNING ${CAMPOS}`, [id, ...valores]));
     auditar({ entidad: 'estaciones_servicio', entidadId: String(id), valorAnterior: antes, valorNuevo: despues });
     return despues;
   }
 
   async desactivar(id: string) {
     const antes = await this.obtener(id);
-    const [despues] = await gestor().query(
+    const despues = unaFila(await gestor().query(
       `UPDATE estaciones_servicio SET eliminado_en = now(), estado = 'inactiva', actualizado_en = now()
-        WHERE estacion_id = $1 RETURNING ${CAMPOS}`, [id]);
+        WHERE estacion_id = $1 RETURNING ${CAMPOS}`, [id]));
     auditar({ entidad: 'estaciones_servicio', entidadId: String(id), valorAnterior: antes, valorNuevo: despues });
     return despues;
   }
