@@ -17,19 +17,28 @@ const SESION: Sesion = {
   usuario: { id: '1', nombre: 'Ana', correo: 'ana@ejemplo.test', roles: ['Administrador'] },
 };
 
-/** Deja `fetch` devolviendo lo que se le diga y guarda cómo lo llamaron. */
-function fingirRespuesta(estado: number, cuerpo: unknown) {
-  const espia = jest.fn(async () => ({
+/**
+ * Deja `fetch` devolviendo lo que se le diga y guarda cómo lo llamaron.
+ *
+ * Los parámetros se declaran aunque no se usen: sin ellos `mock.calls[0][1]`
+ * tiene tipo de tupla vacía y no se puede leer lo que se envió. Y `tsc` sí lo
+ * ve aunque las pruebas pasen, porque `next/jest` transpila con SWC —que borra
+ * los tipos sin comprobarlos— y el `tsc --noEmit` de CI va aparte.
+ */
+type EspiaFetch = jest.Mock<Promise<Partial<Response>>, [string, RequestInit?]>;
+
+function fingirRespuesta(estado: number, cuerpo: unknown): EspiaFetch {
+  const espia = jest.fn(async (_url: string, _init?: RequestInit) => ({
     ok: estado >= 200 && estado < 300,
     status: estado,
     json: async () => cuerpo,
-  }));
+  })) as unknown as EspiaFetch;
   global.fetch = espia as unknown as typeof fetch;
   return espia;
 }
 
-const cabecerasDe = (espia: jest.Mock): Headers =>
-  (espia.mock.calls[0][1] as RequestInit).headers as Headers;
+const peticionDe = (espia: EspiaFetch): RequestInit => espia.mock.calls[0][1] ?? {};
+const cabecerasDe = (espia: EspiaFetch): Headers => peticionDe(espia).headers as Headers;
 
 beforeEach(() => {
   window.localStorage.clear();
@@ -147,13 +156,13 @@ describe('qué hace con cada error', () => {
 
   it('conserva el código en el error, para que la pantalla pueda decidir', async () => {
     fingirRespuesta(422, { message: 'Clave ya usada' });
-    const e = await api.crear('/clientes', {}).catch(x => x);
+    const e = (await api.crear('/clientes', {}).catch(x => x)) as ErrorApi;
     expect(e.estado).toBe(422);
   });
 
   it('un 204 no intenta leer cuerpo', async () => {
     // `DELETE` devuelve 204 sin cuerpo: llamar a .json() ahí lanza.
-    const espia = jest.fn(async () => ({
+    const espia = jest.fn(async (_url: string, _init?: RequestInit) => ({
       ok: true, status: 204,
       json: async () => { throw new Error('no hay cuerpo que leer'); },
     }));
@@ -168,15 +177,14 @@ describe('entrar', () => {
     // 400 en vez de la puerta de MFA, que es un mensaje distinto y confuso.
     const espia = fingirRespuesta(200, SESION);
     await entrar('ana@ejemplo.test', 'clave12345');
-    expect(JSON.parse((espia.mock.calls[0][1] as RequestInit).body as string))
+    expect(JSON.parse(peticionDe(espia).body as string))
       .toEqual({ correo: 'ana@ejemplo.test', clave: 'clave12345' });
   });
 
   it('lo manda cuando sí lo hay', async () => {
     const espia = fingirRespuesta(200, SESION);
     await entrar('ana@ejemplo.test', 'clave12345', '123456');
-    expect(JSON.parse((espia.mock.calls[0][1] as RequestInit).body as string).codigoTotp)
-      .toBe('123456');
+    expect(JSON.parse(peticionDe(espia).body as string).codigoTotp).toBe('123456');
   });
 
   it('NO manda el token de una sesión anterior', async () => {
@@ -184,13 +192,13 @@ describe('entrar', () => {
     guardarSesion(SESION);
     const espia = fingirRespuesta(200, SESION);
     await entrar('ana@ejemplo.test', 'clave12345');
-    const cabeceras = (espia.mock.calls[0][1] as RequestInit).headers as Record<string, string>;
+    const cabeceras = peticionDe(espia).headers as Record<string, string>;
     expect(cabeceras.Authorization).toBeUndefined();
   });
 
   it('propaga el 429 del freno con su mensaje', async () => {
     fingirRespuesta(429, { message: 'Demasiados intentos. Espera un momento y vuelve a intentarlo.' });
-    const e = await entrar('ana@ejemplo.test', 'mala').catch(x => x);
+    const e = (await entrar('ana@ejemplo.test', 'mala').catch(x => x)) as ErrorApi;
     expect(e.estado).toBe(429);
     expect(e.message).toMatch(/Demasiados intentos/);
   });

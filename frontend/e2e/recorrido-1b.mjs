@@ -85,13 +85,24 @@ await paso('alta de orden con una línea de producto', async () => {
      estaciones por cliente porque la API lo exige, así que un cliente sin
      estaciones deja el segundo desplegable vacío. */
   let cliente = null;
+  const opcionesEstacion = pag.getByLabel('Estación').locator('option:not([value=""])');
   for (const o of await pag.getByLabel('Cliente').locator('option').all()) {
     const v = await o.getAttribute('value');
     if (!v) continue;
     await pag.getByLabel('Cliente').selectOption(v);
-    await pag.waitForTimeout(400);
-    const n = await pag.getByLabel('Estación').locator('option:not([value=""])').count();
-    if (n > 0) { cliente = (await o.textContent() ?? '').trim(); break; }
+    /* Se espera a que APAREZCA una estación, no un tiempo fijo. Antes había un
+       waitForTimeout(400) y esta prueba fallaba de vez en cuando: si la
+       petición de estaciones tardaba un poco más, el conteo daba cero, el
+       bucle descartaba al único cliente que sí tenía estaciones y el recorrido
+       moría con «ningún cliente tiene estaciones dadas de alta». Una prueba
+       intermitente es peor que ninguna, porque enseña a reintentar y no mirar. */
+    try {
+      await opcionesEstacion.first().waitFor({ state: 'attached', timeout: 3000 });
+      cliente = (await o.textContent() ?? '').trim();
+      break;
+    } catch {
+      /* Ese cliente no tiene estaciones: se sigue con el siguiente. */
+    }
   }
   if (!cliente) throw new Error('ningún cliente tiene estaciones dadas de alta');
   const estacion = await elegirPrimera(pag.getByLabel('Estación'));

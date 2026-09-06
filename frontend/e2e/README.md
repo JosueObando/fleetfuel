@@ -25,6 +25,29 @@ directorio propio:
 
 `apt-get download` y `dpkg -x` no necesitan root.
 
+**Al 2026-09-06 esto ya está resuelto en esta máquina:** `chromium.launch()`
+arranca sin preparar nada, así que los dos recorridos se corren tal cual. La
+sección de arriba se queda para una máquina nueva.
+
+## No están en CI, y qué costaría meterlos
+
+Nada del entorno lo impide ya —en GitHub Actions basta
+`npx playwright install --with-deps chromium`—. Lo que falta es levantar la
+aplicación entera dentro del trabajo de CI: frontend, API, Postgres y Redis. Es
+un trabajo nuevo del workflow, no una línea más en el existente.
+
+Mientras tanto son verificación manual: se corren al cerrar una fase y su
+resultado vive en el plan de construcción, no en un check verde.
+
+## Nada de esperas por tiempo
+
+Un `waitForTimeout(400)` en `recorrido-1b.mjs` hizo que el recorrido fallara de
+vez en cuando: si la petición de estaciones tardaba un poco más, el bucle
+descartaba al único cliente que sí tenía estaciones y moría con «ningún cliente
+tiene estaciones dadas de alta». Se cambió por esperar a que la opción APAREZCA.
+
+Una prueba intermitente es peor que ninguna: enseña a reintentar y a no mirar.
+
 ## Sobre los selectores
 
 Se usan roles y etiquetas, no clases CSS: un recorrido atado a
