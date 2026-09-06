@@ -12,6 +12,7 @@ import { TokensService } from './tokens.service';
 import { CargaJwt } from './jwt.strategy';
 import { LoginDto } from './dto/login.dto';
 import { Contexto, ejecutarEnContexto } from '../../common/contexto/contexto-peticion';
+import { IntentosLoginService, MotivoDeFallo } from './intentos-login.service';
 
 /**
  * §7: sesión mutilada para quien tiene un rol que exige TOTP y aún no lo
@@ -52,6 +53,7 @@ export class AuthService {
     private readonly config: ConfigService,
     private readonly cifrado: CifradoService,
     private readonly tokens: TokensService,
+    private readonly intentos: IntentosLoginService,
   ) {}
 
   async login(dto: LoginDto, ip?: string): Promise<SesionEmitida | SesionInscripcionMfa> {
@@ -67,12 +69,27 @@ export class AuthService {
       // Se compara igual contra un hash de descarte para no filtrar por tiempo
       // de respuesta que el correo no existe.
       await compare(dto.clave, '$2a$10$invalidinvalidinvalidinvalidinvalidinvalidinvalidinvalidinv');
+      await this.anotarFallo(dto, ip, 'correo_desconocido');
       throw generico;
     }
-    if (!(await compare(dto.clave, fila.hash_clave))) throw generico;
-    if (fila.estado !== 'activo') throw new ForbiddenException('Usuario suspendido');
+    if (!(await compare(dto.clave, fila.hash_clave))) {
+      await this.anotarFallo(dto, ip, 'clave_incorrecta', fila);
+      throw generico;
+    }
+    if (fila.estado !== 'activo') {
+      await this.anotarFallo(dto, ip, 'usuario_suspendido', fila);
+      throw new ForbiddenException('Usuario suspendido');
+    }
 
-    await this.verificarMfa(fila, dto.codigoTotp);
+    // El motivo se calcula y se lanza aquí, en vez de que `verificarMfa` lance
+    // por su cuenta: el registro necesita saber CUÁL de los tres fallos fue, y
+    // deducirlo del mensaje de una excepción es de las cosas que se rompen sin
+    // avisar el día que alguien mejore la redacción.
+    const falloMfa = this.motivoDeMfaInvalido(fila, dto.codigoTotp);
+    if (falloMfa) {
+      await this.anotarFallo(dto, ip, falloMfa, fila);
+      throw EXCEPCION_DE_MFA[falloMfa]();
+    }
 
     // A partir de aquí ya se conoce la empresa: todo lo demás corre con el
     // contexto fijado, igual que cualquier otra petición.
@@ -180,14 +197,32 @@ export class AuthService {
 
   // ── MFA (§7) ──────────────────────────────────────────────────────────────
 
-  private async verificarMfa(fila: FilaLogin, codigo?: string): Promise<void> {
-    if (!fila.mfa_habilitado) return;
-    if (!codigo) throw new UnauthorizedException('Se requiere el código MFA');
-    if (!fila.mfa_secreto) throw new ForbiddenException('MFA habilitado sin secreto configurado');
+  private motivoDeMfaInvalido(fila: FilaLogin, codigo?: string): MotivoDeMfa | null {
+    if (!fila.mfa_habilitado) return null;
+    if (!codigo) return 'mfa_ausente';
+    if (!fila.mfa_secreto) return 'mfa_sin_secreto';
     const secreto = this.cifrado.descifrar(fila.mfa_secreto);
-    if (!authenticator.check(codigo, secreto)) {
-      throw new UnauthorizedException('Código MFA incorrecto');
-    }
+    return authenticator.check(codigo, secreto) ? null : 'mfa_incorrecto';
+  }
+
+  /**
+   * Un intento fallido queda anotado ANTES de que suba la excepción, y con el
+   * motivo real. Hacia fuera el mensaje sigue siendo genérico —«credenciales
+   * inválidas» tanto si el correo no existe como si la clave está mal—, porque
+   * distinguirlos convertiría el login en un oráculo de correos registrados.
+   * Hacia dentro no: quien mira un ataque necesita esa distinción justamente
+   * porque es la que no se le da al atacante.
+   */
+  private anotarFallo(
+    dto: LoginDto, ip: string | undefined, motivo: MotivoDeFallo, fila?: FilaLogin,
+  ): Promise<void> {
+    return this.intentos.registrarFallo({
+      correo: dto.correo,
+      motivo,
+      ip,
+      empresaId: fila?.empresa_id,
+      usuarioId: fila?.usuario_id,
+    });
   }
 
   // ── apoyo ─────────────────────────────────────────────────────────────────
@@ -334,3 +369,15 @@ export class AuthService {
     }
   }
 }
+
+type MotivoDeMfa = Extract<MotivoDeFallo, `mfa_${string}`>;
+
+/**
+ * Los mismos mensajes y los mismos códigos que antes; lo único que cambia es
+ * que ahora se eligen por motivo en vez de lanzarse desde tres sitios.
+ */
+const EXCEPCION_DE_MFA: Record<MotivoDeMfa, () => Error> = {
+  mfa_ausente: () => new UnauthorizedException('Se requiere el código MFA'),
+  mfa_sin_secreto: () => new ForbiddenException('MFA habilitado sin secreto configurado'),
+  mfa_incorrecto: () => new UnauthorizedException('Código MFA incorrecto'),
+};

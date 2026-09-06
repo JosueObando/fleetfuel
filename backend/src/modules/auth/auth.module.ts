@@ -7,6 +7,7 @@ import Redis from 'ioredis';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { MfaService } from './mfa.service';
+import { IntentosLoginService } from './intentos-login.service';
 import { CifradoService } from './cifrado.service';
 import { REDIS, TokensService } from './tokens.service';
 import { JwtStrategy } from './jwt.strategy';
@@ -17,6 +18,7 @@ import { JwtStrategy } from './jwt.strategy';
   controllers: [AuthController],
   providers: [
     AuthService, MfaService, CifradoService, TokensService, JwtStrategy,
+    IntentosLoginService,
     {
       provide: REDIS,
       inject: [ConfigService],
