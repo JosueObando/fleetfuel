@@ -3,6 +3,7 @@ import {
   ArrayMaxSize, ArrayMinSize, IsArray, IsDateString, IsIn, IsInt, IsNumber,
   IsOptional, IsString, Length, Max, Min, ValidateNested,
 } from 'class-validator';
+import { EsId } from '../../../common/es-id.decorator';
 
 export class CompartimentoDto {
   @IsInt() @Min(1) @Max(12) numero: number;
@@ -14,7 +15,7 @@ export class CompartimentoDto {
 }
 
 export class CrearCisternaDto {
-  @IsString() vehiculoId: string;
+  @EsId() vehiculoId: string;
   @IsNumber() @Min(0.01) capacidadTotal: number;
   @IsOptional() @IsString() @Length(2, 120) certificadoCalibracion?: string;
   @IsOptional() @IsDateString() fechaCalibracion?: string;

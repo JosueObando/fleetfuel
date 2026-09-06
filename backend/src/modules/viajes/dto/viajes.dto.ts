@@ -1,15 +1,16 @@
 import { IsDateString, IsIn, IsInt, IsNumber, IsOptional, IsString, Length, Min } from 'class-validator';
+import { EsId } from '../../../common/es-id.decorator';
 
 export class CrearViajeDto {
   @IsString() @Length(2, 40) codigoViaje: string;
   @IsDateString() fechaProgramada: string;
   @IsOptional() @IsIn(['simple', 'multiple', 'retorno']) tipoViaje?: string;
-  @IsOptional() @IsString() cabezalId?: string;
-  @IsOptional() @IsString() cisternaId?: string;
-  @IsOptional() @IsString() conductorId?: string;
-  @IsOptional() @IsString() conductorAuxiliarId?: string;
-  @IsOptional() @IsString() origenId?: string;
-  @IsOptional() @IsString() terminalCargaId?: string;
+  @IsOptional() @EsId() cabezalId?: string;
+  @IsOptional() @EsId() cisternaId?: string;
+  @IsOptional() @EsId() conductorId?: string;
+  @IsOptional() @EsId() conductorAuxiliarId?: string;
+  @IsOptional() @EsId() origenId?: string;
+  @IsOptional() @EsId() terminalCargaId?: string;
   /* Fin previsto: sin él, el viaje ocupa a su cisterna y su conductor de
      forma indefinida y ningún otro viaje posterior podría programarse. */
   @IsOptional() @IsDateString() fechaFin?: string;
@@ -30,14 +31,14 @@ export class CambiarEstadoViajeDto {
 }
 
 export class AsignarOrdenDto {
-  @IsString() ordenId: string;
+  @EsId() ordenId: string;
   @IsInt() @Min(1) secuenciaEntrega: number;
   @IsOptional() @IsDateString() horaEstimada?: string;
 }
 
 export class LineaPlanDto {
-  @IsString() compartimentoId: string;
-  @IsString() detalleOrdenId: string;
+  @EsId() compartimentoId: string;
+  @EsId() detalleOrdenId: string;
   @IsNumber() @Min(0.01) volumenPlanificado: number;
   @IsOptional() @IsString() terminalCarga?: string;
 }

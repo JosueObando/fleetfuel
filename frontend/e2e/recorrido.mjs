@@ -25,7 +25,7 @@ const CORREO = env.SEED_ADMIN_CORREO ?? 'admin@mupa.gob.pa';
    como haría el primer usuario real, y el recorrido entra con ese secreto. */
 const SECRETO = await asegurarSegundoFactor({
   api: API, correo: CORREO, clave: env.SEED_ADMIN_CLAVE,
-  secretoConocido: env.E2E_TOTP_SECRETO ?? 'E45TSC3SDQSGOW2U',
+  secretoConocido: env.E2E_TOTP_SECRETO,
 });
 
 const nav = await chromium.launch();

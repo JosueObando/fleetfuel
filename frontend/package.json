@@ -10,7 +10,8 @@
     "auditar:contraste": "node scripts/auditar-contraste.mjs",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:cov": "jest --coverage"
+    "test:cov": "jest --coverage",
+    "comprobar": "tsc --noEmit && npm run auditar:contraste && npm run test:cov"
   },
   "dependencies": {
     "next": "16.3.4",

@@ -240,6 +240,40 @@ describe('órdenes y viajes, ruta por ruta', () => {
   }, 180_000);
 });
 
+describe('un identificador con basura no puede ser un 500', () => {
+  /*
+   * Todos los ids del sistema son BIGINT y ningún `:id` de ningún controlador
+   * los valida: llegan a Postgres tal cual. Un id como «abc» produce
+   * `invalid input syntax for type bigint`, que sale como 500.
+   *
+   * Importa por dos motivos, y el segundo no es evidente. El primero es que un
+   * error del cliente devuelto como error del servidor miente sobre de quién es
+   * la culpa. El segundo es que ff-errores-5xx vigila la tasa de 5xx de
+   * producción: cualquiera que pida rutas con ids inventados —un rastreador,
+   * un enlace roto— dispara la alerta. Un canal que suena por basura ajena es
+   * un canal que se acaba silenciando.
+   */
+  it.each([
+    ['clientes', '/api/clientes/abc'],
+    ['estaciones', '/api/estaciones/abc'],
+    ['productos', '/api/productos/abc'],
+    ['vehiculos', '/api/vehiculos/abc'],
+    ['cisternas', '/api/cisternas/abc'],
+    ['conductores', '/api/conductores/abc'],
+    ['ordenes', '/api/ordenes/abc'],
+    ['viajes', '/api/viajes/abc'],
+  ])('GET de %s con un id que no es un número responde 4xx, no 5xx', async (_n, url) => {
+    const r = await api().get(url).set(cab());
+    expect(r.status).toBeLessThan(500);
+  });
+
+  it('tampoco por el cuerpo: un id de compartimento con basura no es un 500', async () => {
+    const r = await api().post('/api/viajes/1/plan-carga').set(cabPost())
+      .send({ compartimentoId: 'abc', detalleOrdenId: 'abc', volumenPlanificado: 10 });
+    expect(r.status).toBeLessThan(500);
+  });
+});
+
 describe('administración, ruta por ruta', () => {
   it('usuarios, roles, permisos, dispositivos, auditoría y empresa', async () => {
     const s = sello();

@@ -1,15 +1,23 @@
 # Pruebas del frontend
 
 ```bash
+npm run comprobar  # lo mismo que hace CI: tipos + contraste + cobertura
 npm test           # una pasada
 npm run test:watch # mientras se desarrolla
 npm run test:cov   # con cobertura y umbral
 ```
 
-`next/jest` aplica el mismo transformador SWC que el build, así que las pruebas
-compilan el código igual que producción: JSX, alias de rutas y CSS Modules.
-Configurar `ts-jest` a mano habría creado una segunda forma de compilar, y las
-dos se desincronizan.
+**`npm test` no comprueba los tipos.** `next/jest` aplica el mismo transformador
+SWC que el build, que los BORRA sin mirarlos: una prueba con un error de tipos
+pasa en verde aquí y tumba el trabajo de CI, que sí ejecuta `tsc --noEmit`. Ya
+ocurrió dos veces —la última con cuatro objetos a los que les faltaba una
+propiedad obligatoria—, y las dos veces el síntoma fue el mismo: local en verde,
+CI en rojo. Para eso está `npm run comprobar`: hace los mismos tres pasos que
+CI y en el mismo orden, así que «pasan las pruebas» significa lo mismo aquí que
+allí.
+
+Se eligió SWC, aun con ese coste, porque configurar `ts-jest` a mano habría
+creado una segunda forma de compilar, y las dos se desincronizan.
 
 El entorno es **jsdom** y no node: lo que se prueba aquí —`localStorage`,
 `fetch`, el DOM— sólo existe en un navegador, y es justo lo que falla distinto.

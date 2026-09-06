@@ -1,7 +1,7 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
 import { join } from 'path';
 
 import configuration from './config/configuration';
@@ -13,6 +13,7 @@ import { IdempotenciaInterceptor } from './common/interceptors/idempotencia.inte
 import { AuditoriaInterceptor } from './common/interceptors/auditoria.interceptor';
 import { ThrottlingModule } from './common/throttling/throttling.module';
 import { RegistroPeticionesMiddleware } from './common/registro/registro-peticiones.middleware';
+import { IdDeRutaPipe } from './common/id-de-ruta.pipe';
 
 import { AuthModule } from './modules/auth/auth.module';
 import { UsuariosModule } from './modules/usuarios/usuarios.module';
@@ -68,6 +69,11 @@ import { ViajesModule } from './modules/viajes/viajes.module';
     SaludModule,
   ],
   providers: [
+    // Un identificador de ruta con basura tiene que ser un 400, no el 500 que
+    // producía el bigint de Postgres al recibirlo. Aquí y no en main.ts para
+    // que las pruebas, que montan este módulo, lo ejerciten igual.
+    { provide: APP_PIPE, useClass: IdDeRutaPipe },
+
     // Guards: autenticar y luego autorizar. Corren ANTES que los interceptores,
     // que es lo que permite al de contexto leer request.user.
     { provide: APP_GUARD, useClass: JwtAuthGuard },

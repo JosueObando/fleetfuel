@@ -1,4 +1,5 @@
 import { IsDateString, IsEmail, IsIn, IsNumber, IsOptional, IsString, Length, Min } from 'class-validator';
+import { EsId } from '../../../common/es-id.decorator';
 
 export class CrearConductorDto {
   @IsString() @Length(4, 200) nombreCompleto: string;
@@ -14,7 +15,7 @@ export class CrearConductorDto {
   @IsOptional() @IsNumber() @Min(0) tarifaEntrega?: number;
   @IsOptional() @IsString() @Length(4, 200) contactoEmergencia?: string;
   /** Vínculo opcional con el usuario que usará la app del conductor (Fase 2A). */
-  @IsOptional() @IsString() usuarioId?: string;
+  @IsOptional() @EsId() usuarioId?: string;
 }
 
 export class ActualizarConductorDto extends CrearConductorDto {

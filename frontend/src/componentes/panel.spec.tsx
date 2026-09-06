@@ -95,8 +95,8 @@ describe('PhotoStrip y PhotoCard · los reportes del conductor', () => {
 describe('MapControl y MapView', () => {
   it('los controles del mapa se anuncian como grupo con nombre', () => {
     render(<MapControl etiqueta="Controles del mapa" controles={[
-      { titulo: 'Acercar', onClick: jest.fn() },
-      { titulo: 'Alejar', onClick: jest.fn() },
+      { icono: 'mas', titulo: 'Acercar', onClick: jest.fn() },
+      { icono: 'chevron', titulo: 'Alejar', onClick: jest.fn() },
     ]} />);
     expect(screen.getByRole('group', { name: 'Controles del mapa' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Acercar' })).toBeInTheDocument();
@@ -106,7 +106,7 @@ describe('MapControl y MapView', () => {
     const usuario = userEvent.setup();
     const acercar = jest.fn(); const alejar = jest.fn();
     render(<MapControl etiqueta="Mapa" controles={[
-      { titulo: 'Acercar', onClick: acercar }, { titulo: 'Alejar', onClick: alejar }]} />);
+      { icono: 'mas', titulo: 'Acercar', onClick: acercar }, { icono: 'chevron', titulo: 'Alejar', onClick: alejar }]} />);
     await usuario.click(screen.getByRole('button', { name: 'Alejar' }));
     expect(alejar).toHaveBeenCalled();
     expect(acercar).not.toHaveBeenCalled();
@@ -116,7 +116,7 @@ describe('MapControl y MapView', () => {
     const usuario = userEvent.setup();
     const onClick = jest.fn();
     render(<MapControl etiqueta="Mapa" controles={[
-      { titulo: 'Centrar', onClick, deshabilitado: true }]} />);
+      { icono: 'seguimiento', titulo: 'Centrar', onClick, deshabilitado: true }]} />);
     await usuario.click(screen.getByRole('button', { name: 'Centrar' }));
     expect(onClick).not.toHaveBeenCalled();
   });

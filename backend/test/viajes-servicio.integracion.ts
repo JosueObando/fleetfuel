@@ -47,6 +47,8 @@ const servicio = new ViajesService();
 
 let empresa: string, usuario: string, cisterna: string, compartimento: string;
 let conductor: string, detalleOrden: string, producto: string, orden: string;
+let productoDiesel: string, compartimentoSoloDiesel: string, compartimentoAjeno: string;
+let ordenRecibida: string, detalleAjeno: string;
 
 /** Corre `fn` como lo haría una petición real: con contexto de empresa, un
  *  manager transaccional y RLS activa. Deshace todo al terminar. */
@@ -82,6 +84,20 @@ async function viajeCompleto(s: ViajesService, estado = 'borrador') {
     compartimentoId: compartimento, detalleOrdenId: detalleOrden, volumenPlanificado: 1000,
   } as never);
   if (estado !== 'borrador') await forzarEstado(String(v.id), estado);
+  return String(v.id);
+}
+
+/** Un viaje con cisterna, conductor y una orden asignada, pero SIN plan de
+ *  carga: el punto de partida de casi todas las reglas del plan. */
+async function viajeConOrden(s: ViajesService) {
+  const v = await s.crear({
+    codigoViaje: `PLN-${Math.random().toString(36).slice(2, 9)}`,
+    tipoViaje: 'simple',
+    cisternaId: cisterna,
+    conductorId: conductor,
+    fechaProgramada: '2027-05-01T08:00:00Z',
+  } as never);
+  await s.asignarOrden(String(v.id), { ordenId: orden, secuenciaEntrega: 1 } as never);
   return String(v.id);
 }
 
@@ -141,12 +157,53 @@ beforeAll(async () => {
     `INSERT INTO detalles_orden (empresa_id, orden_id, producto_id, volumen_solicitado)
      VALUES ($1,$2,$3,5000) RETURNING detalle_orden_id`, [empresa, o.orden_id, producto]);
   detalleOrden = String(d.detalle_orden_id);
+
+  // ── Piezas para las reglas del plan de carga ──
+  // Un segundo producto y un compartimento que SÓLO lo admite: es lo que hace
+  // falta para probar la regla anticontaminación.
+  const [p2] = await dueño.query(
+    `INSERT INTO productos_combustible (empresa_id, codigo, nombre)
+     VALUES ($1,'SRV-DSL','Diésel') RETURNING producto_id`, [empresa]);
+  productoDiesel = String(p2.producto_id);
+  const [cd2] = await dueño.query(
+    `INSERT INTO compartimentos_cisterna
+       (empresa_id, cisterna_id, numero, capacidad_nominal, capacidad_calibrada, producto_permitido)
+     VALUES ($1,$2,2,5000,4980,$3) RETURNING compartimento_id`, [empresa, cisterna, productoDiesel]);
+  compartimentoSoloDiesel = String(cd2.compartimento_id);
+
+  // Una cisterna ajena con su compartimento: el que NO es de este viaje.
+  const [veh2] = await dueño.query(
+    `INSERT INTO vehiculos (empresa_id, tipo_vehiculo, placa) VALUES ($1,'cisterna','SRV-2')
+     RETURNING vehiculo_id`, [empresa]);
+  const [c2] = await dueño.query(
+    `INSERT INTO cisternas (empresa_id, vehiculo_id, capacidad_total) VALUES ($1,$2,8000)
+     RETURNING cisterna_id`, [empresa, veh2.vehiculo_id]);
+  const [cc2] = await dueño.query(
+    `INSERT INTO compartimentos_cisterna
+       (empresa_id, cisterna_id, numero, capacidad_nominal, capacidad_calibrada)
+     VALUES ($1,$2,1,4000,3980) RETURNING compartimento_id`, [empresa, c2.cisterna_id]);
+  compartimentoAjeno = String(cc2.compartimento_id);
+
+  // Una orden recién recibida y una línea suya: la orden que aún no se puede
+  // asignar, y la línea que no pertenece a ningún viaje.
+  const [o2] = await dueño.query(
+    `INSERT INTO ordenes_abastecimiento (empresa_id, cliente_id, estacion_id, estado)
+     VALUES ($1,$2,$3,'recibida') RETURNING orden_id`, [empresa, cli.cliente_id, est.estacion_id]);
+  ordenRecibida = String(o2.orden_id);
+  const [d2] = await dueño.query(
+    `INSERT INTO detalles_orden (empresa_id, orden_id, producto_id, volumen_solicitado)
+     VALUES ($1,$2,$3,3000) RETURNING detalle_orden_id`, [empresa, o2.orden_id, producto]);
+  detalleAjeno = String(d2.detalle_orden_id);
 });
 
 afterAll(async () => {
+  // El orden importa: `compartimentos_cisterna.producto_permitido` apunta a
+  // `productos_combustible`, así que el compartimento se borra antes que el
+  // producto. Al revés Postgres rechaza el DELETE y la limpieza deja restos que
+  // hacen fallar la SIGUIENTE ejecución, no ésta.
   for (const t of ['plan_carga', 'viaje_ordenes', 'viajes', 'detalles_orden',
                    'ordenes_abastecimiento', 'estaciones_servicio', 'clientes',
-                   'productos_combustible', 'compartimentos_cisterna', 'cisternas',
+                   'compartimentos_cisterna', 'productos_combustible', 'cisternas',
                    'vehiculos', 'conductores', 'auditoria', 'usuarios']) {
     await dueño.query(`DELETE FROM ${t} WHERE empresa_id = $1`, [empresa]);
   }
@@ -391,5 +448,168 @@ describe('los estados viven en DOS sitios y tienen que decir lo mismo', () => {
       .map(m => m[1]).sort();
 
     expect(Object.keys(FLUJO_VIAJE).sort()).toEqual(enLaBase);
+  });
+});
+
+/*
+ * A partir de aquí, las reglas del lado del FALLO de `asignarOrden` y
+ * `agregarLineaPlan`. Estaban todas sin cubrir —viajes.service.ts iba al 73 %
+ * de ramas— y son justo las que más importan: no describen lo que el sistema
+ * hace, sino lo que impide. Un camión no puede salir con más producto del que
+ * cabe, ni con carga de una orden que nadie pidió, ni con gasolina en un tanque
+ * calibrado para diésel.
+ */
+
+describe('asignarOrden · qué órdenes entran en un viaje y cuáles no', () => {
+  it('una orden que no existe se rechaza como petición mala, no como conflicto', async () => {
+    // 400 y no 404: el viaje sí existe, lo que está mal es lo que se pide.
+    await enServicio(async (s) => {
+      const v = await viajeConOrden(s);
+      await expect(s.asignarOrden(v, {
+        ordenId: '999999999', secuenciaEntrega: 2,
+      } as never)).rejects.toThrow('La orden indicada no existe');
+    });
+  });
+
+  it('una orden recién recibida no se puede asignar: primero se valida', async () => {
+    // §8.1: la validación es la frontera. Asignar una orden sin validar mete en
+    // la calle un pedido que nadie ha confirmado.
+    await enServicio(async (s) => {
+      const v = await viajeConOrden(s);
+      await expect(s.asignarOrden(v, { ordenId: ordenRecibida, secuenciaEntrega: 2 } as never))
+        .rejects.toThrow(/no se puede asignar a un viaje; debe estar validada/);
+    });
+  });
+
+  it('el rechazo dice en qué estado ESTÁ la orden, no sólo que no vale', async () => {
+    await enServicio(async (s) => {
+      const v = await viajeConOrden(s);
+      await expect(s.asignarOrden(v, { ordenId: ordenRecibida, secuenciaEntrega: 2 } as never))
+        .rejects.toThrow(/"recibida"/);
+    });
+  });
+
+  it('la misma orden dos veces en el mismo viaje se rechaza', async () => {
+    await enServicio(async (s) => {
+      const v = await viajeConOrden(s);
+      await expect(s.asignarOrden(v, { ordenId: orden, secuenciaEntrega: 2 } as never))
+        .rejects.toThrow(/ya está en el viaje, o esa secuencia ya está ocupada/);
+    });
+  });
+
+  it('un viaje que ya salió no admite órdenes nuevas', async () => {
+    // La frontera del §8.2: después de autorizar, el camión está en la calle y
+    // añadirle una entrega es replanificar algo que ya se está ejecutando.
+    await enServicio(async (s) => {
+      const v = await viajeConOrden(s);
+      await forzarEstado(v, 'autorizado');
+      await expect(s.asignarOrden(v, { ordenId: orden, secuenciaEntrega: 2 } as never))
+        .rejects.toThrow(/ya no admite órdenes nuevas/);
+    });
+  });
+});
+
+describe('agregarLineaPlan · lo que impide que un camión salga mal cargado', () => {
+  it('un compartimento que no existe se rechaza', async () => {
+    await enServicio(async (s) => {
+      const v = await viajeConOrden(s);
+      await expect(s.agregarLineaPlan(v, {
+        compartimentoId: '999999999',
+        detalleOrdenId: detalleOrden, volumenPlanificado: 100,
+      } as never)).rejects.toThrow('El compartimento indicado no existe');
+    });
+  });
+
+  it('un compartimento de OTRA cisterna se rechaza', async () => {
+    // Sin esta regla se podría planificar carga en un tanque que no viaja: el
+    // plan cuadraría en la pantalla y el camión saldría medio vacío.
+    await enServicio(async (s) => {
+      const v = await viajeConOrden(s);
+      await expect(s.agregarLineaPlan(v, {
+        compartimentoId: compartimentoAjeno, detalleOrdenId: detalleOrden, volumenPlanificado: 100,
+      } as never)).rejects.toThrow('Ese compartimento no pertenece a la cisterna del viaje');
+    });
+  });
+
+  it('una línea de una orden que no está en el viaje se rechaza', async () => {
+    // Carga sin destinatario: producto que sale de la terminal sin que ninguna
+    // entrega de este viaje lo reclame.
+    await enServicio(async (s) => {
+      const v = await viajeConOrden(s);
+      await expect(s.agregarLineaPlan(v, {
+        compartimentoId: compartimento, detalleOrdenId: detalleAjeno, volumenPlanificado: 100,
+      } as never)).rejects.toThrow(/no pertenece a ninguna orden asignada a este viaje/);
+    });
+  });
+
+  it('no se planifica más de lo que el compartimento tiene CALIBRADO', async () => {
+    // Calibrado, no nominal: la diferencia entre 5000 y 4980 es exactamente lo
+    // que separa un aforo legal de uno inventado.
+    await enServicio(async (s) => {
+      const v = await viajeConOrden(s);
+      await expect(s.agregarLineaPlan(v, {
+        compartimentoId: compartimento, detalleOrdenId: detalleOrden, volumenPlanificado: 4990,
+      } as never)).rejects.toThrow(/admite 4980/);
+    });
+  });
+
+  it('no se planifica más de lo que la orden pidió', async () => {
+    await enServicio(async (s) => {
+      const v = await viajeConOrden(s);
+      await s.agregarLineaPlan(v, {
+        compartimentoId: compartimento, detalleOrdenId: detalleOrden, volumenPlanificado: 4000,
+      } as never);
+      // Pedidos 5000, planificados 4000: quedan 1000 y se piden 1500.
+      await expect(s.agregarLineaPlan(v, {
+        compartimentoId: compartimentoSoloDiesel, detalleOrdenId: detalleOrden, volumenPlanificado: 1500,
+      } as never)).rejects.toThrow(/le quedan 1000 por planificar/);
+    });
+  });
+
+  it('un compartimento calibrado para otro producto no admite esta línea', async () => {
+    // La regla anticontaminación. Mezclar productos en un tanque estropea la
+    // carga entera, y el daño no se ve hasta que llega a la estación.
+    await enServicio(async (s) => {
+      const v = await viajeConOrden(s);
+      await expect(s.agregarLineaPlan(v, {
+        compartimentoId: compartimentoSoloDiesel, detalleOrdenId: detalleOrden, volumenPlanificado: 500,
+      } as never)).rejects.toThrow('Ese compartimento no admite el producto de esa línea');
+    });
+  });
+
+  it('el mismo compartimento no se carga dos veces en el mismo viaje', async () => {
+    await enServicio(async (s) => {
+      const v = await viajeConOrden(s);
+      await s.agregarLineaPlan(v, {
+        compartimentoId: compartimento, detalleOrdenId: detalleOrden, volumenPlanificado: 500,
+      } as never);
+      await expect(s.agregarLineaPlan(v, {
+        compartimentoId: compartimento, detalleOrdenId: detalleOrden, volumenPlanificado: 500,
+      } as never)).rejects.toThrow(/ya tiene carga asignada en este viaje/);
+    });
+  });
+
+  it('un viaje sin cisterna no admite plan de carga', async () => {
+    await enServicio(async (s) => {
+      const v = await s.crear({
+        codigoViaje: `NOC-${Math.random().toString(36).slice(2, 9)}`,
+        tipoViaje: 'simple', conductorId: conductor,
+        fechaProgramada: '2027-06-01T08:00:00Z',
+      } as never);
+      await s.asignarOrden(String(v.id), { ordenId: orden, secuenciaEntrega: 1 } as never);
+      await expect(s.agregarLineaPlan(String(v.id), {
+        compartimentoId: compartimento, detalleOrdenId: detalleOrden, volumenPlanificado: 100,
+      } as never)).rejects.toThrow('El viaje no tiene cisterna asignada');
+    });
+  });
+
+  it('un viaje que ya salió tiene el plan de carga cerrado', async () => {
+    await enServicio(async (s) => {
+      const v = await viajeConOrden(s);
+      await forzarEstado(v, 'cargando');
+      await expect(s.agregarLineaPlan(v, {
+        compartimentoId: compartimento, detalleOrdenId: detalleOrden, volumenPlanificado: 100,
+      } as never)).rejects.toThrow(/el plan de carga ya está cerrado/);
+    });
   });
 });

@@ -55,6 +55,10 @@ export function totp(secreto) {
  * (`E2E_TOTP_SECRETO`). Si no —el caso de una base recién sembrada— se inscribe
  * aquí mismo y se devuelve el que acaba de generar el servidor.
  */
+/** El secreto con el que se inscribió la cuenta de desarrollo la primera vez.
+ *  Último recurso: sólo sirve si nadie ha vuelto a inscribir el segundo factor. */
+const SECRETO_HISTORICO = 'E45TSC3SDQSGOW2U';
+
 export async function asegurarSegundoFactor({ api, correo, clave, secretoConocido }) {
   const entrar = (cuerpo) => fetch(`${api}/auth/login`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -73,7 +77,17 @@ export async function asegurarSegundoFactor({ api, correo, clave, secretoConocid
    */
   if (primera.estado === 401 && /código MFA/i.test(primera.cuerpo?.message ?? '')) {
     const recordado = existsSync(CACHE) ? readFileSync(CACHE, 'utf8').trim() : '';
-    const secreto = secretoConocido || recordado;
+    /* El orden importa y estaba al revés. Los recorridos pasaban
+     * `E2E_TOTP_SECRETO ?? 'E45TSC3SDQSGOW2U'`, así que `secretoConocido` nunca
+     * venía vacío y la caché NO SE USABA NUNCA — justo en el caso para el que
+     * existe: la cuenta está inscrita porque la inscribimos nosotros y el
+     * secreto sólo está ahí. Al reinscribir el segundo factor en una base ya
+     * usada, el recorrido seguía mandando el histórico y recibía «Código MFA
+     * incorrecto», sin más síntoma que un login que no navega.
+     *
+     * Ahora manda lo explícito (la variable de entorno), luego lo que nosotros
+     * mismos guardamos, y el histórico queda de último recurso. */
+    const secreto = secretoConocido || recordado || SECRETO_HISTORICO;
     if (!secreto) {
       throw new Error('La cuenta ya tiene TOTP inscrito y no se conoce su secreto. ' +
                       'Define E2E_TOTP_SECRETO o borra e2e/.secreto-totp.');

@@ -3,16 +3,17 @@ import {
   ArrayMinSize, IsArray, IsDateString, IsIn, IsNumber, IsOptional,
   IsString, Length, Max, Min, ValidateNested,
 } from 'class-validator';
+import { EsId } from '../../../common/es-id.decorator';
 
 export class DetalleOrdenDto {
-  @IsString() productoId: string;
+  @EsId() productoId: string;
   @IsNumber() @Min(0.01) volumenSolicitado: number;
   @IsOptional() @IsNumber() @Min(0) @Max(100) tolerancia?: number;
 }
 
 export class CrearOrdenDto {
-  @IsString() clienteId: string;
-  @IsString() estacionId: string;
+  @EsId() clienteId: string;
+  @EsId() estacionId: string;
   @IsOptional() @IsString() @Length(1, 60) numeroOrdenExterna?: string;
   @IsOptional() @IsDateString() fechaRequerida?: string;
   @IsOptional() @IsDateString() ventanaInicio?: string;

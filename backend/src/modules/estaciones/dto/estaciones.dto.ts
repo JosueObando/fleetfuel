@@ -1,7 +1,8 @@
 import { IsIn, IsLatitude, IsLongitude, IsNumber, IsOptional, IsString, Length, Min } from 'class-validator';
+import { EsId } from '../../../common/es-id.decorator';
 
 export class CrearEstacionDto {
-  @IsString() clienteId: string;
+  @EsId() clienteId: string;
   @IsString() @Length(2, 160) nombre: string;
   @IsOptional() @IsString() @Length(1, 60) codigoExterno?: string;
   @IsOptional() @IsString() @Length(2, 80) provincia?: string;
