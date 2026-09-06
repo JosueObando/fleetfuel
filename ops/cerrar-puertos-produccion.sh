@@ -21,6 +21,15 @@
 # que mira el destino ORIGINAL de la conexion. Con `--dport 4200` la regla no
 # casaria con nada y volveriamos a la seguridad de mentira.
 #
+# EL TERCER DETALLE: EL SENTIDO
+#
+# `--ctorigdstport` identifica la CONEXION, no el paquete, asi que casa igual
+# con la ida y con la vuelta. Sin `--ctdir ORIGINAL` la regla tambien descarta
+# el SYN-ACK que el contenedor le devuelve al proxy —sale con src=172.x, que no
+# es el proxy— y el resultado es un cuelgue mudo: la conexion se queda en
+# SYN_RECV, el navegador espera hasta agotar el tiempo y no hay ningun error en
+# ningun log. Una regla que rechaza se diagnostica; esta solo calla.
+#
 # QUE NO TOCA
 #
 # Nada mas. No activa ufw, no cambia politicas por defecto y no roza los
@@ -49,22 +58,46 @@ revisar() {
   iptables -n -L DOCKER-USER --line-numbers | sed 's/^/  /'
   echo
   for p in "${PUERTOS[@]}"; do
-    if iptables -C DOCKER-USER -p tcp -m conntrack --ctorigdstport "$p" \
+    if iptables -C DOCKER-USER -p tcp -m conntrack --ctorigdstport "$p" --ctdir ORIGINAL \
          ! -s "$PROXY" -j DROP -m comment --comment "$ETIQUETA" 2>/dev/null; then
       echo "  puerto $p: CERRADO salvo para $PROXY"
+    elif iptables -C DOCKER-USER -p tcp -m conntrack --ctorigdstport "$p" \
+           ! -s "$PROXY" -j DROP -m comment --comment "$ETIQUETA" 2>/dev/null; then
+      echo "  puerto $p: REGLA ANTIGUA (sin --ctdir). Cierra el puerto pero"
+      echo "             tambien rompe al proxy. Vuelve a correr el script."
     else
       echo "  puerto $p: ABIERTO a toda la LAN"
     fi
   done
 }
 
+# La regla ANTERIOR al 2026-09-06 no llevaba `--ctdir ORIGINAL` y por eso
+# tambien mataba las respuestas del contenedor hacia el proxy (salen con
+# src=172.x, que no es $PROXY, y `--ctorigdstport` casa en los dos sentidos).
+# El sintoma era un cuelgue sin error, con la conexion clavada en SYN_RECV.
+# Hay que barrerla: si se queda puesta, la regla nueva no arregla nada.
+purgar_legado() {
+  local encontrada=0
+  for p in "${PUERTOS[@]}"; do
+    while iptables -C DOCKER-USER -p tcp -m conntrack --ctorigdstport "$p" \
+            ! -s "$PROXY" -j DROP -m comment --comment "$ETIQUETA" 2>/dev/null; do
+      iptables -D DOCKER-USER -p tcp -m conntrack --ctorigdstport "$p" \
+        ! -s "$PROXY" -j DROP -m comment --comment "$ETIQUETA"
+      echo "quitada la regla ANTIGUA del puerto $p (sin --ctdir, rompia las respuestas)"
+      encontrada=1
+    done
+  done
+  return $((1 - encontrada))
+}
+
 case "${1:-}" in
   --revisar) revisar; exit 0 ;;
   --quitar)
+    purgar_legado || true
     for p in "${PUERTOS[@]}"; do
-      while iptables -C DOCKER-USER -p tcp -m conntrack --ctorigdstport "$p" \
+      while iptables -C DOCKER-USER -p tcp -m conntrack --ctorigdstport "$p" --ctdir ORIGINAL \
               ! -s "$PROXY" -j DROP -m comment --comment "$ETIQUETA" 2>/dev/null; do
-        iptables -D DOCKER-USER -p tcp -m conntrack --ctorigdstport "$p" \
+        iptables -D DOCKER-USER -p tcp -m conntrack --ctorigdstport "$p" --ctdir ORIGINAL \
           ! -s "$PROXY" -j DROP -m comment --comment "$ETIQUETA"
         echo "quitada la regla del puerto $p"
       done
@@ -72,16 +105,18 @@ case "${1:-}" in
     revisar; exit 0 ;;
 esac
 
+purgar_legado || true
+
 for p in "${PUERTOS[@]}"; do
   # -C primero: el script se puede correr dos veces sin duplicar reglas.
-  if iptables -C DOCKER-USER -p tcp -m conntrack --ctorigdstport "$p" \
+  if iptables -C DOCKER-USER -p tcp -m conntrack --ctorigdstport "$p" --ctdir ORIGINAL \
        ! -s "$PROXY" -j DROP -m comment --comment "$ETIQUETA" 2>/dev/null; then
     echo "puerto $p: la regla ya estaba"
   else
     # -I y no -A: DOCKER-USER termina en un RETURN que devuelve el paquete a
     # las reglas permisivas de Docker. Una regla anadida al final nunca se
     # llegaria a evaluar.
-    iptables -I DOCKER-USER 1 -p tcp -m conntrack --ctorigdstport "$p" \
+    iptables -I DOCKER-USER 1 -p tcp -m conntrack --ctorigdstport "$p" --ctdir ORIGINAL \
       ! -s "$PROXY" -j DROP -m comment --comment "$ETIQUETA"
     echo "puerto $p: cerrado salvo para $PROXY"
   fi
