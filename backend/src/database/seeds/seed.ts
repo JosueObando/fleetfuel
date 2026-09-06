@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import { hash } from 'bcryptjs';
 import { COSTO_BCRYPT } from '../../common/costo-bcrypt';
+import { aplicarReparto } from '../reparto-permisos';
 import { AppDataSource } from '../data-source';
 
 /**
@@ -11,44 +12,45 @@ import { AppDataSource } from '../data-source';
  * Es idempotente: se puede volver a correr sobre una base ya sembrada.
  */
 
-/** Los 12 roles del §5, con los permisos de Fase 0 que le tocan a cada uno.
- *  Los permisos de negocio (viajes, cargas, liquidaciones) se añaden en Fase 1;
- *  aquí sólo existe el vocabulario que la Fase 0 implementa. */
-const ROLES: Array<{ nombre: string; descripcion: string; exigeMfa: boolean; permisos: string[] }> = [
+/**
+ * Los 12 roles del §5, con su identidad: nombre, para qué son, y si exigen
+ * segundo factor.
+ *
+ * QUÉ permisos tiene cada uno ya NO se decide aquí, sino en
+ * `reparto-permisos.ts`. Estaba repartido entre este fichero y dos migraciones,
+ * y esa división fue el fallo: las migraciones reparten buscando el rol por
+ * nombre, y en una base nueva corren antes de que la semilla lo cree. No
+ * encontraban nada y no fallaban.
+ */
+const ROLES: Array<{ nombre: string; descripcion: string; exigeMfa: boolean }> = [
   { nombre: 'Administrador', exigeMfa: true,
-    descripcion: 'Configuración general, usuarios, permisos, catálogos y auditoría',
-    permisos: ['usuarios:leer','usuarios:crear','usuarios:actualizar','usuarios:suspender',
-               'roles:leer','roles:administrar','dispositivos:leer','dispositivos:revocar',
-               'auditoria:leer','empresas:leer','empresas:administrar'] },
+    descripcion: 'Configuración general, usuarios, permisos, catálogos y auditoría' },
   { nombre: 'Finanzas', exigeMfa: true,
-    descripcion: 'Revisa costos, rentabilidad y pagos a conductores',
-    permisos: ['usuarios:leer','auditoria:leer','empresas:leer'] },
+    descripcion: 'Revisa costos, rentabilidad y pagos a conductores' },
   { nombre: 'Auditor', exigeMfa: true,
-    descripcion: 'Consulta historial, documentos y trazabilidad sin modificar datos',
-    permisos: ['usuarios:leer','roles:leer','dispositivos:leer','auditoria:leer','empresas:leer'] },
+    descripcion: 'Consulta historial, documentos y trazabilidad sin modificar datos' },
   { nombre: 'Operador de órdenes', exigeMfa: false,
-    descripcion: 'Registra o importa órdenes de Terpelo', permisos: ['empresas:leer'] },
+    descripcion: 'Registra o importa órdenes de Terpelo' },
   { nombre: 'Planificador de flota', exigeMfa: false,
-    descripcion: 'Asigna cisterna, compartimentos, conductor y horario', permisos: ['empresas:leer'] },
+    descripcion: 'Asigna cisterna, compartimentos, conductor y horario' },
   { nombre: 'Despachador', exigeMfa: false,
-    descripcion: 'Autoriza salida y verifica documentos', permisos: ['empresas:leer'] },
+    descripcion: 'Autoriza salida y verifica documentos' },
   { nombre: 'Conductor', exigeMfa: false,
-    descripcion: 'Consulta viajes, registra eventos, gastos y evidencias', permisos: [] },
+    descripcion: 'Consulta viajes, registra eventos, gastos y evidencias' },
   // §7: la separación entre quien captura la carga y quien captura la entrega
   // es un control antifraude, no un detalle organizativo. Por eso son dos roles
   // distintos y ninguno hereda del otro — y por eso no existe un rol con paso
   // libre que pudiera reunir ambos sin dejar rastro.
   { nombre: 'Operador de carga', exigeMfa: false,
-    descripcion: 'Confirma volúmenes cargados y sellos', permisos: [] },
+    descripcion: 'Confirma volúmenes cargados y sellos' },
   { nombre: 'Responsable de estación', exigeMfa: false,
-    descripcion: 'Valida recepción y firma entrega', permisos: [] },
+    descripcion: 'Valida recepción y firma entrega' },
   { nombre: 'Supervisor de operaciones', exigeMfa: false,
-    descripcion: 'Monitorea rutas, retrasos, alertas y diferencias',
-    permisos: ['usuarios:leer','dispositivos:leer','empresas:leer'] },
+    descripcion: 'Monitorea rutas, retrasos, alertas y diferencias' },
   { nombre: 'Mantenimiento', exigeMfa: false,
-    descripcion: 'Gestiona servicios preventivos y reparaciones', permisos: ['empresas:leer'] },
+    descripcion: 'Gestiona servicios preventivos y reparaciones' },
   { nombre: 'Cliente externo', exigeMfa: false,
-    descripcion: 'Consulta órdenes y entregas autorizadas', permisos: [] },
+    descripcion: 'Consulta órdenes y entregas autorizadas' },
 ];
 
 async function sembrar() {
@@ -68,6 +70,7 @@ async function sembrar() {
   );
   const empresaId = empresa.empresa_id;
 
+  const rolesPorNombre = new Map<string, string>();
   for (const rol of ROLES) {
     const [creado] = await q.query(
       `INSERT INTO roles (empresa_id, nombre, descripcion, exige_mfa) VALUES ($1,$2,$3,$4)
@@ -75,15 +78,13 @@ async function sembrar() {
        RETURNING rol_id`,
       [empresaId, rol.nombre, rol.descripcion, rol.exigeMfa],
     );
-    for (const codigo of rol.permisos) {
-      await q.query(
-        `INSERT INTO roles_permisos (rol_id, permiso_id)
-         SELECT $1, permiso_id FROM permisos WHERE codigo = $2
-         ON CONFLICT DO NOTHING`,
-        [creado.rol_id, codigo],
-      );
-    }
+    rolesPorNombre.set(rol.nombre, String(creado.rol_id));
   }
+
+  // El reparto COMPLETO, en cada siembra. Es idempotente, y correrlo siempre es
+  // lo que hace que añadir permisos nuevos no dependa de que las migraciones se
+  // ejecutaran en el orden afortunado.
+  await aplicarReparto((sql, params) => q.query(sql, params), rolesPorNombre);
 
   const [admin] = await q.query(
     `INSERT INTO usuarios (empresa_id, nombre, correo, hash_clave)
