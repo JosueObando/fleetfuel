@@ -1,4 +1,4 @@
-import { normalizarIp } from './intentos-login.service';
+import { normalizarIp } from './ip';
 
 /*
  * En `inet`, `::ffff:10.0.0.19` y `10.0.0.19` son familias distintas y NO

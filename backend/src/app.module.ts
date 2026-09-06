@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
@@ -12,6 +12,7 @@ import { ContextoEmpresaInterceptor } from './common/interceptors/contexto-empre
 import { IdempotenciaInterceptor } from './common/interceptors/idempotencia.interceptor';
 import { AuditoriaInterceptor } from './common/interceptors/auditoria.interceptor';
 import { ThrottlingModule } from './common/throttling/throttling.module';
+import { RegistroPeticionesMiddleware } from './common/registro/registro-peticiones.middleware';
 
 import { AuthModule } from './modules/auth/auth.module';
 import { UsuariosModule } from './modules/usuarios/usuarios.module';
@@ -86,4 +87,13 @@ import { ViajesModule } from './modules/viajes/viajes.module';
     { provide: APP_INTERCEPTOR, useClass: AuditoriaInterceptor },
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  /**
+   * A TODA ruta, incluida la que no existe. Un 404 repetido contra rutas que
+   * nadie tiene por qué pedir es de las señales más baratas que hay para ver
+   * a alguien tanteando el servidor, y filtrarlo aquí sería tirarla.
+   */
+  configure(consumer: MiddlewareConsumer): void {
+    consumer.apply(RegistroPeticionesMiddleware).forRoutes('*');
+  }
+}

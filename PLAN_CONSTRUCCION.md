@@ -112,7 +112,7 @@ uso enseña más sobre lo que falta que tres módulos a medio terminar.»*
 
 | Fase | Duración §19 | Estado | Comentario |
 |---|---|---|---|
-| 0 · Cimientos | 30 d | 🟡 **4 de 5** | 0.7 cerrado. El proxy sirve en producción. Del 0.6 quedan la observabilidad y el servidor de prueba |
+| 0 · Cimientos | 30 d | ✅ **cerrada** | 2026-09-06. Los tres entornos en pie, observabilidad recogiendo y respaldos verificándose solos |
 | UX-0 · Sistema de diseño | ~15 d | 🟢 **código completo** | 24/24 componentes, contraste AA en CI. Falta Noka y la revisión humana |
 | 1A · Catálogos | 25 d | ✅ **cerrada** | Criterio de salida verificado DESDE LA UI: alta de cliente, conductor, vehículo y cisterna con compartimentos, las cuatro en auditoría |
 | UX-1 · Shell y catálogos | — | 🟢 **código completo** | 3 columnas, 5 breakpoints, estado en la URL, CRUD de los 6 catálogos |
@@ -216,9 +216,11 @@ curl -s localhost:4100/api/salud | jq
 - [x] `.github/workflows/ci.yml` ejecutado paso a paso en clúster limpio,
       incluido `migration:revert`
 
-### 0.6 · Los tres entornos — 🟡 **4 de 5**
+### 0.6 · Los tres entornos — ✅ **5 de 5**
 
-- [ ] Servidor de **prueba** provisionado
+- [x] Servidor de **prueba** provisionado — 2026-09-06, replanteando lo que
+      este documento daba por imposible: `docker-compose.prueba.yml`, puertos
+      4300/3300, base, volúmenes y secretos propios
 - [x] Servidor de **producción** — redefinido el 2026-09-04 a esta misma
       máquina; compose propio levantado y verificado de extremo a extremo
 - [x] **Respaldo** automático de Postgres con restauración probada —
@@ -226,7 +228,8 @@ curl -s localhost:4100/api/salud | jq
       rotación 7+4. Falta el destino fuera de este host (ver los bloqueos)
 - [x] Nginx + Let's Encrypt como reverse proxy (§8: «nuevo») — cerrado el
       2026-09-06: host creado en NPM, TLS del comodín, puertos cerrados a la LAN
-- [ ] Observabilidad: Grafana+Loki+Prometheus, o Sentry+Better Stack (§8)
+- [x] Observabilidad: **Grafana + Loki + Prometheus** (§8) — autoalojada,
+      2026-09-06. `docker-compose.observabilidad.yml` y `ops/observabilidad.md`
 
 > **Nginx, al 2026-09-06.** Decidida la topología de **un solo origen**: el
 > frontend en `/` y la API en `/api` bajo el mismo host. `NEXT_PUBLIC_API_URL`
@@ -277,7 +280,44 @@ curl -s localhost:4100/api/salud | jq
 > pero no depende del acceso al CT y no se pierde al recrear el host en NPM.
 > Ver el bloqueo 3, cerrado.
 >
-> El servidor de **prueba** es lo único del §19 que esta máquina no da.
+> **El servidor de prueba SÍ lo da esta máquina** (2026-09-06). Este documento
+> decía lo contrario, y era la misma clase de error que el descarte de Let's
+> Encrypt: una conclusión heredada que nadie volvió a comprobar. Producción se
+> redefinió a esta misma máquina el 04-09 y funciona; un tercer proyecto de
+> Compose es mecánicamente lo mismo, y para un entorno de prueba la objeción de
+> compartir disco pesa aún menos, porque sus datos son desechables por
+> definición.
+>
+> Sirve para ensayar el despliegue antes de tocar producción: correr
+> `migration:run` contra datos con forma y arrancar la MISMA etapa `production`
+> de la imagen. Hoy ese ensayo se hacía en producción, que es donde no se debe
+> descubrir que una migración falla. Construye con etiqueta `:prueba` y no
+> reutiliza `:prod`: compartirla haría que reconstruir para probar cambiara, en
+> silencio, la imagen que producción levantaría en su siguiente reinicio.
+>
+> **Lo único que no reproduce** es el origen único: sin proxy delante, su
+> bundle lleva la URL absoluta y por tanto sí hay CORS, donde producción no
+> tiene. Un fallo de CORS es de los pocos que este entorno no puede atrapar.
+> Se arregla creando `prueba.jop.lat` en el NPM, que el comodín ya cubre.
+
+> **Observabilidad, cerrada el 2026-09-06.** Grafana + Loki + Prometheus
+> autoalojados, unos 400 MB de RAM. Se descartó Sentry + Better Stack: los
+> registros llevan correos, IPs y cuerpos de error, y sacarlos de la red es una
+> decisión que este sistema no necesita tomar.
+>
+> Lo primero que hubo que arreglar fue que **el backend no registraba ni una
+> petición HTTP** —214 líneas en producción, todas de arranque—. Ahora cada una
+> deja una línea JSON con su `idPeticion`, que vuelve al cliente en
+> `X-Request-Id`. Nunca el cuerpo: el del login lleva la clave y el TOTP. Y lo
+> genera un *middleware*, no un interceptor, porque cuando un guard rechaza
+> —el 401 del JWT, el 429 del freno— la excepción sube y el interceptor no
+> llega a correr: justo el tráfico que más interesa sería el único invisible.
+>
+> **Queda fuera, con motivo:** las métricas por contenedor. cAdvisor es
+> incompatible con el almacenamiento de Docker 29 y producía métricas
+> etiquetadas con el cgroup en crudo en vez del nombre — datos correctos e
+> ilegibles. Detalle completo en `ops/observabilidad.md`. Tampoco hay alertas
+> configuradas todavía.
 
 ### 0.7 · Respaldo del repositorio — ✅ (2026-09-03)
 
@@ -297,14 +337,21 @@ curl -s localhost:4100/api/salud | jq
 **Criterio de salida de la Fase 0**
 
 ```bash
-npm run typecheck && npm test && npm run test:integracion   # 0 fallos
-curl -sf https://<host-prueba>/api/salud                    # 200 en PRUEBA
-git remote -v && git push origin main                       # remoto vivo
+sg docker -c "docker compose exec -T backend npm run typecheck"        # 0 errores
+sg docker -c "docker compose exec -T backend npm test"                 # 0 fallos
+sg docker -c "docker compose exec -T backend npm run test:integracion" # 0 fallos
+curl -sf http://localhost:4300/api/salud                               # 200 en PRUEBA
+curl -sf https://fleetfuel.jop.lat/api/salud                           # 200 en PRODUCCIÓN
+git remote -v && git push origin main                                  # remoto vivo
 ```
 
-**El riesgo de esta fase:** darla por cerrada con 4 de 5. Las fases siguientes
-producen pantallas y la presión por avanzar aumenta; el punto 0.6 no se vuelve
-más fácil, sólo más caro.
+**Ejecutado el 2026-09-06:** typecheck limpio, 54 pruebas unitarias y 53 de
+integración en verde, los tres entornos respondiendo y el remoto al día.
+
+**El riesgo de esta fase era** darla por cerrada con 4 de 5 — las fases
+siguientes producen pantallas, la presión por avanzar aumenta y el 0.6 no se
+vuelve más fácil, sólo más caro. No se corrió: se cerró entera antes de
+empezar 1C.
 
 ---
 

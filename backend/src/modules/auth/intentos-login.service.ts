@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
+import { normalizarIp } from '../../common/ip';
 
 /**
  * Por qué falló el intento. Se guarda el motivo REAL, no el mensaje genérico
@@ -26,24 +27,6 @@ export interface IntentoFallido {
 }
 
 const ANCHO_CORREO = 160;
-const PREFIJO_IPV4_MAPEADA = '::ffff:';
-
-/**
- * Node entrega las IPv4 MAPEADAS en IPv6 cuando el socket es de doble pila:
- * `::ffff:10.0.0.19` en vez de `10.0.0.19`. Es el mismo detalle que obliga a
- * `proxy-de-confianza.spec.ts` a fijar la equivalencia para `trust proxy`.
- *
- * Aquí muerde de otra forma. En el tipo `inet` de Postgres las dos escrituras
- * son familias DISTINTAS y no comparan entre sí, así que la tabla acabaría con
- * las dos mezcladas —limpias las que llegan por el proxy, mapeadas las
- * directas— y un `WHERE ip = '10.0.0.19'` devolvería sólo la mitad. Sin error:
- * cero filas, que se lee como «no hubo intentos».
- */
-export function normalizarIp(ip: string | undefined): string | null {
-  if (!ip) return null;
-  return ip.startsWith(PREFIJO_IPV4_MAPEADA) ? ip.slice(PREFIJO_IPV4_MAPEADA.length) : ip;
-}
-
 @Injectable()
 export class IntentosLoginService {
   private readonly log = new Logger(IntentosLoginService.name);

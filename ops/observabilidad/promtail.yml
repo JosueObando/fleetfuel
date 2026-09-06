@@ -1,0 +1,46 @@
+# Recoge los logs de TODOS los contenedores por descubrimiento de Docker, no por
+# una lista escrita a mano: un contenedor nuevo aparece solo. Una lista fija se
+# queda desactualizada en silencio, y lo que falta en un registro no se nota.
+server:
+  http_listen_port: 9080
+  log_level: warn
+
+positions:
+  filename: /tmp/posiciones.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: contenedores
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 15s
+
+    relabel_configs:
+      # Docker devuelve el nombre con una barra delante: /fleetfuel_backend
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/(.*)'
+        target_label: contenedor
+      - source_labels: ['__meta_docker_container_label_com_docker_compose_project']
+        target_label: entorno
+      - source_labels: ['__meta_docker_container_label_com_docker_compose_service']
+        target_label: servicio
+
+    pipeline_stages:
+      # Se extrae el JSON de nuestras líneas de petición. Las que no son JSON
+      # —el arranque de Nest, los logs de Postgres— no casan y siguen adelante
+      # como texto: `json` no descarta lo que no puede analizar.
+      - json:
+          expressions:
+            nivel: nivel
+            tipo: tipo
+      # SÓLO estas dos pasan a etiqueta, y es la decisión que decide si este
+      # Loki aguanta. Loki indexa por etiquetas y guarda una serie por cada
+      # combinación distinta: etiquetar por `ruta` o por `estado` parece cómodo
+      # y multiplica las series hasta reventarlo —con IDs en la URL, son
+      # infinitas—. `ruta`, `estado`, `ms` e `idPeticion` viven dentro de la
+      # línea y se filtran al consultar: más lento, muchísimo más barato.
+      - labels:
+          nivel:
+          tipo:

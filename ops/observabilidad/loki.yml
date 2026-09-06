@@ -1,0 +1,48 @@
+# Loki para UNA máquina: sin agrupación, sin almacenamiento de objetos, todo en
+# disco local. La configuración de ejemplo de Loki trae un anillo de consenso y
+# almacenamiento S3 porque asume un clúster; aquí eso sería complejidad pura.
+auth_enabled: false
+
+server:
+  http_listen_port: 3100
+  # `warn` y no `info`: Loki registrando cada petición suya en el mismo disco
+  # que los registros que guarda es una espiral que se come el espacio.
+  log_level: warn
+
+common:
+  path_prefix: /loki
+  storage:
+    filesystem:
+      chunks_directory: /loki/chunks
+      rules_directory: /loki/rules
+  replication_factor: 1
+  ring:
+    kvstore:
+      store: inmemory
+
+schema_config:
+  configs:
+    - from: 2026-01-01
+      store: tsdb
+      object_store: filesystem
+      schema: v13
+      index:
+        prefix: index_
+        period: 24h
+
+limits_config:
+  # 30 días. Con el volumen de este sistema son unos pocos cientos de MB, y es
+  # el horizonte en el que uno se pregunta «¿esto pasaba antes del despliegue?».
+  retention_period: 720h
+  # Rechaza lo que llegue con fecha vieja: si un contenedor reenviara su
+  # historial entero al reiniciarse, se mezclaría con lo actual.
+  reject_old_samples: true
+  reject_old_samples_max_age: 168h
+  volume_enabled: true
+
+compactor:
+  working_directory: /loki/compactor
+  delete_request_store: filesystem
+  # Sin esto la retención NO borra nada: se limita a marcar. Es el error que
+  # hace que el disco se llene meses después de dar el asunto por resuelto.
+  retention_enabled: true

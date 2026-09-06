@@ -1,0 +1,139 @@
+# Observabilidad (0.6) — autoalojada, en esta misma máquina.
+#
+# Se eligió Grafana+Loki+Prometheus sobre Sentry+Better Stack: los registros
+# llevan correos, IPs y cuerpos de error, y mandarlos a un tercero es una
+# decisión que este sistema no necesita tomar. Cuesta ~600 MB de RAM.
+#
+# Un proyecto compose PROPIO, como producción: nombre, red y volúmenes aparte.
+# Que la observabilidad comparta ciclo de vida con lo observado es cómo se llega
+# a apagarla «un momento» para desplegar y no volver a encenderla.
+#
+#   sg docker -c "docker compose -f docker-compose.observabilidad.yml \
+#     --env-file .env.observabilidad -p fleetfuel-obs up -d"
+
+name: fleetfuel-obs
+
+services:
+  loki:
+    image: grafana/loki:3.2.1
+    container_name: fleetfuel_obs_loki
+    restart: unless-stopped
+    command: -config.file=/etc/loki/loki.yml
+    volumes:
+      - ./ops/observabilidad/loki.yml:/etc/loki/loki.yml:ro
+      - loki_data:/loki
+    # SIN `ports`. Se llega por la red interna desde Grafana. Publicarlo sería
+    # abrir a la LAN un servicio sin autenticación que contiene todos los
+    # registros del sistema —incluidos correos e IPs—. Y el 3100 lo ocupa el
+    # frontend de desarrollo, así que además chocaría.
+    networks: [observabilidad]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://localhost:3100/ready || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+  promtail:
+    image: grafana/promtail:3.2.1
+    container_name: fleetfuel_obs_promtail
+    restart: unless-stopped
+    command: -config.file=/etc/promtail/promtail.yml
+    volumes:
+      - ./ops/observabilidad/promtail.yml:/etc/promtail/promtail.yml:ro
+      # El socket, para DESCUBRIR los contenedores; los ficheros, para leer sus
+      # registros. Ambos de sólo lectura: promtail no tiene ninguna razón para
+      # escribir, y el socket de Docker es equivalente a root en esta máquina.
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - promtail_data:/tmp
+    depends_on:
+      loki:
+        condition: service_healthy
+    networks: [observabilidad]
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: fleetfuel_obs_prometheus
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      # 30 días, igual que Loki: no tiene sentido poder ver un registro sin
+      # poder ver qué hacía la máquina en ese momento.
+      - --storage.tsdb.retention.time=30d
+      - --storage.tsdb.retention.size=2GB
+    volumes:
+      - ./ops/observabilidad/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks: [observabilidad]
+
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    container_name: fleetfuel_obs_node
+    restart: unless-stopped
+    command:
+      - --path.rootfs=/host
+      - --collector.filesystem.mount-points-exclude=^/(dev|proc|sys|var/lib/docker/.+)($$|/)
+    pid: host
+    volumes:
+      - /:/host:ro,rslave
+    networks: [observabilidad]
+
+  # cAdvisor (métricas POR CONTENEDOR) queda FUERA, y no por olvido.
+  #
+  # Es incompatible con el Docker de esta máquina. Al crear cada contenedor
+  # busca su capa de escritura en /var/lib/docker/image/overlay2/layerdb/mounts/,
+  # que es el layout del driver overlay2; Docker 29 usa el del snapshotter,
+  # /var/lib/docker/rootfs/overlayfs/. No la encuentra y falla al CREAR el
+  # contenedor —no al medirlo—, así que ni `--disable_metrics=disk,diskIO` ni
+  # `DOCKER_API_VERSION` lo esquivan: se probaron los dos, con v0.49.1 y con
+  # v0.52.1.
+  #
+  # El resultado no era «sin datos», que se nota. Era peor: métricas correctas
+  # etiquetadas `/system.slice/docker-<sha256>.scope` en vez de
+  # `name="fleetfuel_db"`. Paneles que pintan algo y no dicen nada.
+  #
+  # Lo que se pierde: memoria y CPU por contenedor. Lo que NO se pierde: la
+  # memoria, la CPU y el disco de la máquina, que es la pregunta que de verdad
+  # importa en un equipo de 5,7 GB con tres entornos; y `docker stats` sigue
+  # respondiendo «cuál» en el momento en que haga falta.
+  #
+  # Revisar cuando cAdvisor soporte el snapshotter de Docker.
+
+  grafana:
+    image: grafana/grafana:11.3.1
+    container_name: fleetfuel_obs_grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USUARIO:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_CLAVE:?Hay que definir GRAFANA_CLAVE en .env.observabilidad}
+      # Sin registro de usuarios ni anónimos: es una consola de administración
+      # en la LAN, no un sitio.
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+      GF_AUTH_ANONYMOUS_ENABLED: 'false'
+      GF_ANALYTICS_REPORTING_ENABLED: 'false'
+      GF_ANALYTICS_CHECK_FOR_UPDATES: 'false'
+    volumes:
+      - ./ops/observabilidad/grafana/fuentes:/etc/grafana/provisioning/datasources:ro
+      - ./ops/observabilidad/grafana/paneles:/etc/grafana/provisioning/dashboards:ro
+      - ./ops/observabilidad/grafana/json:/etc/grafana/paneles:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      # El único puerto publicado del stack, y sólo en la LAN. No pasa por el
+      # proxy: no tiene por qué estar en internet.
+      - "${GRAFANA_PUERTO:-3400}:3000"
+    depends_on:
+      loki:
+        condition: service_healthy
+    networks: [observabilidad]
+
+networks:
+  observabilidad:
+    name: fleetfuel_observabilidad
+
+volumes:
+  loki_data:
+  promtail_data:
+  prometheus_data:
+  grafana_data:

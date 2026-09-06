@@ -1,0 +1,24 @@
+global:
+  scrape_interval: 30s
+  evaluation_interval: 30s
+
+scrape_configs:
+  # La máquina: CPU, memoria, disco, carga.
+  - job_name: maquina
+    static_configs:
+      - targets: ['node-exporter:9100']
+
+  # No hay objetivo de métricas por contenedor: cAdvisor es incompatible con el
+  # almacenamiento de Docker 29 en esta máquina. El motivo completo está en
+  # docker-compose.observabilidad.yml, donde se quitó.
+
+  # El propio stack: un Loki que se cae sin que nadie lo note deja de recoger
+  # registros, y el síntoma es que no hay registros — indistinguible de que no
+  # pase nada.
+  - job_name: loki
+    static_configs:
+      - targets: ['loki:3100']
+
+  - job_name: prometheus
+    static_configs:
+      - targets: ['localhost:9090']

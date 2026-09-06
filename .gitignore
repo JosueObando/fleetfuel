@@ -16,3 +16,7 @@ frontend/next-env.d.ts
 # que no lleva secretos, se vuelve a incluir a mano.
 .env.produccion*
 !.env.produccion.example
+.env.observabilidad*
+!.env.observabilidad.example
+.env.prueba*
+!.env.prueba.example
