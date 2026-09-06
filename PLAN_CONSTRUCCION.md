@@ -112,7 +112,7 @@ uso enseña más sobre lo que falta que tres módulos a medio terminar.»*
 
 | Fase | Duración §19 | Estado | Comentario |
 |---|---|---|---|
-| 0 · Cimientos | 30 d | 🟡 **4 de 5** | 0.7 cerrado. Del 0.6 quedan Nginx en NPM y la observabilidad |
+| 0 · Cimientos | 30 d | 🟡 **4 de 5** | 0.7 cerrado. El proxy sirve en producción. Del 0.6 quedan la observabilidad y el servidor de prueba |
 | UX-0 · Sistema de diseño | ~15 d | 🟢 **código completo** | 24/24 componentes, contraste AA en CI. Falta Noka y la revisión humana |
 | 1A · Catálogos | 25 d | ✅ **cerrada** | Criterio de salida verificado DESDE LA UI: alta de cliente, conductor, vehículo y cisterna con compartimentos, las cuatro en auditoría |
 | UX-1 · Shell y catálogos | — | 🟢 **código completo** | 3 columnas, 5 breakpoints, estado en la URL, CRUD de los 6 catálogos |
@@ -125,8 +125,15 @@ uso enseña más sobre lo que falta que tres módulos a medio terminar.»*
 | 4 · Integraciones | 45 d | ⬜ | |
 | 5 · Analítica | 40 d | ⬜ | |
 
-Repositorio: `main` en `2de1dff`, respaldado en
-`git@github.com:JosueObando/fleetfuel.git` (privado). Local y remoto idénticos.
+Repositorio: `main` en `67acab8`, respaldado en
+`git@github.com:JosueObando/fleetfuel.git` (privado).
+
+**FleetFuel se sirve en <https://fleetfuel.jop.lat>** desde el 2026-09-06, con
+TLS válido y un solo origen. Verificado de extremo a extremo: `/entrar` 200 en
+25 ms, `/api/salud` con `postgres: ok` y `redis: ok`, los chunks del bundle
+200, el 80 redirigiendo con 301, y `POST /api/auth/login` devolviendo 401 con
+credenciales falsas. Los puertos 4200 y 3200 ya **no** son alcanzables desde la
+LAN; el 4100 de desarrollo sigue abierto a propósito.
 
 **Producción está levantada** en esta misma máquina desde el 2026-09-04, con
 sus cuatro servicios sanos y separados de desarrollo en nombre, volúmenes, red
@@ -208,7 +215,7 @@ curl -s localhost:4100/api/salud | jq
 - [x] `.github/workflows/ci.yml` ejecutado paso a paso en clúster limpio,
       incluido `migration:revert`
 
-### 0.6 · Los tres entornos — 🟡 **3 de 5**
+### 0.6 · Los tres entornos — 🟡 **4 de 5**
 
 - [ ] Servidor de **prueba** provisionado
 - [x] Servidor de **producción** — redefinido el 2026-09-04 a esta misma
@@ -216,7 +223,8 @@ curl -s localhost:4100/api/salud | jq
 - [x] **Respaldo** automático de Postgres con restauración probada —
       `ops/respaldo-postgres.sh`, diario a las 02:00 por timer de systemd,
       rotación 7+4. Falta el destino fuera de este host (ver los bloqueos)
-- [ ] Nginx + Let's Encrypt como reverse proxy (§8: «nuevo») — 🟡 **parcial**, solo falta crear el host en NPM
+- [x] Nginx + Let's Encrypt como reverse proxy (§8: «nuevo») — cerrado el
+      2026-09-06: host creado en NPM, TLS del comodín, puertos cerrados a la LAN
 - [ ] Observabilidad: Grafana+Loki+Prometheus, o Sentry+Better Stack (§8)
 
 > **Nginx, al 2026-09-06.** Decidida la topología de **un solo origen**: el
@@ -226,11 +234,9 @@ curl -s localhost:4100/api/salud | jq
 > habría sido decorativo, porque esa URL se hornea en el JavaScript del
 > navegador y el cliente habría seguido llamando al 4200 directamente.
 >
-> La configuración está escrita y **probada** en `ops/nginx-fleetfuel.conf`
-> (nginx desechable en el 8081: `/entrar` 200, `/api/salud` 200, login POST
-> 200 con la puerta de MFA activa). `ops/proxy-inverso.md` especifica lo que
-> hay que crear en el NPM de 10.0.0.19. **Queda por aplicar allí**, y falta
-> decidir la política de límite del login.
+> La configuración está escrita en `ops/nginx-fleetfuel.conf` y **aplicada**
+> en el NPM de 10.0.0.19 según `ops/proxy-inverso.md`: el host reenvía `/` al
+> 3200 y una Custom Location `/api` al 4200, sin `Cache Assets`.
 >
 > **Let's Encrypt sí es posible, y ya está en marcha.** Corregido el
 > 2026-09-06: en el NPM hay un comodín `*.jop.lat` de Let's Encrypt válido
@@ -240,9 +246,35 @@ curl -s localhost:4100/api/salud | jq
 > nada. El descarte anterior razonaba sobre el reto HTTP-01, que sí exige
 > alcanzabilidad; era un error.
 >
-> **Puerta trasera abierta:** 3200 y 4200 escuchan en `0.0.0.0`, así que hoy se
-> puede llamar a la API saltándose el proxy. Se cierra con `ufw` restringiendo
-> a 10.0.0.19; requiere `sudo`, o sea una persona.
+> **Puerta trasera cerrada** el 2026-09-06 con `ops/cerrar-puertos-produccion.sh`
+> y su unidad de systemd. No con `ufw`, que aquí **miente**: Docker mete su DNAT
+> en PREROUTING y el tráfico va por FORWARD, mientras ufw trabaja en INPUT, así
+> que el puerto seguiría abierto a toda la LAN y `ufw status` diría que está
+> denegado. El enganche correcto es la cadena `DOCKER-USER`, emparejando con
+> `conntrack --ctorigdstport` porque allí el DNAT ya ocurrió.
+>
+> **Y ahí hubo una segunda trampa, que dejó la URL pública colgada desde
+> las 04:11 hasta que se diagnosticó.**
+> `--ctorigdstport` identifica la CONEXIÓN, no el paquete: casa en los dos
+> sentidos. El SYN del proxy pasaba, pero el SYN-ACK que el contenedor le
+> devuelve sale con `src=172.19.0.x` —que no es 10.0.0.19— y la propia regla lo
+> descartaba. La conexión se quedaba en `SYN_RECV` y la URL pública se colgaba
+> **sin un solo error en ningún log**, porque un `DROP` no devuelve RST. El
+> síntoma era idéntico a «el host de NPM no está creado», que era falso. Lo
+> arregla `--ctdir ORIGINAL` (commit `67acab8`), que limita la regla al sentido
+> de ida; el script purga la regla vieja antes de instalar la nueva, porque
+> dejarla puesta anula el arreglo.
+>
+> ⚠ **El freno de fuerza bruta del login se quedó fuera.** Para que el host
+> cargara hubo que correr `npm-configurar.sh --quitar-limite`, porque la zona
+> `login` de `limit_req` se declara **dentro** del CT 10.0.0.19 y eso pide un
+> `ssh root@` que desde aquí no autentica. Verificado el 2026-09-06: **42
+> intentos seguidos contra `POST /api/auth/login`, 42 respuestas 401, ni un
+> 429, y ni una línea en `auditoria`.** Detrás no hay nada: sin `Throttler`,
+> sin bloqueo por intentos y sin marca de código TOTP consumido. Y el cuerpo
+> del login lleva **los dos factores juntos**, así que quien acierte la clave
+> puede recorrer los 10⁶ códigos TOTP sin que nada lo detenga ni lo registre.
+> Ver el bloqueo 3.
 >
 > El servidor de **prueba** es lo único del §19 que esta máquina no da.
 
@@ -562,9 +594,11 @@ descubrirlo cuando `RequestList` ya esté maquetado.
 
 ---
 
-## Los dos bloqueos abiertos hoy
+## Los tres bloqueos abiertos hoy
 
-Ninguno es código. Los dos necesitan una decisión antes de que arranque 1A.
+Los dos primeros son decisiones, no código. El tercero apareció el 2026-09-06
+al verificar el proxy, y es el único que corre prisa: el sistema ya está
+publicado.
 
 1. **Cómo se respaldan los datos.** *(parcial al 2026-09-04)* Ya existe el
    mecanismo: `ops/respaldo-postgres.sh`, diario a las 02:00 por timer de
@@ -584,7 +618,28 @@ Ninguno es código. Los dos necesitan una decisión antes de que arranque 1A.
 2. **Si `RouteRequest` y el chat entran al alcance.** Bloquea a UX-2, pero se
    decide ahora porque cambia el modelo de datos de la Fase 2.
 
-> **Cerrado:** el respaldo del repositorio (0.7), el 2026-09-03.
+3. **`POST /auth/login` no tiene ningún freno.** *(abierto el 2026-09-06)*
+   Las tres defensas que faltan son en realidad una sola, y por eso el hueco es
+   mayor que sus partes: sin auditoría no se puede **ver** el ataque, sin
+   límite no se puede **frenar**, y como los dos factores viajan en el mismo
+   cuerpo, el segundo factor sin freno de peticiones no es un segundo factor.
+   Dos caminos, y hay que elegir uno:
+   - **En el proxy**, que es donde se decidió (`rate=10r/m`, `burst=10 nodelay`,
+     `429`): declarar la zona en `/data/nginx/custom/http_top.conf` del CT
+     10.0.0.19, reiniciar su contenedor y volver a correr
+     `ops/npm-configurar.sh` **sin** `--quitar-limite`. Necesita acceso al CT.
+   - **En el backend**, con un `Throttler`: más lento que nginx, pero no
+     depende de nadie y no se pierde al recrear el host en NPM.
+
+   Y en los dos casos falta **auditar los intentos fallidos**, que hoy no dejan
+   rastro: `registrarAcceso` sólo corre en el camino de éxito
+   (`backend/src/modules/auth/auth.service.ts:224`). Decisión previa: la tabla
+   `auditoria` exige `empresa_id` y `usuario_id`, y un intento contra un correo
+   que no existe no tiene ninguno de los dos — que es justo el caso que más
+   interesa ver.
+
+> **Cerrado:** el respaldo del repositorio (0.7), el 2026-09-03. El proxy
+> inverso con TLS (0.6), el 2026-09-06.
 
 ---
 
