@@ -97,6 +97,24 @@ export class ViajesService {
       throw new ConflictException(
         `El viaje está "${antes.estado}": ya no admite cambios de asignación ni de fecha`);
 
+    /* La cisterna no se toca mientras haya plan de carga.
+       El plan apunta a COMPARTIMENTOS, y los compartimentos son de una cisterna
+       concreta: cambiarla —o quitarla— deja líneas que hablan de un tanque que
+       ya no es el del viaje. `autorizar` lo cazaba tres pasos después, que
+       impide que el viaje salga pero no impide que el estado incoherente
+       exista. Se rechaza en el origen: para cambiar de cisterna, primero se
+       vacía el plan.
+
+       `dto.cisternaId !== undefined` y no `dto.cisternaId`: el nulo explícito
+       —que `@IsOptional()` deja pasar— es justamente el caso que se colaba. */
+    if (dto.cisternaId !== undefined
+        && String(dto.cisternaId ?? '') !== String(antes.cisternaId ?? '')
+        && antes.planCarga.length > 0) {
+      throw new ConflictException(
+        'El viaje tiene plan de carga sobre los compartimentos de su cisterna actual: ' +
+        'vacía el plan antes de cambiarla o quitarla');
+    }
+
     const columnas: Record<string, unknown> = {
       codigo_viaje: dto.codigoViaje, tipo_viaje: dto.tipoViaje, cabezal_id: dto.cabezalId,
       cisterna_id: dto.cisternaId, conductor_id: dto.conductorId,

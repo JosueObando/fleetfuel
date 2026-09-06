@@ -51,6 +51,11 @@ export class TokensService {
   }
 
   /** Corta todas las sesiones abiertas desde un dispositivo (§7). */
+  /** Cuántas sesiones tiene abiertas ese dispositivo, sin tocarlas. */
+  async contarSesiones(empresaId: string, dispositivoId: string): Promise<number> {
+    return this.redis.scard(this.claveDispositivo(empresaId, dispositivoId));
+  }
+
   async revocarDispositivo(empresaId: string, dispositivoId: string): Promise<number> {
     const idx = this.claveDispositivo(empresaId, dispositivoId);
     const jtis = await this.redis.smembers(idx);

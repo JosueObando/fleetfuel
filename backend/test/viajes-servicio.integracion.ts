@@ -296,25 +296,36 @@ describe('autorizar · la separación entre quien planifica y quien deja salir',
     });
   });
 
-  it('exige cisterna, y se puede llegar a no tenerla aunque haya plan de carga', async () => {
-    // Parecía una rama inalcanzable: `autorizar` exige plan de carga ANTES de
-    // mirar la cisterna, y `agregarLineaPlan` no deja crear el plan sin
-    // cisterna. Pero sí se llega, por otro lado: `actualizar` acepta
-    // `cisternaId: null` —`@IsOptional()` de class-validator deja pasar el nulo
-    // explícito— y lo escribe. El viaje se queda con líneas de plan que
-    // apuntan a compartimentos de una cisterna que ya no es suya.
+  it('NO se puede quitar la cisterna a un viaje que ya tiene plan de carga', async () => {
+    // `actualizar` aceptaba `cisternaId: null` —`@IsOptional()` de
+    // class-validator deja pasar el nulo explícito— y lo escribía. El viaje se
+    // quedaba con líneas de plan apuntando a compartimentos de una cisterna que
+    // ya no era suya: un estado incoherente que sólo se cazaba tres pasos
+    // después, al autorizar.
     //
-    // Que `autorizar` lo atrape es lo que impide que ese viaje salga. Lo que
-    // esta prueba deja a la vista es que el hueco existe antes: convendría que
-    // quitar la cisterna con un plan de carga encima no fuera posible, en vez
-    // de depender de que alguien lo cace tres pasos después.
+    // Se rechaza en el origen. Quitar la cisterna exige vaciar el plan primero,
+    // que es la única forma de que las dos cosas sigan diciendo lo mismo.
     await enServicio(async s => {
       const id = await viajeCompleto(s, 'programado');
-      const sinCisterna = await s.actualizar(id, { cisternaId: null } as never);
-      expect(sinCisterna.cisternaId).toBeNull();
-      expect(sinCisterna.planCarga.length).toBeGreaterThan(0);   // el plan sigue ahí
+      await expect(s.actualizar(id, { cisternaId: null } as never))
+        .rejects.toThrow(/plan de carga/i);
 
-      await expect(s.autorizar(id)).rejects.toThrow(/necesita cisterna y conductor/);
+      const intacto = await s.obtener(id);
+      expect(intacto.cisternaId).not.toBeNull();
+    });
+  });
+
+  it('sin plan de carga, quitar la cisterna sí se permite', async () => {
+    // El límite es la incoherencia, no la edición: un viaje en planificación al
+    // que todavía no se le ha asignado carga puede cambiar de idea.
+    await enServicio(async s => {
+      const v = await s.crear({
+        codigoViaje: `SRV-LIBRE-${Math.random().toString(36).slice(2, 7)}`,
+        tipoViaje: 'simple', cisternaId: cisterna, conductorId: conductor,
+        fechaProgramada: '2027-11-01T08:00:00Z',
+      } as never);
+      const sinCisterna = await s.actualizar(String(v.id), { cisternaId: null } as never);
+      expect(sinCisterna.cisternaId).toBeNull();
     });
   });
 

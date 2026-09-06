@@ -1,4 +1,4 @@
-import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from '@nestjs/common';
+import { Logger, CallHandler, ExecutionContext, Injectable, NestInterceptor } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { from, Observable } from 'rxjs';
@@ -23,6 +23,7 @@ import { UsuarioAutenticado } from '../decorators/usuario-actual.decorator';
  */
 @Injectable()
 export class ContextoEmpresaInterceptor implements NestInterceptor {
+  private readonly log = new Logger(ContextoEmpresaInterceptor.name);
   constructor(@InjectDataSource() private readonly dataSource: DataSource) {}
 
   intercept(ctx: ExecutionContext, next: CallHandler): Observable<unknown> {
@@ -67,6 +68,21 @@ export class ContextoEmpresaInterceptor implements NestInterceptor {
         firstValueFromCompat(next.handle()),
       );
       await runner.commitTransaction();
+
+      /* Los efectos que no son Postgres van AQUÍ, con la transacción ya
+         confirmada. Si uno falla no se puede deshacer nada —por eso se registra
+         en vez de propagarse— y tampoco puede tumbar una petición cuyo trabajo
+         real ya está guardado. */
+      for (const efecto of contexto.trasConfirmar ?? []) {
+        try {
+          await efecto();
+        } catch (e) {
+          this.log.error(
+            `Un efecto posterior al commit falló en ${contexto.ruta}: ${(e as Error).message}. ` +
+            'Lo guardado en Postgres SÍ quedó; esto no.',
+          );
+        }
+      }
       return resultado;
     } catch (error) {
       if (runner.isTransactionActive) await runner.rollbackTransaction();

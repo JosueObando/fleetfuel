@@ -25,6 +25,17 @@ export interface Contexto {
   ruta?: string;
   /** Los servicios empujan aquí lo que el interceptor no puede deducir solo. */
   cambios: CambioAuditado[];
+  /**
+   * Efectos que sólo deben ocurrir si la transacción CONFIRMA.
+   *
+   * Existen para lo que no vive en Postgres y por tanto no se revierte con él:
+   * hoy, cortar sesiones en Redis al revocar un dispositivo. Hacerlo dentro de
+   * la transacción falla ABIERTO —si algo posterior revienta, las sesiones
+   * quedan cortadas y el dispositivo sin revocar, así que el equipo robado
+   * vuelve a entrar—. Aplazarlo al commit invierte el peor caso: dispositivo
+   * marcado con sus sesiones vivas como mucho lo que dure el token de acceso.
+   */
+  trasConfirmar?: Array<() => Promise<void>>;
 }
 
 const almacen = new AsyncLocalStorage<Contexto>();
@@ -57,4 +68,16 @@ export function gestor(): EntityManager {
 /** Registra un cambio para la bitácora. El interceptor lo persiste al cerrar. */
 export function auditar(cambio: CambioAuditado): void {
   contextoActual().cambios.push(cambio);
+}
+
+/**
+ * Agenda un efecto para DESPUÉS de que la transacción confirme.
+ *
+ * Para lo que no es Postgres y por tanto no se revierte con él. Si el efecto
+ * falla, la transacción ya está confirmada y no se deshace: quien lo use tiene
+ * que elegir el orden de modo que ese sea el fallo aceptable.
+ */
+export function alConfirmar(efecto: () => Promise<void>): void {
+  const ctx = contextoActual();
+  (ctx.trasConfirmar ??= []).push(efecto);
 }

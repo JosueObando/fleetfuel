@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { auditar, contextoActual, gestor } from '../../common/contexto/contexto-peticion';
+import { alConfirmar, auditar, contextoActual, gestor } from '../../common/contexto/contexto-peticion';
 import { TokensService } from '../auth/tokens.service';
 
 @Injectable()
@@ -29,11 +29,19 @@ export class DispositivosService {
     );
     if (!dispositivo) throw new NotFoundException('Dispositivo no encontrado');
 
+    /* Se CUENTAN ahora y se CORTAN después del commit.
+       Hacerlo dentro de la transacción fallaba abierto: si algo posterior
+       reventaba, Postgres olvidaba la revocación y Redis no, así que al equipo
+       robado se le cerraba la sesión y podía volver a entrar. Al revés, el peor
+       caso es el seguro — dispositivo marcado, sesiones vivas como mucho lo que
+       dure el token de acceso. */
+    const sesiones = await this.tokens.contarSesiones(ctx.empresaId, id);
+
     await gestor().query(
       `UPDATE dispositivos SET revocado_en = now(), revocado_por = $2 WHERE dispositivo_id = $1`,
       [id, ctx.usuarioId],
     );
-    const sesiones = await this.tokens.revocarDispositivo(ctx.empresaId, id);
+    alConfirmar(() => this.tokens.revocarDispositivo(ctx.empresaId, id).then(() => undefined));
 
     auditar({
       entidad: 'dispositivos', entidadId: id, motivo,

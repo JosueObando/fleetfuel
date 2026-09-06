@@ -9,7 +9,7 @@ import { authenticator } from 'otplib';
 import type Redis from 'ioredis';
 
 import { AppModule } from '../src/app.module';
-import { REDIS } from '../src/modules/auth/tokens.service';
+import { REDIS, TokensService } from '../src/modules/auth/tokens.service';
 import {
   conexionDueño, sembrarEmpresa, borrarEmpresa, darPermisos, limpiarFreno,
 } from './apoyo/aplicacion';
@@ -277,9 +277,19 @@ describe('administración, ruta por ruta', () => {
       `INSERT INTO dispositivos (empresa_id, usuario_id, identificador, nombre)
        VALUES ($1,$2,$3,'Equipo superficie') RETURNING dispositivo_id`,
       [empresa, usuarioId, `sup-${s}`]);
-    await ruta('PATCH /dispositivos/:id/revocar',
+    // Con una sesión abierta de verdad: al revocar tiene que quedar cortada.
+    // Es la comprobación de que el interceptor ejecuta los efectos posteriores
+    // al commit — el servicio ya no corta Redis por su cuenta.
+    const tokens = modulo.get(TokensService);
+    const jti = await tokens.registrar({
+      usuarioId, empresaId: empresa, dispositivoId: String(d.dispositivo_id) });
+    expect(await tokens.vigente(jti)).toBe(true);
+
+    const revocado = await ruta('PATCH /dispositivos/:id/revocar',
       api().patch(`/api/dispositivos/${d.dispositivo_id}/revocar`).set(cab())
         .send({ motivo: 'Baja de prueba del recorrido' }), [200]);
+    expect(revocado.body.sesionesCortadas).toBe(1);
+    expect(await tokens.vigente(jti)).toBe(false);
 
     await ruta('GET /auditoria', api().get('/api/auditoria').set(cab()), [200]);
     await ruta('GET /empresa', api().get('/api/empresa').set(cab()), [200]);

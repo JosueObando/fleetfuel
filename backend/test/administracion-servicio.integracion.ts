@@ -51,9 +51,13 @@ async function enContextoConfirmado<T>(fn: () => Promise<T>): Promise<T> {
   await runner.startTransaction();
   try {
     await runner.query(`SELECT set_config('app.empresa_id', $1, true)`, [empresa]);
-    const r = await ejecutarEnContexto(
-      { empresaId: empresa, usuarioId: usuario.id, manager: runner.manager, cambios: [] }, fn);
+    const ctx = { empresaId: empresa, usuarioId: usuario.id, manager: runner.manager,
+                  cambios: [], trasConfirmar: [] as Array<() => Promise<void>> };
+    const r = await ejecutarEnContexto(ctx, fn);
     await runner.commitTransaction();
+    // Igual que hace `ContextoEmpresaInterceptor`: los efectos que no son
+    // Postgres corren DESPUÉS del commit, nunca dentro.
+    for (const efecto of ctx.trasConfirmar) await efecto();
     return r;
   } catch (e) {
     if (runner.isTransactionActive) await runner.rollbackTransaction();
@@ -386,24 +390,17 @@ describe('dispositivos · revocar es una operación en dos mundos', () => {
   }, 30_000);
 });
 
-describe('revocar NO es atómico entre los dos mundos', () => {
-  it('si la transacción se revierte, Redis ya cortó pero Postgres olvida la baja', async () => {
-    // Esto NO es una prueba de que algo funcione: fija una propiedad conocida y
-    // deja el riesgo a la vista.
+describe('revocar confirma primero y corta después', () => {
+  it('si la transacción se revierte, Redis NO se toca', async () => {
+    // Antes fallaba ABIERTO: Postgres iba dentro de la transacción y Redis
+    // fuera, así que un fallo posterior dejaba las sesiones cortadas y el
+    // dispositivo SIN revocar — al equipo robado se le cerraba la sesión y
+    // podía volver a entrar.
     //
-    // `revocar` escribe en Postgres dentro de la transacción de la petición y
-    // borra las sesiones de Redis en el acto. Redis no participa de esa
-    // transacción. Si algo posterior falla —el interceptor de auditoría, por
-    // ejemplo— Postgres revierte y Redis no: las sesiones quedan cortadas y el
-    // dispositivo NO queda marcado como revocado.
-    //
-    // El resultado falla ABIERTO: al equipo robado se le cierra la sesión y
-    // puede volver a entrar, porque su dispositivo sigue vivo en la base. Lo
-    // seguro sería confirmar primero y cortar Redis después: entonces el peor
-    // caso es un dispositivo marcado cuyas sesiones sobreviven quince minutos.
-    //
-    // Cambiarlo exige un enganche posterior al commit, así que se documenta y
-    // se decide, en vez de descubrirlo el día que haga falta.
+    // Ahora el corte de Redis se agenda para DESPUÉS del commit. El peor caso
+    // pasa a ser el contrario y es el seguro: dispositivo marcado —futuros
+    // logins bloqueados— con sus sesiones vivas como mucho lo que dure el token
+    // de acceso, quince minutos.
     const [d] = await dueño.query(
       `INSERT INTO dispositivos (empresa_id, usuario_id, identificador, nombre)
        VALUES ($1,$2,$3,'Para revertir') RETURNING dispositivo_id`,
@@ -417,8 +414,8 @@ describe('revocar NO es atómico entre los dos mundos', () => {
 
     const [fila] = await dueño.query(
       `SELECT revocado_en FROM dispositivos WHERE dispositivo_id = $1`, [dispositivoId]);
-    expect(fila.revocado_en).toBeNull();        // Postgres lo olvidó…
-    expect(await tokens.vigente(jti)).toBe(false); // …y Redis no.
+    expect(fila.revocado_en).toBeNull();           // Postgres lo olvidó…
+    expect(await tokens.vigente(jti)).toBe(true);  // …y Redis tampoco lo hizo.
 
     await dueño.query(`DELETE FROM dispositivos WHERE dispositivo_id = $1`, [dispositivoId]);
   }, 30_000);
