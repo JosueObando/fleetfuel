@@ -16,17 +16,27 @@ export default crearConfig({
   testEnvironment: 'jsdom',
   setupFilesAfterEnv: ['<rootDir>/pruebas/preparar.ts'],
   testMatch: ['<rootDir>/src/**/*.spec.ts', '<rootDir>/src/**/*.spec.tsx'],
-  // Trinquete, no meta. El frontend arrancó con CERO pruebas; estos números
-  // son ridículos como objetivo y valen como suelo: impiden que las tres
-  // suites que existen se borren o se dejen pudrir sin que CI diga nada.
-  // Cuando suba, súbelo. Ver PRUEBAS.md.
+  // El alias `@/` del tsconfig se declara aquí a mano: `next/jest` lo deduce de
+  // `compilerOptions.paths`, pero este tsconfig no fija `baseUrl` y sin él no
+  // llega a generarlo. El síntoma es «Cannot find module '@/…'» sólo dentro de
+  // `jest.mock(...)`, porque el código de producción sí lo resuelve por otra vía.
+  moduleNameMapper: { '^@/(.*)$': '<rootDir>/src/$1' },
+  // Trinquete, no meta. El frontend arrancó con CERO pruebas y un umbral del
+  // 7 %; hoy pasa el 80 % que pide la disciplina. Se sube cada vez que la
+  // cobertura sube, nunca al revés. Ver PRUEBAS.md.
   coverageThreshold: {
-    global: { statements: 7, branches: 6, functions: 4, lines: 7 },
+    global: { statements: 84, branches: 76, functions: 68, lines: 85 },
   },
   collectCoverageFrom: [
     'src/**/*.{ts,tsx}',
     '!src/**/*.d.ts',
     '!src/app/**/layout.tsx',
+    // El kit del sistema de diseño es el «equivalente a Storybook» del plan:
+    // una ruta que MUESTRA los 24 componentes en sus estados. Cubrirla mediría
+    // que el escaparate se renderiza, no que los componentes funcionen — y eso
+    // ya se prueba en cada componente. Misma razón por la que el backend deja
+    // fuera los DTO y las entidades.
+    '!src/app/kit/**',
     '!src/**/*.module.css',
   ],
 });

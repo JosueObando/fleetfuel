@@ -101,6 +101,16 @@ export default function Viajes() {
 
   return (
     <div className={estilos.dos}>
+      {/* El aviso va FUERA de las dos columnas a propósito. Estuvo dentro del
+          panel de detalle, y ahí sólo se veía con un viaje seleccionado: un 403
+          al cargar la lista, o un fallo al crear el PRIMER viaje, dejaban la
+          pantalla vacía y muda. Los dos son justo los primeros errores que se
+          encuentra alguien que estrena el sistema. */}
+      {error && (
+        <div className={estilos.avisoGeneral} role="alert">
+          <p className={catalogo.aviso}>{error}</p>
+        </div>
+      )}
       <section className={estilos.lista} aria-label="Viajes">
         <div className={catalogo.barra}>
           <h1 className={catalogo.titulo}>Viajes</h1>
@@ -177,8 +187,6 @@ export default function Viajes() {
                 ))}
               </div>
             </div>
-
-            {error && <div className={estilos.seccion}><p className={catalogo.aviso}>{error}</p></div>}
 
             <div className={estilos.seccion}>
               <h3 className={estilos.tituloSeccion}>Órdenes del viaje</h3>

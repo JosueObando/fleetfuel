@@ -1,0 +1,6 @@
+
+/* El aviso general ocupa las dos columnas: es de la pantalla, no de un panel. */
+.avisoGeneral {
+  grid-column: 1 / -1;
+  padding: 0 var(--esp-4);
+}
