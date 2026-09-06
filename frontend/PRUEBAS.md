@@ -35,15 +35,14 @@ cuela en una revisión visual, porque en pantalla se ve perfecto.
 
 ## El umbral
 
-| | al empezar | hoy | umbral |
-|---|---|---|---|
-| Sentencias | 7,24 % | **84,96 %** | 84 |
-| Ramas | 6,75 % | **77,88 %** | 76 |
-| Funciones | 4,65 % | **69,45 %** | 68 |
-| Líneas | 7,44 % | **85,83 %** | 85 |
+| | al empezar | pantallas | componentes del panel | umbral |
+|---|---|---|---|---|
+| Sentencias | 7,24 % | 84,96 % | **92,00 %** | 91 |
+| Ramas | 6,75 % | 77,88 % | **81,17 %** | 80 |
+| Funciones | 4,65 % | 69,45 % | **82,42 %** | 81 |
+| Líneas | 7,44 % | 85,83 % | **93,33 %** | 92 |
 
-Sentencias y líneas pasan el 80 % de la disciplina. Lo que falta en funciones y
-ramas son manejadores de la maqueta y caminos de error.
+**Las cuatro pasan el 80 % que pide la disciplina.**
 
 ## Qué queda fuera de la medida, a propósito
 

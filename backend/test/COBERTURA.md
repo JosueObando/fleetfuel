@@ -12,18 +12,22 @@ muere y se lleva por delante la costumbre.
 
 Así que es un **trinquete**: se puso justo por debajo de lo que ya había.
 
-| | al ponerlo | catálogos | administración y ramas | umbral |
-|---|---|---|---|---|
-| Sentencias | 63,47 % | 74,36 % | **89,41 %** | 88 |
-| Ramas | 42,52 % | 60,24 % | **71,95 %** | 70 |
-| Funciones | 46,48 % | 59,66 % | **79,67 %** | 78 |
-| Líneas | 66,18 % | 77,55 % | **92,10 %** | 91 |
+| | al ponerlo | catálogos | administración | superficie de la API | umbral |
+|---|---|---|---|---|---|
+| Sentencias | 63,47 % | 74,36 % | 89,41 % | **94,27 %** | 93 |
+| Ramas | 42,52 % | 60,24 % | 71,95 % | **80,00 %** | 79 |
+| Funciones | 46,48 % | 59,66 % | 79,67 % | **98,68 %** | 97 |
+| Líneas | 66,18 % | 77,55 % | 92,10 % | **95,35 %** | 94 |
 
-El trinquete ha subido tres veces, que es exactamente para lo que está.
+El trinquete ha subido cuatro veces, que es exactamente para lo que está.
+**Las cuatro métricas pasan ya el 80 % que pide la disciplina.**
 
-Sentencias y líneas ya pasan el 80 % que pide la disciplina; **las ramas no**, y
-es donde queda trabajo: lo que falta son caminos de error y valores por defecto,
-no funcionalidad sin probar.
+Lo que cerró las funciones fue `api-superficie.integracion.ts`, que recorre las
+64 rutas: las de servicio no tocan los controladores, así que sus métodos
+figuraban sin cubrir aunque la lógica de debajo estuviera probada. Y lo que
+cerró las ramas fue probar los VALORES POR DEFECTO de `configuration.ts` —cada
+`||` es una decisión sobre qué pasa cuando falta una variable, que es el
+escenario de un despliegue nuevo—.
 
 **La regla de uso: cuando la cobertura suba, súbelo.** Nunca al revés. Bajarlo
 para que pase un commit es exactamente el fallo que el trinquete existe para

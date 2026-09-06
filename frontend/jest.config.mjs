@@ -25,7 +25,7 @@ export default crearConfig({
   // 7 %; hoy pasa el 80 % que pide la disciplina. Se sube cada vez que la
   // cobertura sube, nunca al revés. Ver PRUEBAS.md.
   coverageThreshold: {
-    global: { statements: 84, branches: 76, functions: 68, lines: 85 },
+    global: { statements: 91, branches: 80, functions: 81, lines: 92 },
   },
   collectCoverageFrom: [
     'src/**/*.{ts,tsx}',

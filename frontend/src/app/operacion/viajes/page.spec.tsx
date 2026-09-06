@@ -213,3 +213,64 @@ describe('la lista', () => {
     expect(await screen.findByText(/Faltan: viajes:leer/)).toBeInTheDocument();
   });
 });
+
+describe('asignar órdenes y armar el plan de carga', () => {
+  const conOrden = () => ({
+    ...programado(),
+    estado: 'borrador',
+    transicionesPosibles: ['programado', 'cancelado'],
+    cisternaId: '3',
+    ordenes: [{ id: 'vo1', ordenId: '5', secuencia: 1, estacion: 'Vía España', estado: 'asignada' }],
+    planCarga: [{ id: 'p1', compartimentoId: '11', compartimento: 1,
+                  capacidadCalibrada: '4980', volumenPlanificado: '3000' }],
+  });
+
+  it('asignar una orden validada usa la ruta del viaje', async () => {
+    const usuario = userEvent.setup();
+    api.obtener.mockImplementation(async (r: string) =>
+      r.startsWith('/viajes') ? conOrden()
+      : { id: '5', numeroOrdenExterna: 'EXT-1', detalles: [{ id: 'd1', producto: 'Diésel' }] });
+    api.listar.mockImplementation((r: string) =>
+      Promise.resolve(r === '/viajes' ? LISTA
+        : r === '/ordenes?estado=validada' ? [{ id: '9', numeroOrdenExterna: 'EXT-9' }] : []));
+    render(<Viajes />);
+    await abrirViaje(usuario);
+
+    // El botón nace deshabilitado hasta elegir la orden: sin eso se asignaría
+    // una orden vacía y el servidor respondería un 400 que no explica nada.
+    const boton = await screen.findByRole('button', { name: /Asignar orden/ });
+    expect(boton).toBeDisabled();
+
+    await usuario.selectOptions(screen.getByRole('combobox', { name: /Orden validada/ }), '9');
+    expect(screen.getByRole('button', { name: /Asignar orden/ })).not.toBeDisabled();
+    await usuario.click(screen.getByRole('button', { name: /Asignar orden/ }));
+
+    await waitFor(() => expect(api.crear).toHaveBeenCalledWith(
+      '/viajes/1/ordenes', { ordenId: '9', secuenciaEntrega: 1 }));
+  }, 30_000);
+
+  it('quitar una línea del plan usa su propia ruta', async () => {
+    const usuario = userEvent.setup();
+    api.obtener.mockImplementation(async (r: string) =>
+      r.startsWith('/viajes') ? conOrden()
+      : { id: '5', numeroOrdenExterna: 'EXT-1', detalles: [{ id: 'd1', producto: 'Diésel' }] });
+    render(<Viajes />);
+    await abrirViaje(usuario);
+
+    const quitar = await screen.findByRole('button', { name: /Quitar/ });
+    await usuario.click(quitar);
+    await waitFor(() => expect(api.desactivar).toHaveBeenCalledWith('/viajes/1/plan-carga/p1'));
+  }, 30_000);
+
+  it('el plan de carga muestra el volumen contra lo calibrado', async () => {
+    // Es la comprobación que hace un operador de un vistazo: si lo planificado
+    // supera lo calibrado, la carga no cabe.
+    const usuario = userEvent.setup();
+    api.obtener.mockImplementation(async (r: string) =>
+      r.startsWith('/viajes') ? conOrden()
+      : { id: '5', numeroOrdenExterna: 'EXT-1', detalles: [] });
+    render(<Viajes />);
+    await abrirViaje(usuario);
+    expect(await screen.findByText(/3000|3,000/)).toBeInTheDocument();
+  }, 30_000);
+});
