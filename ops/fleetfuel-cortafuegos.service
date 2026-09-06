@@ -4,6 +4,13 @@ Description=FleetFuel · cerrar los puertos de produccion a todo menos al proxy
 # arranca, y el script falla a proposito si no la encuentra.
 After=docker.service
 Requires=docker.service
+# PartOf: si el demonio de Docker se reinicia —una actualizacion de paquete, un
+# `systemctl restart docker`—, systemd reinicia tambien esta unidad y las
+# reglas se vuelven a poner. Docker no deberia vaciar DOCKER-USER, que existe
+# justo para las reglas de uno, pero el modo de fallo si lo hiciera seria
+# silencioso: los puertos quedarian abiertos otra vez y nada lo diria. Una
+# linea a cambio de quitar esa duda.
+PartOf=docker.service
 
 [Service]
 Type=oneshot
