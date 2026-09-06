@@ -33,6 +33,17 @@ export default () => ({
     // Antes existía además MFA_ROLES_OBLIGATORIOS: una segunda regla, global y
     // que nadie aplicaba. Tener dos es cómo se llegó a no aplicar ninguna.
   },
+  // Freno de fuerza bruta del login. Ver src/common/throttling/.
+  // Los valores por defecto están pensados para que un usuario legítimo no los
+  // note nunca: cinco intentos fallidos contra la MISMA cuenta desde la MISMA
+  // dirección en un minuto no es alguien que se equivocó de clave, y treinta
+  // desde una dirección cubre a una oficina entera saliendo por NAT.
+  login: {
+    ventanaSegundos: parseInt(process.env.LOGIN_VENTANA_SEGUNDOS || '60', 10),
+    limitePorCuenta: parseInt(process.env.LOGIN_LIMITE_CUENTA || '5', 10),
+    limitePorIp: parseInt(process.env.LOGIN_LIMITE_IP || '30', 10),
+    bloqueoSegundos: parseInt(process.env.LOGIN_BLOQUEO_SEGUNDOS || '300', 10),
+  },
   idempotencia: {
     ttlHoras: parseInt(process.env.IDEMPOTENCIA_TTL_HORAS || '24', 10),
   },

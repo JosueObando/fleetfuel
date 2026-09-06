@@ -11,6 +11,7 @@ import { InscripcionMfaGuard } from './common/guards/inscripcion-mfa.guard';
 import { ContextoEmpresaInterceptor } from './common/interceptors/contexto-empresa.interceptor';
 import { IdempotenciaInterceptor } from './common/interceptors/idempotencia.interceptor';
 import { AuditoriaInterceptor } from './common/interceptors/auditoria.interceptor';
+import { ThrottlingModule } from './common/throttling/throttling.module';
 
 import { AuthModule } from './modules/auth/auth.module';
 import { UsuariosModule } from './modules/usuarios/usuarios.module';
@@ -56,6 +57,8 @@ import { ViajesModule } from './modules/viajes/viajes.module';
       }),
     }),
     AuthModule,
+    // Después de AuthModule: su factoría inyecta el REDIS que aquél exporta.
+    ThrottlingModule,
     UsuariosModule,
     RolesModule,
     EmpresasModule,

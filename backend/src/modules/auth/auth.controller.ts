@@ -1,4 +1,5 @@
-import { Body, Controller, Get, HttpCode, Post } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Post, UseGuards } from '@nestjs/common';
+import { ThrottlerGuard } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { MfaService } from './mfa.service';
 import { LoginDto } from './dto/login.dto';
@@ -17,8 +18,13 @@ export class AuthController {
     private readonly mfa: MfaService,
   ) {}
 
+  // El freno va aquí y no como guard global (ver ThrottlingModule). Corre
+  // antes del handler, así que corta ANTES de que bcrypt compare la clave:
+  // esa comparación es cara a propósito, y sin freno delante es además un
+  // vector para tumbar la CPU del backend con peticiones baratas.
   @Publico()
   @SinIdempotencia()
+  @UseGuards(ThrottlerGuard)
   @HttpCode(200)
   @Post('login')
   login(@Body() dto: LoginDto, @Ip() ip: string) {
