@@ -89,23 +89,37 @@ describe('el login no puede ser un directorio de correos', () => {
 
   it('tarda parecido en los dos casos', async () => {
     // El camino del correo inexistente compara contra un hash de descarte a
-    // propósito. Si alguien lo quitara «porque no hace nada», ese camino
-    // pasaría a responder en microsegundos y el tiempo delataría qué correos
-    // están registrados — sin que ninguna otra prueba se enterara.
+    // propósito. Ha fallado dos veces: primero porque la constante no era un
+    // bcrypt válido (0,15 ms contra 85), después porque era de coste 10 frente
+    // a los 12 reales (tres veces más rápido, medido en producción). Las dos
+    // veces el código se leía correcto.
+    //
+    // Se promedian tres medidas porque una sola es ruido; el margen de 3x es
+    // holgado a propósito, porque lo que se vigila es que la protección SIGA
+    // ahí, no cronometrar con precisión.
     const cronometrar = async (correo: string) => {
       const t = process.hrtime.bigint();
       await auth.login({ correo, clave: 'claveequivocada' } as never).catch(() => undefined);
       return Number(process.hrtime.bigint() - t) / 1e6;
     };
-    const sinUsuario = await cronometrar('nadie@ejemplo.test');
-    const conUsuario = await cronometrar(CORREO);
+    // El freno vive en el guard del controlador, no en el servicio, así que
+    // repetir el mismo correo aquí no lo activa.
+    const media = async (correo: string) => {
+      const tomas: number[] = [];
+      for (let i = 0; i < 3; i++) tomas.push(await cronometrar(correo));
+      return tomas.reduce((a, b) => a + b) / tomas.length;
+    };
 
-    // bcrypt con coste 10 no baja de unos milisegundos; el umbral es holgado a
-    // propósito, porque lo que se vigila es que el hash de descarte SIGA ahí,
-    // no medir con precisión.
-    expect(sinUsuario).toBeGreaterThan(10);
-    expect(conUsuario).toBeGreaterThan(10);
-  });
+    const sinUsuario = await media('nadie@ejemplo.test');
+    const conUsuario = await media(CORREO);
+
+    // Los dos hacen trabajo de bcrypt de verdad...
+    expect(sinUsuario).toBeGreaterThan(50);
+    expect(conUsuario).toBeGreaterThan(50);
+    // ...y ninguno delata al otro por ser mucho más rápido.
+    const razon = Math.max(sinUsuario, conUsuario) / Math.min(sinUsuario, conUsuario);
+    expect(razon).toBeLessThan(3);
+  }, 60_000);
 });
 
 describe('los cinco caminos dejan su motivo real', () => {

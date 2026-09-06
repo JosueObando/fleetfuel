@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import { hash } from 'bcryptjs';
+import { COSTO_BCRYPT } from '../../common/costo-bcrypt';
 import { AppDataSource } from '../data-source';
 
 /**
@@ -89,7 +90,7 @@ async function sembrar() {
      VALUES ($1,$2,$3,$4)
      ON CONFLICT (empresa_id, correo) DO UPDATE SET nombre = EXCLUDED.nombre
      RETURNING usuario_id`,
-    [empresaId, 'Administrador inicial', correo, await hash(clave, 12)],
+    [empresaId, 'Administrador inicial', correo, await hash(clave, COSTO_BCRYPT)],
   );
   await q.query(
     `INSERT INTO usuarios_roles (usuario_id, rol_id)

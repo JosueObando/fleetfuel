@@ -3,7 +3,9 @@ import { hash } from 'bcryptjs';
 import { auditar, contextoActual, gestor } from '../../common/contexto/contexto-peticion';
 import { CrearUsuarioDto } from './dto/crear-usuario.dto';
 
-const COSTO_BCRYPT = 12;
+// El coste vive en common/costo-bcrypt.ts: el hash de descarte del login
+// tiene que usar el mismo, y un número repetido aquí se desincroniza.
+import { COSTO_BCRYPT } from '../../common/costo-bcrypt';
 
 @Injectable()
 export class UsuariosService {

@@ -3,6 +3,7 @@ import { config as cargarEnv } from 'dotenv';
 import { join } from 'path';
 import { DataSource } from 'typeorm';
 import { hash } from 'bcryptjs';
+import { COSTO_BCRYPT } from '../../src/common/costo-bcrypt';
 import Redis from 'ioredis';
 
 cargarEnv({ path: join(__dirname, '../../../.env') });
@@ -68,7 +69,10 @@ export async function sembrarEmpresa(
   const [u] = await dueño.query(
     `INSERT INTO usuarios (empresa_id, nombre, correo, hash_clave, estado, mfa_habilitado)
      VALUES ($1,'Usuario Prueba',$2,$3,$4,$5) RETURNING usuario_id`,
-    [empresa, opciones.correo, await hash(clave, 10), opciones.estado ?? 'activo', opciones.mfa ?? false]);
+    // Con el mismo coste que en producción: con coste 10 el usuario de prueba
+    // se compararía cuatro veces más rápido que el hash de descarte, y la
+    // prueba de tiempos fallaría por el andamiaje y no por el código.
+    [empresa, opciones.correo, await hash(clave, COSTO_BCRYPT), opciones.estado ?? 'activo', opciones.mfa ?? false]);
 
   return { empresa, usuario: { id: String(u.usuario_id), correo: opciones.correo, clave } };
 }
