@@ -147,6 +147,28 @@ describe('las separaciones del §7 siguen en pie', () => {
     expect(planificador.has('viajes:autorizar')).toBe(false);
   });
 
+  it('el DESPACHADOR sí autoriza: es lo que el §5 dice que hace', () => {
+    // El PRD lo describe como «Autoriza salida y verifica documentos» y el rol
+    // no tenía el permiso: la descripción y el reparto se contradecían. Se
+    // corrigió el reparto —decisión del 2026-09-06— porque es lo que refuerza
+    // la separación: el Planificador arma el viaje, el Despachador lo deja
+    // salir, y ninguno hace las dos cosas.
+    const despachador = concedidos.get('Despachador') ?? new Set();
+    expect(despachador.has('viajes:autorizar')).toBe(true);
+    expect(despachador.has('viajes:crear')).toBe(false);
+  });
+
+  it('nadie puede crear un viaje Y autorizarlo, salvo el Administrador', () => {
+    // El Administrador es la excepción declarada: administra la empresa entera.
+    // Cualquier OTRO rol que reúna las dos cosas rompe el control del §7 sin
+    // que nada más lo señale.
+    const infractores = [...concedidos.entries()]
+      .filter(([rol]) => rol !== 'Administrador')
+      .filter(([, p]) => p.has('viajes:crear') && p.has('viajes:autorizar'))
+      .map(([rol]) => rol);
+    expect(infractores).toEqual([]);
+  });
+
   it('el Conductor y el Cliente externo sólo leen lo suyo', () => {
     for (const rol of ['Conductor', 'Cliente externo']) {
       const suyos = [...(concedidos.get(rol) ?? [])];

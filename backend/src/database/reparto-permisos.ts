@@ -68,10 +68,16 @@ export const REPARTO: Record<string, string[]> = {
     'viajes:crear', 'viajes:actualizar',
   ],
 
-  // §7: quien arma el viaje NO lo autoriza, y quien lo autoriza no lo arma.
-  // Es un control antifraude, y por eso `viajes:autorizar` no está aquí.
+  // §5: «Autoriza salida y verifica documentos». Tiene `viajes:autorizar` y NO
+  // `viajes:crear`, que es exactamente la separación del §7: quien arma el
+  // viaje no lo deja salir, y quien lo deja salir no lo arma.
+  //
+  // Hasta el 2026-09-06 este rol NO tenía el permiso, pese a que su propia
+  // descripción decía que autoriza: el reparto y el §5 se contradecían, y
+  // autorizaba el Supervisor de operaciones, que mezcla vigilar con autorizar.
   'Despachador': [
-    'empresas:leer', ...LEER_CATALOGOS, ...LEER_OPERACION, 'viajes:actualizar',
+    'empresas:leer', ...LEER_CATALOGOS, ...LEER_OPERACION,
+    'viajes:actualizar', 'viajes:autorizar',
   ],
 
   'Operador de órdenes': [
