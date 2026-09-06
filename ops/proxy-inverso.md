@@ -171,10 +171,13 @@ Contra NPM ya configurado, sobre `https://fleetfuel.jop.lat`. Y que el puerto
 ## El límite del login
 
 `rate=10r/m`, `burst=30 nodelay`, respuesta `429`. Ráfaga generosa y ritmo
-corto, porque el pico legítimo (veinte personas a las 8:00, alguna tecleando
-mal el TOTP que rota cada 30 segundos, y todas contadas como **una** dirección
-si la Alcaldía sale por NAT) tiene forma de ráfaga, mientras que el ataque
-tiene forma de ritmo sostenido.
+corto, porque el pico legítimo (entrar, teclear mal el TOTP que rota cada 30
+segundos, reintentar, recargar — y varios usuarios tras un mismo NAT contados
+como **una** dirección) tiene forma de ráfaga, mientras que el ataque tiene
+forma de ritmo sostenido.
+
+Con pocos usuarios, `burst=30` sobra: bajarlo a 10 no molestaría a nadie y
+regalaría menos intentos. Pendiente de decidir.
 
 Importa porque `POST /auth/login` lleva **los dos factores** en el mismo
 cuerpo, y no hay nada más detrás: ni `@nestjs/throttler`, ni bloqueo por

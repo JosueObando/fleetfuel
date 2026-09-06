@@ -22,7 +22,7 @@ NPM=http://10.0.0.19:81
 # fleetfuel.jop.lat y no la IP pelada: jop.lat es un dominio real en Cloudflare
 # y ya tiene un comodin *.jop.lat de Let's Encrypt instalado en este NPM, asi
 # que este nombre YA resuelve y YA esta cubierto. Cero DNS, cero emision, y las
-# credenciales dejan de viajar en claro por la LAN municipal.
+# credenciales dejan de viajar en claro por la LAN.
 #
 # (El reto HTTP-01 no serviria aqui —LE no puede alcanzar una IP privada—, pero
 # el certificado existente se emitio por DNS-01, que solo mira un TXT en el DNS
