@@ -109,18 +109,38 @@ y tiene que alcanzarlos. Eso significa que **cualquiera en la LAN puede llamar
 a la API directamente** por el 4200 y saltarse el proxy entero: sin TLS y sin
 el límite de peticiones.
 
-Se cierra con un cortafuegos que solo deje pasar al proxy. Requiere `sudo`, así
-que lo tiene que correr una persona:
+Se cierra con `ops/cerrar-puertos-produccion.sh`, que requiere `sudo` y por
+tanto lo corre una persona:
 
-    sudo ufw allow from 10.0.0.19 to any port 3200 proto tcp comment 'FleetFuel prod frontend <- NPM'
-    sudo ufw allow from 10.0.0.19 to any port 4200 proto tcp comment 'FleetFuel prod API <- NPM'
-    sudo ufw deny 3200/tcp
-    sudo ufw deny 4200/tcp
+    sudo ./ops/cerrar-puertos-produccion.sh --revisar   # mirar antes
+    sudo ./ops/cerrar-puertos-produccion.sh             # aplicar
+    sudo ./ops/cerrar-puertos-produccion.sh --quitar    # deshacer
 
-> Antes de activar `ufw` por primera vez en esta máquina: **permitir SSH**
-> (`sudo ufw allow 22/tcp`). Activarlo sin esa regla deja la máquina
-> inaccesible. Y ojo con no cerrar los puertos de desarrollo (3100, 4100,
-> 5433), que se usan desde la propia máquina.
+> ⚠ **`sudo ufw deny 4200` no sirve, y encima lo parece.** Docker mete sus
+> reglas de DNAT en `PREROUTING` y el tráfico hacia un contenedor va por
+> `FORWARD`, mientras ufw trabaja en `INPUT`: el puerto seguiría abierto a toda
+> la LAN mientras `ufw status` dice que está denegado. El enganche que Docker
+> respeta es la cadena `DOCKER-USER`.
+>
+> Y dentro de `DOCKER-USER` el DNAT **ya ocurrió**, así que el puerto de
+> destino del paquete es el del contenedor (4100), no el publicado (4200). Por
+> eso el script empareja con `conntrack --ctorigdstport`, que mira el destino
+> original de la conexión; con `--dport 4200` la regla no casaría con nada.
+
+El script no activa ufw, no cambia políticas por defecto y no toca los puertos
+de desarrollo (3100, 4100, 5433, 6380) ni la consola del 8000, que se usan
+desde la LAN. Afecta exactamente a dos puertos, y es reversible.
+
+**iptables no sobrevive a un reinicio.** Para que persista:
+
+    sudo cp ops/fleetfuel-cortafuegos.service /etc/systemd/system/
+    sudo systemctl daemon-reload
+    sudo systemctl enable --now fleetfuel-cortafuegos
+
+La comprobación real hay que hacerla **desde otra máquina de la LAN**, no desde
+esta: el tráfico que nace aquí no pasa por `FORWARD` y no se ve afectado.
+
+    curl -m 5 http://10.0.0.193:4200/api/salud    # debe agotar el tiempo
 
 ## Cómo se comprueba
 
@@ -134,6 +154,32 @@ Con el nginx de prueba, sin tocar NPM:
     curl -s http://localhost:8081/api/salud                                 # {"estado":"ok",...}
 
 Contra NPM ya configurado, lo mismo sobre `http://10.0.0.19`.
+
+## El límite del login
+
+`rate=10r/m`, `burst=30 nodelay`, respuesta `429`. Ráfaga generosa y ritmo
+corto, porque el pico legítimo (veinte personas a las 8:00, alguna tecleando
+mal el TOTP que rota cada 30 segundos, y todas contadas como **una** dirección
+si la Alcaldía sale por NAT) tiene forma de ráfaga, mientras que el ataque
+tiene forma de ritmo sostenido.
+
+Importa porque `POST /auth/login` lleva **los dos factores** en el mismo
+cuerpo, y no hay nada más detrás: ni `@nestjs/throttler`, ni bloqueo por
+intentos, ni marca de código ya usado en el `authenticator.check` de otplib.
+
+Probado: 40 peticiones seguidas dan 32 pasos y 429 el resto, sin afectar a
+`/api/salud` ni a `/entrar`. Si 30 se queda corto en el pico real, se sube el
+**burst**, no el rate.
+
+`/auth/refrescar` queda fuera a propósito: cada sesión lo llama cada 15
+minutos, un límite ahí no para a nadie y expulsaría a la gente a media jornada.
+
+## Automatizado
+
+`ops/npm-configurar.sh` hace por la API de NPM lo mismo que la tabla de arriba
+a mano, sin duplicar el host si ya existe. Pide las credenciales sin eco y no
+las guarda. El `limit_req_zone` sigue siendo manual —va en contexto http y la
+API de NPM no lo expone—; el propio script imprime el comando al terminar.
 
 ## Lo que no he verificado
 

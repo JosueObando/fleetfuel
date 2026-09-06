@@ -1,0 +1,15 @@
+[Unit]
+Description=FleetFuel · cerrar los puertos de produccion a todo menos al proxy
+# Despues de Docker: la cadena DOCKER-USER no existe hasta que el demonio
+# arranca, y el script falla a proposito si no la encuentra.
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/home/app/fleetfuel/ops/cerrar-puertos-produccion.sh
+ExecStop=/home/app/fleetfuel/ops/cerrar-puertos-produccion.sh --quitar
+
+[Install]
+WantedBy=multi-user.target
