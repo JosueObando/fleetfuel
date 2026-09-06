@@ -345,3 +345,51 @@ describe('dar de baja libera el identificador, y no con un 500', () => {
     expect(choque.status).toBe(409);
   });
 });
+
+describe('LOS SEIS catálogos contestan con la misma forma', () => {
+  it('ningún PATCH devuelve un array', async () => {
+    // Esta prueba existe porque encontrar los sitios uno a uno falló: la
+    // primera pasada los buscó con una expresión regular que se paraba en el
+    // template anidado de `${presentes.map(...)}`, y dejó fuera `actualizar` de
+    // vehículos y de productos. Recorrer los seis endpoints no depende de que
+    // nadie acierte con el patrón.
+    const sello = Date.now();
+    const cabeceras = () => ({ Authorization: `Bearer ${token}`, 'Idempotency-Key': nuevaClave() });
+
+    const crear = async (ruta: string, cuerpo: unknown) => {
+      const r = await api().post(ruta).set(cabeceras()).send(cuerpo as object);
+      expect({ ruta, estado: r.status }).toEqual({ ruta, estado: 201 });
+      return r.body;
+    };
+
+    const cliente = await crear('/api/clientes', { nombre: `Forma cliente ${sello}` });
+    const vehiculo = await crear('/api/vehiculos', { tipoVehiculo: 'cisterna', placa: `FS-${sello}` });
+
+    const casos: Array<[ruta: string, id: string, parche: object]> = [
+      ['/api/clientes', cliente.id, { nombre: `Editado ${sello}` }],
+      ['/api/vehiculos', vehiculo.id, { marca: 'Volvo' }],
+      ['/api/productos',
+        (await crear('/api/productos', { codigo: `FS-${sello}`, nombre: 'Producto forma' })).id,
+        { nombre: 'Producto editado' }],
+      ['/api/conductores',
+        (await crear('/api/conductores', {
+          nombreCompleto: 'Chofer Forma', documento: `FD-${sello}`, licencia: `FL-${sello}` })).id,
+        { telefono: '6000-0000' }],
+      ['/api/estaciones',
+        (await crear('/api/estaciones', { clienteId: cliente.id, nombre: `Estación ${sello}` })).id,
+        { nombre: 'Estación editada' }],
+      ['/api/cisternas',
+        (await crear('/api/cisternas', {
+          vehiculoId: vehiculo.id, capacidadTotal: 9000,
+          compartimentos: [{ numero: 1, capacidadNominal: 4000, capacidadCalibrada: 3980 }] })).id,
+        { material: 'acero' }],
+    ];
+
+    for (const [ruta, id, parche] of casos) {
+      const r = await api().patch(`${ruta}/${id}`).set('Authorization', `Bearer ${token}`).send(parche);
+      expect({ ruta, estado: r.status, esArray: Array.isArray(r.body) })
+        .toEqual({ ruta, estado: 200, esArray: false });
+      expect({ ruta, tieneId: r.body?.id !== undefined }).toEqual({ ruta, tieneId: true });
+    }
+  }, 60_000);
+});

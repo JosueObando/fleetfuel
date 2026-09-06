@@ -56,11 +56,11 @@ export class VehiculosService {
     if (dto.placa && dto.placa !== antes.placa) await this.placaLibre(dto.placa, id);
     const presentes = Object.entries(COLUMNAS(dto)).filter(([, v]) => v !== undefined);
     if (!presentes.length) return antes;
-    const [despues] = await gestor().query(
+    const despues = unaFila(await gestor().query(
       `UPDATE vehiculos SET ${presentes.map(([c], i) => `${c} = $${i + 2}`).join(', ')},
               actualizado_en = now()
         WHERE vehiculo_id = $1 RETURNING ${CAMPOS}`,
-      [id, ...presentes.map(([, v]) => v)]);
+      [id, ...presentes.map(([, v]) => v)]));
     auditar({ entidad: 'vehiculos', entidadId: String(id), valorAnterior: antes, valorNuevo: despues });
     return despues;
   }

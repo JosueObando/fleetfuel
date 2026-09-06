@@ -8,7 +8,8 @@ import { AppModule } from '../src/app.module';
 import { REDIS } from '../src/modules/auth/tokens.service';
 import { AuthService } from '../src/modules/auth/auth.service';
 import { CifradoService } from '../src/modules/auth/cifrado.service';
-import { conexionDueño, conexionRedis, sembrarEmpresa, borrarEmpresa } from './apoyo/aplicacion';
+import { TokensService } from '../src/modules/auth/tokens.service';
+import { conexionDueño, conexionRedis, sembrarEmpresa, borrarEmpresa, darPermisos } from './apoyo/aplicacion';
 
 /**
  * Los cinco caminos de `AuthService.login`, contra la aplicación real.
@@ -34,6 +35,7 @@ const CORREO = 'auth-prueba@ejemplo.test';
 let modulo: TestingModule;
 let auth: AuthService;
 let cifrado: CifradoService;
+let tokens: TokensService;
 let dueño: DataSource;
 let redis: Redis;
 let empresa: string;
@@ -55,6 +57,7 @@ beforeAll(async () => {
   await modulo.init();
   auth = modulo.get(AuthService);
   cifrado = modulo.get(CifradoService);
+  tokens = modulo.get(TokensService);
 }, 60_000);
 
 afterAll(async () => {
@@ -213,3 +216,166 @@ async function activarMfa(): Promise<string> {
     [usuario.id, cifrado.cifrar(secreto)]);
   return secreto;
 }
+
+/* ─────────────────────── el refresco de sesión ───────────────────────
+ *
+ * Es la mitad del sistema de sesiones y no tenía ninguna prueba: 15 minutos de
+ * token de acceso significan que el refresco corre cada cuarto de hora, y es
+ * donde muerden de verdad el cierre de sesión, la revocación de un dispositivo
+ * y la exigencia de MFA sobrevenida. Si alguna de esas dejara de morder, el
+ * síntoma sería que una sesión revocada sigue funcionando — sin ningún error.
+ */
+
+/** Entra de verdad y devuelve la sesión completa. */
+async function sesionAbierta(dispositivo?: string) {
+  await dueño.query(`UPDATE usuarios SET mfa_habilitado=false, mfa_secreto=NULL, estado='activo'
+                      WHERE usuario_id = $1`, [usuario.id]);
+  return (await auth.login(
+    { correo: CORREO, clave: usuario.clave, ...(dispositivo ? { dispositivo } : {}) } as never,
+  )) as { accessToken: string; refreshToken: string };
+}
+
+describe('refrescar · lo que rechaza', () => {
+  it('un token que no es un JWT', async () => {
+    await expect(auth.refrescar('no.es.un.token'))
+      .rejects.toThrow(/Token de refresco inválido o vencido/);
+  });
+
+  it('un token de ACCESO usado como refresco', async () => {
+    // Los dos son JWT válidos y del mismo emisor. Lo único que los separa es el
+    // campo `tipo` y el secreto con que se firman: si esta comprobación se
+    // cayera, un token de acceso robado se podría estirar indefinidamente.
+    const s = await sesionAbierta();
+    await expect(auth.refrescar(s.accessToken))
+      .rejects.toThrow(/Token de refresco inválido o vencido|no sirve para refrescar/);
+  });
+
+  it('un refresco que ya se cerró sesión', async () => {
+    // La firma sigue siendo auténtica: lo que dice que ya no vale es Redis.
+    const s = await sesionAbierta();
+    await auth.cerrarSesion(s.refreshToken);
+    await expect(auth.refrescar(s.refreshToken))
+      .rejects.toThrow(/Sesión revocada/);
+  });
+
+  it('un usuario suspendido DESPUÉS de entrar', async () => {
+    // El token sigue vivo y firmado; la suspensión tiene que morder aquí o el
+    // usuario seguiría operando hasta que venciera el refresco: siete días.
+    const s = await sesionAbierta();
+    await dueño.query(`UPDATE usuarios SET estado='suspendido' WHERE usuario_id=$1`, [usuario.id]);
+    await expect(auth.refrescar(s.refreshToken)).rejects.toThrow(/Usuario no disponible/);
+  });
+
+  it('y al rechazarlo, revoca el refresco: no se puede reintentar', async () => {
+    const s = await sesionAbierta();
+    await dueño.query(`UPDATE usuarios SET estado='suspendido' WHERE usuario_id=$1`, [usuario.id]);
+    await auth.refrescar(s.refreshToken).catch(() => undefined);
+    await dueño.query(`UPDATE usuarios SET estado='activo' WHERE usuario_id=$1`, [usuario.id]);
+    // Aunque se rehabilite al usuario, ese refresco ya está quemado.
+    await expect(auth.refrescar(s.refreshToken)).rejects.toThrow(/Sesión revocada/);
+  });
+
+  it('un rol que EMPIEZA a exigir MFA corta el refresco', async () => {
+    // §7, y no es redundante con el login: entre entrar y refrescar le pueden
+    // asignar al usuario un rol que exige TOTP. Sin esta comprobación
+    // refrescaría hacia una sesión completa sin haberse inscrito nunca.
+    const rolId = await darPermisos(dueño, {
+      empresa, usuarioId: usuario.id, nombreRol: `Exige MFA ${Date.now()}`,
+      codigos: ['empresas:leer'], exigeMfa: false });
+    const s = await sesionAbierta();
+    await dueño.query(`UPDATE roles SET exige_mfa = true WHERE rol_id = $1`, [rolId]);
+
+    await expect(auth.refrescar(s.refreshToken))
+      .rejects.toThrow(/exige segundo factor. Inicia sesión de nuevo/);
+
+    await dueño.query(`DELETE FROM usuarios_roles WHERE rol_id = $1`, [rolId]);
+    await dueño.query(`DELETE FROM roles_permisos WHERE rol_id = $1`, [rolId]);
+    await dueño.query(`DELETE FROM roles WHERE rol_id = $1`, [rolId]);
+  }, 30_000);
+
+  it('un dispositivo revocado corta el refresco', async () => {
+    const s = await sesionAbierta('equipo-de-pruebas');
+    await dueño.query(
+      `UPDATE dispositivos SET revocado_en = now() WHERE usuario_id = $1 AND identificador = $2`,
+      [usuario.id, 'equipo-de-pruebas']);
+    await expect(auth.refrescar(s.refreshToken)).rejects.toThrow(/Dispositivo revocado/);
+  }, 30_000);
+});
+
+describe('refrescar · lo que hace cuando acepta', () => {
+  it('emite una sesión nueva', async () => {
+    const s = await sesionAbierta();
+    const nueva = await auth.refrescar(s.refreshToken);
+    expect(nueva.accessToken).toBeTruthy();
+    expect(nueva.refreshToken).toBeTruthy();
+    expect(nueva.refreshToken).not.toBe(s.refreshToken);
+  });
+
+  it('ROTA: el refresco usado deja de valer en el acto', async () => {
+    // Es lo que hace que un refresco robado sirva UNA vez, y que ese uso
+    // delate a alguien: el siguiente que lo intente —el ladrón o el legítimo—
+    // se encuentra la sesión revocada.
+    const s = await sesionAbierta();
+    await auth.refrescar(s.refreshToken);
+    await expect(auth.refrescar(s.refreshToken)).rejects.toThrow(/Sesión revocada/);
+  });
+
+  it('la sesión nueva sí se puede volver a refrescar', async () => {
+    const s = await sesionAbierta();
+    const segunda = await auth.refrescar(s.refreshToken);
+    const tercera = await auth.refrescar(segunda.refreshToken);
+    expect(tercera.accessToken).toBeTruthy();
+  });
+});
+
+describe('cerrar sesión', () => {
+  it('mata el refresco', async () => {
+    const s = await sesionAbierta();
+    await auth.cerrarSesion(s.refreshToken);
+    await expect(auth.refrescar(s.refreshToken)).rejects.toThrow(/Sesión revocada/);
+  });
+
+  it('con un token ya vencido o basura NO falla', async () => {
+    // Cerrar sesión con algo que ya no vale es el resultado deseado: pedirle al
+    // usuario que arregle su token para poder salir sería absurdo.
+    await expect(auth.cerrarSesion('no.es.un.token')).resolves.toBeUndefined();
+    await expect(auth.cerrarSesion('')).resolves.toBeUndefined();
+  });
+});
+
+describe('el dispositivo se registra al entrar', () => {
+  it('queda guardado con su identificador y su nombre', async () => {
+    await dueño.query(`DELETE FROM dispositivos WHERE usuario_id = $1`, [usuario.id]);
+    await auth.login({
+      correo: CORREO, clave: usuario.clave,
+      dispositivo: 'tableta-1', dispositivoNombre: 'Tableta del despachador',
+    } as never);
+    const [d] = await dueño.query(
+      `SELECT identificador, nombre FROM dispositivos WHERE usuario_id = $1`, [usuario.id]);
+    expect(d.identificador).toBe('tableta-1');
+    expect(d.nombre).toBe('Tableta del despachador');
+  }, 30_000);
+
+  it('entrar dos veces con el mismo equipo no crea dos filas', async () => {
+    // Es un upsert por (usuario, identificador). Sin él, cada inicio de sesión
+    // añadiría un «dispositivo» y la pantalla de revocación sería inservible.
+    await dueño.query(`DELETE FROM dispositivos WHERE usuario_id = $1`, [usuario.id]);
+    for (let i = 0; i < 3; i++) {
+      await auth.login({ correo: CORREO, clave: usuario.clave, dispositivo: 'tableta-1' } as never);
+    }
+    const [{ n }] = await dueño.query(
+      `SELECT count(*)::int AS n FROM dispositivos WHERE usuario_id = $1`, [usuario.id]);
+    expect(n).toBe(1);
+  }, 30_000);
+
+  it('entrar con un dispositivo REVOCADO se rechaza', async () => {
+    await dueño.query(`DELETE FROM dispositivos WHERE usuario_id = $1`, [usuario.id]);
+    await auth.login({ correo: CORREO, clave: usuario.clave, dispositivo: 'robado' } as never);
+    await dueño.query(
+      `UPDATE dispositivos SET revocado_en = now() WHERE usuario_id=$1 AND identificador='robado'`,
+      [usuario.id]);
+    await expect(auth.login(
+      { correo: CORREO, clave: usuario.clave, dispositivo: 'robado' } as never))
+      .rejects.toThrow(/dispositivo fue revocado/);
+  }, 30_000);
+});

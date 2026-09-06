@@ -418,3 +418,94 @@ describe('productos · no se retira lo que está en uso', () => {
     });
   });
 });
+
+describe('editar · las ramas que sólo corren al modificar', () => {
+  it('vehículos · cambiar la placa comprueba que la nueva esté libre', async () => {
+    await enContexto(async () => {
+      const ocupada = `P-${unico()}`;
+      await vehiculos.crear({ tipoVehiculo: 'cabezal', placa: ocupada } as never);
+      const otro = await vehiculos.crear({ tipoVehiculo: 'cabezal', placa: `P-${unico()}` } as never);
+      await expect(vehiculos.actualizar(String(otro.id), { placa: ocupada } as never))
+        .rejects.toThrow(/Ya existe un vehículo con esa placa/);
+    });
+  });
+
+  it('vehículos · dejar la MISMA placa no choca consigo mismo', async () => {
+    await enContexto(async () => {
+      const placa = `P-${unico()}`;
+      const v = await vehiculos.crear({ tipoVehiculo: 'cabezal', placa } as never);
+      const editado = await vehiculos.actualizar(String(v.id), { placa, marca: 'Volvo' } as never);
+      expect(editado.marca).toBe('Volvo');
+    });
+  });
+
+  it('vehículos · un PATCH sin campos devuelve el registro sin tocar nada', async () => {
+    // Sin esta salida temprana se armaría un `UPDATE … SET` vacío, que es un
+    // error de sintaxis de SQL: un 500 por no cambiar nada.
+    await enContexto(async () => {
+      const v = await vehiculos.crear({ tipoVehiculo: 'cabezal', placa: `P-${unico()}` } as never);
+      const igual = await vehiculos.actualizar(String(v.id), {} as never);
+      expect(igual.id).toBe(v.id);
+    });
+  });
+
+  it('vehículos · uno que no existe da 404', async () => {
+    await enContexto(async () => {
+      await expect(vehiculos.obtener('999999999')).rejects.toThrow(/Vehículo no encontrado/);
+    });
+  });
+
+  it('estaciones · cambiar de cliente comprueba que el nuevo exista', async () => {
+    await enContexto(async () => {
+      const c = await clientes.crear({ nombre: `Cliente ${unico()}` } as never);
+      const e = await estaciones.crear({ clienteId: String(c.id), nombre: 'Movible' } as never);
+      await expect(estaciones.actualizar(String(e.id), { clienteId: '999999999' } as never))
+        .rejects.toThrow(/El cliente indicado no existe/);
+    });
+  });
+
+  it('estaciones · el código externo no se puede pisar', async () => {
+    await enContexto(async () => {
+      const c = await clientes.crear({ nombre: `Cliente ${unico()}` } as never);
+      const codigo = `EXT-${unico()}`;
+      await estaciones.crear({ clienteId: String(c.id), nombre: 'Con código', codigoExterno: codigo } as never);
+      const otra = await estaciones.crear({ clienteId: String(c.id), nombre: 'Otra' } as never);
+      await expect(estaciones.actualizar(String(otra.id), { codigoExterno: codigo } as never))
+        .rejects.toThrow(/Ya existe una estación con ese código externo/);
+    });
+  });
+
+  it('estaciones · media coordenada tampoco se cuela al EDITAR', async () => {
+    // La misma regla que al crear. Es fácil validarla sólo en el alta y dejar
+    // que un PATCH deje la fila a medias.
+    await enContexto(async () => {
+      const c = await clientes.crear({ nombre: `Cliente ${unico()}` } as never);
+      const e = await estaciones.crear({
+        clienteId: String(c.id), nombre: 'Ubicada', latitud: 8.98, longitud: -79.52 } as never);
+      await expect(estaciones.actualizar(String(e.id), { latitud: 9.1 } as never))
+        .rejects.toThrow(/Latitud y longitud deben ir juntas/);
+    });
+  });
+
+  it('estaciones · al darla de baja queda inactiva', async () => {
+    await enContexto(async () => {
+      const c = await clientes.crear({ nombre: `Cliente ${unico()}` } as never);
+      const e = await estaciones.crear({ clienteId: String(c.id), nombre: 'Se cierra' } as never);
+      const baja = await estaciones.desactivar(String(e.id));
+      expect(baja.estado).toBe('inactiva');
+    });
+  });
+
+  it('los seis catálogos listan sin explotar y no muestran las bajas', async () => {
+    await enContexto(async () => {
+      const c = await clientes.crear({ nombre: `Listable ${unico()}` } as never);
+      await clientes.desactivar(String(c.id));
+      const lista = await clientes.listar();
+      expect(lista.some((f: { id: string }) => String(f.id) === String(c.id))).toBe(false);
+
+      for (const s of [vehiculos, cisternas, conductores, estaciones, productos]) {
+        expect(Array.isArray(await s.listar())).toBe(true);
+      }
+    });
+  });
+});

@@ -48,11 +48,11 @@ export class ProductosService {
     };
     const presentes = Object.entries(columnas).filter(([, v]) => v !== undefined);
     if (!presentes.length) return antes;
-    const [despues] = await gestor().query(
+    const despues = unaFila(await gestor().query(
       `UPDATE productos_combustible SET ${presentes.map(([c], i) => `${c} = $${i + 2}`).join(', ')},
               actualizado_en = now()
         WHERE producto_id = $1 RETURNING ${CAMPOS}`,
-      [id, ...presentes.map(([, v]) => v)]);
+      [id, ...presentes.map(([, v]) => v)]));
     auditar({ entidad: 'productos_combustible', entidadId: String(id), valorAnterior: antes, valorNuevo: despues });
     return despues;
   }
