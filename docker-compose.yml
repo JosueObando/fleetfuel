@@ -8,7 +8,7 @@ services:
       POSTGRES_USER: ${DATABASE_USER:-fleetfuel_owner}
       POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-cambiar_en_produccion}
     ports:
-      # 5433 y no 5432: SISOP MUPA ya ocupa el puerto por defecto y los dos
+      # 5433 y no 5432: otro Postgres ocupa ya el puerto por defecto en esta
       # sistemas se desarrollan en la misma máquina.
       - "${DATABASE_PORT:-5433}:5432"
     volumes:

@@ -1,8 +1,9 @@
 # FleetFuel Control — Fase 0
 
-Sistema integral de administración de cisternas y control de combustible para la
-flota de la Alcaldía de Panamá. Este repositorio es la **Fase 0** de la §19 del
-expediente técnico: los cimientos que la arquitectura describe como *«las cinco
+Sistema integral de administración de cisternas y control de combustible.
+**Proyecto personal**: el dominio del producto es la logística de combustible,
+no la titularidad del despliegue. Este repositorio es la **Fase 0** de la §19
+del expediente técnico: los cimientos que la arquitectura describe como *«las cinco
 cosas más caras de añadir tarde en todo el proyecto»*.
 
 No produce ninguna pantalla. Produce las garantías sobre las que se apoyan todas
@@ -47,8 +48,9 @@ conectar como dueño para el login, hay una función `SECURITY DEFINER`
 (`fn_login_resolver`) que devuelve sólo lo que el login necesita. La aplicación
 puede ejecutarla; no puede leer la tabla.
 
-**4. No hay rol con paso libre.** SISOP MUPA tiene un `Administrador General` que
-evade la comprobación de permisos. Aquí no, y es deliberado: el riesgo de este
+**4. No hay rol con paso libre.** Lo habitual en sistemas parecidos es un
+`Administrador General` que evade la comprobación de permisos. Aquí no, y es
+deliberado: el riesgo de este
 negocio no es el robo de datos sino **el fraude de volumen** (§7), y la separación
 entre quien captura la carga y quien captura la entrega deja de existir en cuanto
 un rol puede hacerlo todo.
@@ -185,7 +187,7 @@ Si el usuario tiene un rol con `exige_mfa` y todavía no configuró su TOTP, el
 login **no** devuelve una sesión normal: devuelve una *sesión de inscripción*.
 
 ```jsonc
-// 200 · admin@mupa.gob.pa que aún no configuró su segundo factor
+// 200 · el administrador que aún no configuró su segundo factor
 {
   "accessToken": "…",        // tipo: "inscripcion-mfa", permisos: []
   "debeInscribirMfa": true,
@@ -222,9 +224,10 @@ las restricciones de exclusión del §5.1 (una cisterna o un conductor no pueden
 estar en dos viajes que se superpongan) y el particionado por mes de
 `posiciones_gps` del §5.2.
 
-## Relación con SISOP MUPA
+## De dónde salen algunas soluciones
 
-Son sistemas distintos —aquél es seguimiento de obras públicas— pero comparten
-stack, y varias soluciones de aquí son su versión endurecida: RBAC sin bypass,
-RLS por empresa en vez de por obra, y auditoría por interceptor en vez de por
-llamada explícita.
+Varias decisiones de aquí son la versión endurecida de patrones que el autor ya
+había visto fallar en otro sistema del mismo stack: RBAC **sin bypass**, RLS por
+empresa en lugar de un filtro que hay que acordarse de poner, y auditoría por
+interceptor en vez de por llamada explícita. Las tres tienen en común que
+convierten «acuérdate de hacerlo» en «no se puede no hacerlo».

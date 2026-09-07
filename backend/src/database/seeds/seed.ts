@@ -57,9 +57,9 @@ async function sembrar() {
   await AppDataSource.initialize();
   const q = AppDataSource.manager;
 
-  const nombreEmpresa = process.env.SEED_EMPRESA_NOMBRE || 'Alcaldía de Panamá';
+  const nombreEmpresa = process.env.SEED_EMPRESA_NOMBRE || 'Flota propia';
   const ruc = process.env.SEED_EMPRESA_RUC || '8-NT-1-000';
-  const correo = process.env.SEED_ADMIN_CORREO || 'admin@mupa.gob.pa';
+  const correo = process.env.SEED_ADMIN_CORREO || 'admin@fleetfuel.jop.lat';
   const clave = process.env.SEED_ADMIN_CLAVE || 'Admin12345*';
 
   const [empresa] = await q.query(

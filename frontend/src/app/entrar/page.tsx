@@ -48,13 +48,13 @@ export default function Entrar() {
           <span className={estilos.circulo}><Icon nombre="flota" tamano={20} /></span>
           <div>
             <div className={estilos.titulo}>FleetFuel</div>
-            <div className={estilos.subtitulo}>Alcaldía de Panamá</div>
+            <div className={estilos.subtitulo}>Control de flota y combustible</div>
           </div>
         </div>
 
         <form className={estilos.formulario} onSubmit={enviar}>
           <Campo etiqueta="Correo" tipo="email" valor={correo} onCambio={setCorreo}
-                 requerido autoComplete="username" marcador="tu@mupa.gob.pa" />
+                 requerido autoComplete="username" marcador="tu@correo" />
           <Campo etiqueta="Contraseña" tipo="password" valor={clave} onCambio={setClave}
                  requerido autoComplete="current-password" />
           <Campo etiqueta="Código de verificación" valor={totp} onCambio={setTotp}

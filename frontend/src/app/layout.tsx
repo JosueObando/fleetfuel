@@ -14,7 +14,7 @@ const montserrat = Montserrat({
 
 export const metadata: Metadata = {
   title: 'FleetFuel Control',
-  description: 'Seguimiento de flota y combustible · Alcaldía de Panamá',
+  description: 'Seguimiento de flota y combustible',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

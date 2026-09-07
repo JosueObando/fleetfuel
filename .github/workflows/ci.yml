@@ -194,7 +194,7 @@ jobs:
       REDIS_HOST: localhost
       REDIS_PORT: 6380
       BACKEND_PORT: 4100
-      SEED_ADMIN_CORREO: admin@mupa.gob.pa
+      SEED_ADMIN_CORREO: admin@fleetfuel.jop.lat
       SEED_ADMIN_CLAVE: ClaveDeCI12345
       # El freno del login se afloja SOLO en este trabajo. Los dos recorridos
       # inician sesión varias veces cada uno —la sonda de inscripción y la

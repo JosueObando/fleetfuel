@@ -39,7 +39,7 @@ describe('PermisosGuard', () => {
   });
 
   it('no existe rol con paso libre: el fraude de volumen del §7 vive ahí', () => {
-    // A diferencia de SISOP MUPA, un rol llamado "Administrador General" no
+    // Un rol llamado "Administrador General" tampoco
     // evade la comprobación. Si esta prueba empieza a fallar es que alguien
     // reintrodujo el bypass, y con él la posibilidad de que una sola persona
     // capture la carga y la entrega.

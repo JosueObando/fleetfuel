@@ -10,9 +10,9 @@ describe('huellaDeCorreo', () => {
   it('mete el mismo correo en el mismo cupo aunque cambien mayúsculas y espacios', () => {
     // Si no, alternar mayúsculas da intentos infinitos: `Admin@x`, `ADmin@x`,
     // `aDmin@x`… son cupos distintos y el freno no frena nada.
-    const esperada = huellaDeCorreo('admin@mupa.gob.pa');
-    expect(huellaDeCorreo('ADMIN@MUPA.GOB.PA')).toBe(esperada);
-    expect(huellaDeCorreo('  Admin@Mupa.Gob.Pa  ')).toBe(esperada);
+    const esperada = huellaDeCorreo('admin@fleetfuel.jop.lat');
+    expect(huellaDeCorreo('ADMIN@FLEETFUEL.JOP.LAT')).toBe(esperada);
+    expect(huellaDeCorreo('  Admin@Fleetfuel.Jop.Lat  ')).toBe(esperada);
   });
 
   it('separa cuentas distintas', () => {
@@ -22,8 +22,8 @@ describe('huellaDeCorreo', () => {
   it('no lleva el correo en claro', () => {
     // La clave acaba en Redis: un `KEYS *` no tiene por qué devolver la lista
     // de quién intentó entrar hoy.
-    expect(huellaDeCorreo('admin@mupa.gob.pa')).not.toContain('admin');
-    expect(huellaDeCorreo('admin@mupa.gob.pa')).toMatch(/^[0-9a-f]{16}$/);
+    expect(huellaDeCorreo('admin@fleetfuel.jop.lat')).not.toContain('admin');
+    expect(huellaDeCorreo('admin@fleetfuel.jop.lat')).toMatch(/^[0-9a-f]{16}$/);
   });
 
   it('aguanta cualquier cosa en el cuerpo sin reventar', () => {

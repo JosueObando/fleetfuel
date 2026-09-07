@@ -2,7 +2,7 @@
 
 Del contenedor Docker a la implementación del panel de tracking, fase por fase.
 
-**Versión:** 1.0 · **Fecha:** 2026-08-30 · **Ámbito:** Alcaldía de Panamá
+**Versión:** 1.1 · **Fecha:** 2026-09-07 · **Ámbito:** proyecto personal
 
 ## De dónde sale este plan
 
@@ -402,13 +402,13 @@ empezar 1C.
 
 - [ ] Proyecto Next.js 16 + React 19 + TypeScript 5.6 (§8 «Stack recomendado»)
 - [ ] **Tokens como variables CSS** (`#/spec/ux-tokens-color`), en la columna
-      MUPA, no en la del original oscuro:
+      del spec, no en la del original oscuro:
       `--action #0660FF` · `--bg-base #F4F6F7` · `--bg-surface #FCFDFD` ·
       `--fg-strong #21252B` · `--fg-default #363B43` · `--fg-muted #627485` ·
       `--border-subtle #D9D9D9` · éxito `#2ECC71` · aviso `#F59E0B` · error `#E53935`
 - [ ] Escala tipográfica, radios y transiciones (`#/spec/ux-tokens-forma`).
-      Radios MUPA: `--radius-sm 8` inputs y chips · `--radius-card 16` tarjetas ·
-      `--radius-pill` botones — **los botones MUPA son pastilla, no radio 8**
+      Radios del spec: `--radius-sm 8` inputs y chips · `--radius-card 16` tarjetas ·
+      `--radius-pill` botones — **los botones del spec son pastilla, no radio 8**
 - [ ] Tipografía a dos voces: **Noka** sólo en títulos e ID de envío,
       **Montserrat** en todo lo demás. **Nunca Prometo en UI**
 - [ ] Los **24 componentes** de las fichas, cada uno con sus 6 estados
@@ -435,7 +435,8 @@ empezar 1C.
 - [ ] Recorrido de teclado grabado de extremo a extremo, sin trampas
 
 **El riesgo de esta fase:** construir los componentes con el tema **oscuro** del
-original. El spec trae una columna MUPA entera (`#/spec/ux-equivalencias-mupa`)
+original. El spec trae una columna de equivalencias entera
+(`#/spec/ux-equivalencias-mupa`)
 precisamente porque dentro del ecosistema municipal el tema es **claro por
 defecto**, con jerarquía por sombras azuladas en vez de por luminancia. Repintar
 24 componentes después es rehacerlos.
@@ -497,9 +498,21 @@ catálogo y la URL restaura la vista exacta tras recargar.
 **No se empieza 1C hasta que esto sea cierto.** Es una instrucción literal del
 §19, no una recomendación.
 
-- [ ] `orden → plan de carga → viaje` desplegado en **producción**
-- [ ] Usuarios reales de la Alcaldía operando viajes reales
+- [x] `orden → plan de carga → viaje` desplegado en **producción** (2026-09-06)
+- [ ] **Uso real**: viajes de verdad recorridos de punta a punta por quien opera
+      el sistema
 - [ ] Al menos 2 semanas de operación, con los defectos encontrados triados
+
+> **Releída el 2026-09-07.** La versión original de esta compuerta decía
+> «usuarios reales de la Alcaldía», y eso venía de una premisa falsa: **esto es
+> un proyecto personal.** Tal como estaba escrita era insatisfacible —no hay
+> una Alcaldía que ponga usuarios—, así que bloqueaba para siempre en vez de
+> proteger algo.
+>
+> Lo que la compuerta protege SÍ sigue en pie, y no depende de quién sea el
+> dueño: un módulo diseñado contra datos imaginados se rehace cuando llegan los
+> de verdad. Así que se reescribe en términos que este proyecto puede cumplir
+> —uso real, no uso institucional— y se mantiene el listón de las dos semanas.
 
 > *«El módulo de liquidaciones se diseña mucho mejor cuando ya existen viajes
 > reales que liquidar.»*

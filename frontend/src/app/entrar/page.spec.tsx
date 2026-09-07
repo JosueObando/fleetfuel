@@ -20,11 +20,11 @@ const { entrar, guardarSesion } = jest.requireMock('@/api/cliente') as {
 
 const SESION = {
   accessToken: 'a', refreshToken: 'r',
-  usuario: { id: '1', nombre: 'Ana', correo: 'ana@mupa.gob.pa', roles: [] },
+  usuario: { id: '1', nombre: 'Ana', correo: 'ana@fleetfuel.jop.lat', roles: [] },
 };
 
 const rellenar = async (usuario: ReturnType<typeof userEvent.setup>, totp?: string) => {
-  await usuario.type(screen.getByLabelText(/Correo/), 'ana@mupa.gob.pa');
+  await usuario.type(screen.getByLabelText(/Correo/), 'ana@fleetfuel.jop.lat');
   await usuario.type(screen.getByLabelText(/Contraseña/), 'ClaveDePrueba123');
   if (totp) await usuario.type(screen.getByLabelText(/Código de verificación/), totp);
   await usuario.click(screen.getByRole('button', { name: /Entrar/ }));
@@ -71,7 +71,7 @@ describe('entrar bien', () => {
     render(<Entrar />);
     await rellenar(usuario);
     await waitFor(() => expect(entrar).toHaveBeenCalled());
-    expect(entrar).toHaveBeenCalledWith('ana@mupa.gob.pa', 'ClaveDePrueba123', undefined);
+    expect(entrar).toHaveBeenCalledWith('ana@fleetfuel.jop.lat', 'ClaveDePrueba123', undefined);
   });
 
   it('y sí se manda cuando lo hay', async () => {
@@ -79,7 +79,7 @@ describe('entrar bien', () => {
     render(<Entrar />);
     await rellenar(usuario, '123456');
     await waitFor(() => expect(entrar).toHaveBeenCalled());
-    expect(entrar).toHaveBeenCalledWith('ana@mupa.gob.pa', 'ClaveDePrueba123', '123456');
+    expect(entrar).toHaveBeenCalledWith('ana@fleetfuel.jop.lat', 'ClaveDePrueba123', '123456');
   });
 });
 

@@ -38,7 +38,7 @@ const PARES = [
   ['--fg-muted',   '--bg-base',    4.5, 'Captions sobre el lienzo'],
   ['--fg-muted',   '--bg-surface', 4.5, 'Captions sobre panel'],
   ['--fg-on-action', '--action',   4.5, 'Texto sobre botón primario'],
-  ['--fg-on-action', '--bg-inverse',4.5,'Texto del sidebar (azul MUPA)'],
+  ['--fg-on-action', '--bg-inverse',4.5,'Texto del sidebar (azul de marca)'],
   ['--action',     '--bg-surface', 3.0, 'Trazo de ruta y selección'],
   ['--action',     '--action-subtle', 3.0, 'Icono sobre botón secundario'],
   ['--border-subtle', '--bg-surface', 1.0, 'Divisores (decorativos)'],

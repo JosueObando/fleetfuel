@@ -44,7 +44,7 @@ export default function Kit() {
       <div className={estilos.contenedor}>
         <h1 className={estilos.titulo}>Kit · FleetFuel Control</h1>
         <p className={estilos.subtitulo}>
-          Sistema de diseño de la fase UX-0. Tema claro MUPA.
+          Sistema de diseño de la fase UX-0. Tema claro del spec.
         </p>
 
         <section className={estilos.seccion}>
@@ -125,7 +125,7 @@ export default function Kit() {
             <div className={estilos.forma} style={{ borderRadius: 'var(--radius-pill)' }}>pill</div>
           </div>
           <p className={estilos.aviso}>
-            Los botones MUPA son <strong>pastilla</strong>, no radio 8. Es la
+            Los botones del spec son <strong>pastilla</strong>, no radio 8. Es la
             diferencia más citada del spec frente al original.
           </p>
         </section>

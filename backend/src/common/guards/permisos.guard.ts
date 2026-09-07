@@ -7,7 +7,7 @@ import { UsuarioAutenticado } from '../decorators/usuario-actual.decorator';
 /**
  * RBAC por permiso granular (§7).
  *
- * A diferencia de SISOP MUPA no hay rol con paso libre. Aquí el riesgo del
+ * No hay rol con paso libre, a diferencia de lo habitual. Aquí el riesgo del
  * negocio es el fraude de volumen, y un "Administrador General" que evade toda
  * comprobación es precisamente el agujero por donde se cuela: la separación
  * entre quien captura la carga y quien captura la entrega deja de existir si

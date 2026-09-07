@@ -48,9 +48,9 @@ export default () => ({
     ttlHoras: parseInt(process.env.IDEMPOTENCIA_TTL_HORAS || '24', 10),
   },
   seed: {
-    empresaNombre: process.env.SEED_EMPRESA_NOMBRE || 'Alcaldía de Panamá',
+    empresaNombre: process.env.SEED_EMPRESA_NOMBRE || 'Flota propia',
     empresaRuc: process.env.SEED_EMPRESA_RUC || '8-NT-1-000',
-    adminCorreo: process.env.SEED_ADMIN_CORREO || 'admin@mupa.gob.pa',
+    adminCorreo: process.env.SEED_ADMIN_CORREO || 'admin@fleetfuel.jop.lat',
     adminClave: process.env.SEED_ADMIN_CLAVE || 'Admin12345*',
   },
 });

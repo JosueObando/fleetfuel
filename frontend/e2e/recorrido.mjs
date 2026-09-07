@@ -19,7 +19,7 @@ import { entorno, totp, asegurarSegundoFactor } from './entorno.mjs';
 const env = entorno();
 const API = env.E2E_API ?? 'http://localhost:4100/api';
 const APP = env.E2E_APP ?? 'http://localhost:3100';
-const CORREO = env.SEED_ADMIN_CORREO ?? 'admin@mupa.gob.pa';
+const CORREO = env.SEED_ADMIN_CORREO ?? 'admin@fleetfuel.jop.lat';
 
 /* En una base recién sembrada el administrador no tiene TOTP: se inscribe aquí,
    como haría el primer usuario real, y el recorrido entra con ese secreto. */

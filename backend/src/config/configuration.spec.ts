@@ -33,7 +33,7 @@ describe('sin ninguna variable de entorno', () => {
   });
 
   it('la base apunta a localhost y al 5433, no al 5432', () => {
-    // El 5433 es deliberado: SISOP MUPA ocupa el 5432 en la misma máquina.
+    // El 5433 es deliberado: otro Postgres ocupa el 5432 en la misma máquina.
     expect(c().database.host).toBe('localhost');
     expect(c().database.port).toBe(5433);
   });

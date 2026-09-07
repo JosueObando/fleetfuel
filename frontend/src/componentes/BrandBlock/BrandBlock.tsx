@@ -12,7 +12,7 @@ interface Props {
 /** Ficha 1 · Marca del producto. Cabecera del sidebar. */
 export function BrandBlock({
   nombre = 'FleetFuel',
-  descriptor = 'Alcaldía de Panamá',
+  descriptor = 'Control de flota y combustible',
   cargando = false,
   soloMarca = false,
 }: Props) {
