@@ -14,16 +14,17 @@ Así que es un **trinquete**: se puso justo por debajo de lo que ya había.
 
 | | al ponerlo | catálogos | administr. | superficie | plan carga | reserva | cierre | entregas | umbral |
 |---|---|---|---|---|---|---|---|---|---|
-| Sentencias | 63,47 % | 74,36 % | 89,41 % | 94,27 % | 96,30 % | 97,35 % | 97,92 % | **97,78 %** | 97 |
-| Ramas | 42,52 % | 60,24 % | 71,95 % | 80,00 % | 84,50 % | 87,97 % | 89,38 % | **89,25 %** | 89 |
+| Sentencias | 63,47 % | 74,36 % | 89,41 % | 94,27 % | 96,30 % | 97,35 % | 97,92 % | **97,98 %** | 97 |
+| Ramas | 42,52 % | 60,24 % | 71,95 % | 80,00 % | 84,50 % | 87,97 % | 89,38 % | **90,67 %** | 90 |
 | Funciones | 46,48 % | 59,66 % | 79,67 % | 98,68 % | 98,71 % | 100 % | 100 % | **100 %** | 99 |
-| Líneas | 66,18 % | 77,55 % | 92,10 % | 95,35 % | 97,43 % | 98,55 % | 98,89 % | **98,72 %** | 98 |
+| Líneas | 66,18 % | 77,55 % | 92,10 % | 95,35 % | 97,43 % | 98,55 % | 98,89 % | **98,88 %** | 98 |
 
-La columna «entregas» es la primera que BAJA un poco, y el umbral no se mueve.
-Es lo que pasa cuando entra un módulo nuevo: 443 pruebas contra 411, con un
-servicio de 250 líneas recién escrito. Mientras siga por encima del umbral, el
-trinquete ha hecho su trabajo — impedir que el módulo nuevo entre sin pruebas,
-no exigir que entre siendo el mejor cubierto del repositorio.
+La columna «entregas» bajó unas décimas al entrar el módulo nuevo —443 pruebas
+contra 411, con un servicio de 250 líneas recién escrito— y el umbral no se
+movió. Eso es el trinquete haciendo su trabajo: impedir que un módulo nuevo
+entre sin pruebas, no exigir que entre siendo el mejor cubierto del
+repositorio. Cerradas después las ramas que quedaban nombradas en la auditoría,
+la columna acaba en 457 pruebas y por encima de donde estaba.
 
 El trinquete ha subido ocho veces, que es exactamente para lo que está.
 
@@ -40,6 +41,21 @@ escribirla. El trinquete frena la erosión, no prohíbe escribir.
 > columna que falta no se reconstruye —no hay medida guardada de ese día— y se
 > deja dicho en vez de inventarla. Si el documento que gobierna cuándo se sube
 > el umbral se queda atrás, la regla se erosiona sin que nadie la derogue.
+
+El cierre de esa misma columna se llevó tres deudas que llevaban semanas
+apuntadas, y las tres eran de la misma familia —**caminos que sólo existen fuera
+de la máquina de pruebas**:
+
+- **Los valores por omisión de `data-source.ts`.** Cada `||` decide qué pasa
+  cuando falta una variable de entorno, y ese es el escenario de la primera vez
+  que alguien clona el proyecto. Aquí las variables SIEMPRE están porque `.env`
+  las carga. Mismo criterio que ya se aplicó a `configuration.ts`.
+- **`IdDeRutaPipe`.** Estaba probado lo que rechaza y no lo que DEJA pasar, que
+  es donde un pipe global rompe cosas ajenas: un `:codigo` o un `:slug` tienen
+  que llegar intactos aunque no sean números.
+- **La sesión mutilada de inscripción de MFA, en el login.** Estaban probados el
+  token que sale de ahí y el guard que lo corta, pero no el camino que lo EMITE.
+  Se comprobaba que la llave abre lo que debe, y no que alguien la entregue.
 
 La ronda «entregas» es la primera que no cierra huecos sino que construye: el
 módulo de entregas de la Fase 1C, escrito con las pruebas por delante. 31 casos

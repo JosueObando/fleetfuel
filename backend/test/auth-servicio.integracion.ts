@@ -232,6 +232,72 @@ async function sesionAbierta(dispositivo?: string) {
   )) as { accessToken: string; refreshToken: string };
 }
 
+/*
+ * ─────────────────────────────────────────────────────────────────────────────
+ * La sesión MUTILADA de inscripción, en el login.
+ *
+ * §7: si el rol exige segundo factor y el usuario todavía no lo configuró, no
+ * se le puede negar la entrada —tiene que poder inscribirse alguna vez— pero
+ * tampoco darle la sesión completa. Se le da una que no sirve para nada salvo
+ * configurar el TOTP.
+ *
+ * Estaba probado el TOKEN que sale de aquí (`jwt.strategy.spec.ts`) y el guard
+ * que lo corta (`inscripcion-mfa.spec.ts`), pero no el camino del login que lo
+ * EMITE. O sea: se comprobaba que la llave abre lo que debe, y no que alguien
+ * la entregue.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+describe('login · el rol exige MFA y el usuario aún no lo tiene', () => {
+  let rolId: string;
+
+  beforeEach(async () => {
+    rolId = await darPermisos(dueño, {
+      empresa, usuarioId: usuario.id, nombreRol: `Exige TOTP ${Date.now()}`,
+      codigos: ['empresas:leer'], exigeMfa: true });
+    await dueño.query(
+      `UPDATE usuarios SET mfa_habilitado = false, mfa_secreto = NULL WHERE usuario_id = $1`,
+      [usuario.id]);
+  });
+
+  afterEach(async () => {
+    await dueño.query(`DELETE FROM usuarios_roles WHERE rol_id = $1`, [rolId]);
+    await dueño.query(`DELETE FROM roles_permisos WHERE rol_id = $1`, [rolId]);
+    await dueño.query(`DELETE FROM roles WHERE rol_id = $1`, [rolId]);
+  });
+
+  it('entra, pero con una sesión marcada como de inscripción', async () => {
+    const s = await auth.login({ correo: usuario.correo, clave: usuario.clave });
+    expect((s as { debeInscribirMfa?: boolean }).debeInscribirMfa).toBe(true);
+    // Y le dice adónde ir: una sesión que no sirve para nada sin decir para qué
+    // sirve es una puerta cerrada sin cartel.
+    expect((s as { siguiente?: string }).siguiente).toMatch(/mfa/);
+  });
+
+  it('esa sesión NO trae permisos: es lo que la hace inofensiva', async () => {
+    // El token lleva `permisos: []` a propósito. Si arrastrara los del rol, un
+    // usuario sin segundo factor tendría acceso completo con sólo no
+    // inscribirse — justo al revés de lo que el §7 pretende.
+    const s = await auth.login({ correo: usuario.correo, clave: usuario.clave });
+    const carga = JSON.parse(
+      Buffer.from((s as { accessToken: string }).accessToken.split('.')[1], 'base64').toString());
+    expect(carga.tipo).toBe('inscripcion-mfa');
+    expect(carga.permisos).toEqual([]);
+  });
+
+  it('no viene con refresco: no se prolonga una sesión que no sirve', async () => {
+    const s = await auth.login({ correo: usuario.correo, clave: usuario.clave });
+    expect((s as { refreshToken?: string }).refreshToken).toBeUndefined();
+  });
+
+  it('el acceso queda registrado como lo que es', async () => {
+    await auth.login({ correo: usuario.correo, clave: usuario.clave });
+    const [f] = await dueño.query(
+      `SELECT accion FROM auditoria WHERE usuario_id = $1 ORDER BY auditoria_id DESC LIMIT 1`,
+      [usuario.id]);
+    expect(f?.accion).toBe('login-inscripcion-mfa');
+  });
+});
+
 describe('refrescar · lo que rechaza', () => {
   it('un token que no es un JWT', async () => {
     await expect(auth.refrescar('no.es.un.token'))

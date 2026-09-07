@@ -37,3 +37,59 @@ describe('AppDataSource · la conexión de dueño', () => {
     expect(opciones.synchronize).toBe(false);
   });
 });
+
+/*
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Los VALORES POR OMISIÓN, que es lo que se usa en un despliegue nuevo.
+ *
+ * Cada `||` de este fichero es una decisión sobre qué pasa cuando falta una
+ * variable de entorno, y ese es exactamente el escenario de la primera vez que
+ * alguien levanta el proyecto. Aquí las variables SIEMPRE están —`.env` las
+ * carga—, así que la rama que corre en la máquina de quien acaba de clonar era
+ * la única sin probar. Es el mismo motivo por el que se probaron los valores
+ * por omisión de `configuration.ts`.
+ *
+ * El módulo se recarga porque `AppDataSource` se construye UNA vez al importar.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+describe('sin variables de entorno · lo que ve quien acaba de clonar', () => {
+  const VARIABLES = ['DATABASE_HOST', 'DATABASE_PORT', 'DATABASE_NAME',
+                     'DATABASE_USER', 'DATABASE_PASSWORD'] as const;
+  const originales: Record<string, string | undefined> = {};
+
+  beforeEach(() => {
+    for (const v of VARIABLES) { originales[v] = process.env[v]; delete process.env[v]; }
+  });
+  afterEach(() => {
+    for (const v of VARIABLES) {
+      if (originales[v] === undefined) delete process.env[v];
+      else process.env[v] = originales[v];
+    }
+    jest.resetModules();
+  });
+
+  it('cae a los valores del compose de desarrollo', async () => {
+    await jest.isolateModulesAsync(async () => {
+      // `dotenv` no pisa lo que ya está puesto, pero aquí NO hay nada puesto:
+      // por eso hay que evitar que lo cargue del `.env` del repositorio.
+      jest.doMock('dotenv', () => ({ config: () => ({ parsed: {} }) }));
+      const { AppDataSource } = await import('./data-source');
+      const o = AppDataSource.options as unknown as Record<string, unknown>;
+      expect(o.host).toBe('localhost');
+      expect(o.port).toBe(5433);
+      expect(o.database).toBe('fleetfuel_db');
+      expect(o.username).toBe('fleetfuel_owner');
+    });
+  });
+
+  it('la clave por omisión GRITA que hay que cambiarla', async () => {
+    // No es un detalle estético: es la única señal que tiene quien despliega de
+    // que está a punto de publicar con una contraseña conocida.
+    await jest.isolateModulesAsync(async () => {
+      jest.doMock('dotenv', () => ({ config: () => ({ parsed: {} }) }));
+      const { AppDataSource } = await import('./data-source');
+      expect((AppDataSource.options as { password?: string }).password)
+        .toBe('cambiar_en_produccion');
+    });
+  });
+});
