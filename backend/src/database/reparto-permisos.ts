@@ -40,7 +40,7 @@ const LEER_CATALOGOS = CATALOGOS.map(m => `${m}:leer`);
 /** Leer el flujo de la Fase 1B. */
 const LEER_OPERACION = [
   'ordenes:leer', 'viajes:leer', 'plancarga:leer', 'entregas:leer',
-  'solicitudesruta:leer', 'gastos:leer',
+  'solicitudesruta:leer', 'gastos:leer', 'informes:leer',
 ];
 
 export const REPARTO: Record<string, string[]> = {
@@ -58,6 +58,7 @@ export const REPARTO: Record<string, string[]> = {
     ...TODOS('entregas', ['leer', 'crear', 'aprobar']),
     ...TODOS('solicitudesruta', ['leer', 'crear', 'resolver']),
     ...TODOS('gastos', ['leer', 'crear', 'aprobar']),
+    'informes:leer',
   ],
 
   'Supervisor de operaciones': [

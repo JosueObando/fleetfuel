@@ -33,6 +33,7 @@ import { ViajesModule } from './modules/viajes/viajes.module';
 import { EntregasModule } from './modules/entregas/entregas.module';
 import { SolicitudesRutaModule } from './modules/solicitudes-ruta/solicitudes-ruta.module';
 import { GastosModule } from './modules/gastos/gastos.module';
+import { InformesModule } from './modules/informes/informes.module';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { GastosModule } from './modules/gastos/gastos.module';
     EntregasModule,
     SolicitudesRutaModule,
     GastosModule,
+    InformesModule,
     ConfigModule.forRoot({
       isGlobal: true,
       load: [configuration],

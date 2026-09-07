@@ -117,7 +117,7 @@ uso enseña más sobre lo que falta que tres módulos a medio terminar.»*
 | 1A · Catálogos | 25 d | ✅ **cerrada** | Criterio de salida verificado DESDE LA UI: alta de cliente, conductor, vehículo y cisterna con compartimentos, las cuatro en auditoría |
 | UX-1 · Shell y catálogos | — | 🟢 **código completo** | 3 columnas, 5 breakpoints, estado en la URL, CRUD de los 6 catálogos |
 | 1B · Órdenes → viaje | 35 d | 🟢 **código verificado** | 5 tablas, exclusiones del §5.1, 14 rutas, 16 pruebas y el flujo completo recorrido desde la UI. Falta solo la compuerta de producción |
-| 1C · Entregas, liquidación | 30 d | 🟡 **parcial** | Entregas y conciliación de volúmenes construidas y probadas (2026-09-07). Gastos, liquidaciones e informes siguen tras la compuerta 🏁 |
+| 1C · Entregas, liquidación | 30 d | 🟡 **4 de 5** | Entregas, conciliación, gastos e informes construidos y probados (2026-09-07). **Sólo faltan las liquidaciones**, que es lo que la compuerta 🏁 protege por su nombre |
 | 2A · App del conductor | 45 d | ⬜ | |
 | 2B · GPS, geocercas, alertas | 30 d | ⬜ | |
 | UX-2 · Panel de tracking | ~35 d | ⬜ | Compuerta dura: 2B |
@@ -511,10 +511,14 @@ catálogo y la URL restaura la vista exacta tras recargar.
 - [x] **Entregas** — §7.14 completa, 5 rutas, 25 pruebas (2026-09-07)
 - [ ] Evidencia fotográfica y documentos de la entrega — llega con 2A, que es
       donde el conductor captura evidencias (§5)
-- [ ] Gastos
-- [ ] Liquidaciones, con los cálculos del §10
+- [x] **Gastos** — §7.17 completa, 6 rutas, 19 pruebas
+- [ ] **Liquidaciones, con los cálculos del §10** — lo único que queda, y es
+      exactamente lo que la compuerta protege: *«se diseñan mucho mejor cuando
+      ya existen viajes reales que liquidar»*
 - [x] **Conciliación de volúmenes** (§17) y merma con tolerancia — §10.4 y §10.5
-- [ ] Reportes básicos (§14)
+- [x] **Reportes básicos (§14)** — operativo, cadena del volumen, mermas por
+      conductor/cisterna/producto y recorridos. Los del §14.3 (costo por km,
+      rentabilidad) NO: dependen del motor de costos de la Fase 3
 
 ### Por qué esta parte se adelantó a la compuerta, y el resto no
 

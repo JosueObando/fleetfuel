@@ -592,6 +592,37 @@ describe('gastos de viaje · las seis rutas del §7.17', () => {
 });
 
 /*
+ * §14 · Informes. Sólo lectura y agregados: aquí se comprueba que las cuatro
+ * rutas existen, responden y no revientan. Que los NÚMEROS sean los correctos
+ * se prueba en `informes.integracion.ts`, con datos de resultado conocido.
+ */
+describe('informes · las cuatro rutas del §14', () => {
+  it('operativo, volumen, mermas y recorridos', async () => {
+    const operativo = await ruta('GET /informes/operativo',
+      api().get('/api/informes/operativo').set(cab()), [200]);
+    expect(operativo.body).toHaveProperty('viajesProgramados');
+
+    const volumen = await ruta('GET /informes/volumen',
+      api().get('/api/informes/volumen').set(cab()), [200]);
+    expect(volumen.body).toHaveProperty('volumenPendiente');
+
+    const mermas = await ruta('GET /informes/mermas',
+      api().get('/api/informes/mermas?agruparPor=producto').set(cab()), [200]);
+    expect(Array.isArray(mermas.body)).toBe(true);
+
+    // Una agrupación inventada NO puede ser un 500: se normaliza a la de por
+    // omisión, porque el mapa de agrupación no tiene esa clave y buscarla a
+    // ciegas reventaría con un TypeError.
+    const inventada = await api().get('/api/informes/mermas?agruparPor=luna').set(cab());
+    expect(inventada.status).toBe(200);
+
+    const recorridos = await ruta('GET /informes/recorridos',
+      api().get('/api/informes/recorridos?limite=5').set(cab()), [200]);
+    expect(Array.isArray(recorridos.body)).toBe(true);
+  }, 60_000);
+});
+
+/*
  * ─────────────────────────────────────────────────────────────────────────────
  * Que no se quede ninguna ruta fuera, y que eso lo diga una prueba.
  *
