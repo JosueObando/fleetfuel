@@ -206,10 +206,16 @@ describe('login sin aflojar la RLS', () => {
 describe('el andamiaje de las pruebas se mantiene al día solo', () => {
   it('toda tabla con empresa_id está en la lista de limpieza', async () => {
     const filas = await dueño.query(
+      // Las PARTICIONES quedan fuera: se borran con su tabla padre, y además
+      // nacen solas —`fn_asegurar_particion_gps` crea la del mes cuando llega
+      // la primera posición—, así que enumerarlas en una lista fija sería
+      // imposible de mantener y la lista volvería a quedarse corta cada mes.
       `SELECT t.tablename FROM pg_tables t
          JOIN information_schema.columns c
            ON c.table_name = t.tablename AND c.column_name = 'empresa_id'
-        WHERE t.schemaname = 'public'`);
+        WHERE t.schemaname = 'public'
+          AND NOT EXISTS (SELECT 1 FROM pg_inherits i
+                           WHERE i.inhrelid = (quote_ident(t.tablename))::regclass)`);
     const conEmpresa: string[] = filas
       .map((f: { tablename: string }) => f.tablename)
       // `empresas` sale porque su `empresa_id` es su propia clave primaria: no

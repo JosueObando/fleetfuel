@@ -737,6 +737,47 @@ describe('sincronización · la cola de salida del móvil', () => {
 });
 
 /*
+ * Fase 2B · Telemetría. Cinco rutas: la ingesta del lote y las cuatro lecturas
+ * que el panel de tracking necesita para existir.
+ */
+describe('telemetría · las cinco rutas de 2B', () => {
+  it('ingerir un lote y leer última, recorrido, kilómetros y flota', async () => {
+    const { viaje } = await viajeHasta('transito_estacion', sello());
+    const [vehiculo] = (await api().get('/api/vehiculos').set(cab()).expect(200)).body
+      .filter((v: { tipoVehiculo: string }) => v.tipoVehiculo === 'cisterna').slice(-1);
+    const ahora = () => new Date().toISOString();
+
+    const ingesta = await ruta('POST /gps/posiciones',
+      api().post('/api/gps/posiciones').set(cab()).send({
+        vehiculoId: String(vehiculo.id), viajeId: String(viaje.id),
+        posiciones: [
+          { fechaHora: new Date(Date.now() - 60000).toISOString(),
+            latitud: 8.9750, longitud: -79.5300, velocidad: 45 },
+          { fechaHora: ahora(), latitud: 8.9520, longitud: -79.5350, velocidad: 50 },
+        ],
+      }), [200, 201]);
+    expect(ingesta.body.ingeridas).toBe(2);
+
+    const ultima = await ruta('GET /gps/viaje/:viajeId/ultima',
+      api().get(`/api/gps/viaje/${viaje.id}/ultima`).set(cab()), [200]);
+    expect(ultima.body.stale).toBe(false);
+
+    const recorrido = await ruta('GET /gps/viaje/:viajeId/recorrido',
+      api().get(`/api/gps/viaje/${viaje.id}/recorrido?limite=10`).set(cab()), [200]);
+    expect(recorrido.body).toHaveLength(2);
+
+    const km = await ruta('GET /gps/viaje/:viajeId/kilometros',
+      api().get(`/api/gps/viaje/${viaje.id}/kilometros`).set(cab()), [200]);
+    // Los dos puntos están a ~2,57 km en el mapa real.
+    expect(km.body.kilometrosGps).toBeGreaterThan(2.5);
+
+    const flota = await ruta('GET /gps/flota', api().get('/api/gps/flota').set(cab()), [200]);
+    expect(flota.body.map((f: { viajeId: string }) => String(f.viajeId)))
+      .toContain(String(viaje.id));
+  }, 120_000);
+});
+
+/*
  * ─────────────────────────────────────────────────────────────────────────────
  * Que no se quede ninguna ruta fuera, y que eso lo diga una prueba.
  *

@@ -107,7 +107,7 @@ export async function sembrarEmpresa(
  */
 export const TABLAS_POR_EMPRESA = [
   'intentos_login', 'auditoria', 'claves_idempotencia', 'dispositivos',
-  'eventos_viaje', 'liquidaciones_conductor', 'gastos_viaje', 'solicitudes_ruta', 'entregas', 'plan_carga', 'viaje_ordenes', 'viajes',
+  'posiciones_gps', 'eventos_viaje', 'liquidaciones_conductor', 'gastos_viaje', 'solicitudes_ruta', 'entregas', 'plan_carga', 'viaje_ordenes', 'viajes',
   'detalles_orden', 'ordenes_abastecimiento', 'estaciones_servicio', 'clientes',
   'productos_combustible', 'compartimentos_cisterna', 'cisternas',
   'vehiculos', 'conductores', 'roles', 'usuarios',

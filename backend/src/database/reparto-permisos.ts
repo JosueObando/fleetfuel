@@ -41,6 +41,7 @@ const LEER_CATALOGOS = CATALOGOS.map(m => `${m}:leer`);
 const LEER_OPERACION = [
   'ordenes:leer', 'viajes:leer', 'plancarga:leer', 'entregas:leer',
   'solicitudesruta:leer', 'gastos:leer', 'informes:leer', 'eventos:leer',
+  'gps:leer',
 ];
 
 export const REPARTO: Record<string, string[]> = {
@@ -61,6 +62,7 @@ export const REPARTO: Record<string, string[]> = {
     'informes:leer',
     ...TODOS('liquidaciones', ['leer', 'calcular', 'aprobar', 'pagar']),
     ...TODOS('eventos', ['leer', 'crear', 'anular']),
+    ...TODOS('gps', ['leer', 'ingerir']),
   ],
 
   'Supervisor de operaciones': [
@@ -162,6 +164,8 @@ export const REPARTO: Record<string, string[]> = {
                 'gastos:leer', 'gastos:crear',
                 // §5, literal: «registra EVENTOS, gastos y evidencias».
                 'eventos:leer', 'eventos:crear',
+                // El movil manda su telemetria; no la consulta de los demas.
+                'gps:ingerir',
                 // Ve lo suyo: es a quien se le paga.
                 'liquidaciones:leer'],
   // §5: «Consulta órdenes y entregas autorizadas».

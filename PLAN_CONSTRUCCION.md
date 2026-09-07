@@ -593,10 +593,19 @@ rehacer liquidaciones contra un modelo de viaje que la operación real cambió.
 
 **Puerta de entrada:** 2A con conductores reales enviando datos · 1C cerrada.
 
-- [ ] Tabla `posiciones_gps` **particionada por mes** (§5.2) — preparada en Fase 0
-- [ ] Ingesta por WebSocket, cadencia de 5 s (`#/spec/ux-modelo-datos`)
-- [ ] Polling de respaldo de la lista completa cada 60 s
-- [ ] Marca `stale` en telemetría, para el banner de telemetría caída
+- [x] **Tabla `posiciones_gps` particionada por mes** (2026-09-07) — NO estaba
+      preparada en Fase 0 pese a lo que decía este plan: no existía. Las
+      particiones se crean solas con `fn_asegurar_particion_gps`, en vez de por
+      una tarea programada que falla en silencio el día 1 a las 00:00
+- [x] **Ingesta por lotes** con `unnest` en una sola sentencia. Falta el
+      WebSocket: hoy es HTTP, que es lo que la app de 2A puede usar sin más
+- [ ] Polling de respaldo de la lista completa cada 60 s — `GET /gps/flota` ya
+      lo sirve; falta el lado del panel
+- [x] **Marca `stale`** — calculada al leer y no almacenada: una marca guardada
+      estaría obsoleta en cuanto pasara el tiempo, y mantenerla al día exigiría
+      justo el proceso que se cae y deja el banner apagado
+- [x] **Kilómetros GPS del §10.1** y su diferencia contra el odómetro,
+      calculados en PostGIS
 - [ ] Geocercas
 - [ ] Las 8 alertas del §22: desvío de ruta, exceso de velocidad, parada no
       autorizada, pérdida de GPS, sello inconsistente, diferencia de volumen,

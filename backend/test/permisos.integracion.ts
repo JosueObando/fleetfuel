@@ -228,10 +228,11 @@ describe('las separaciones del §7 siguen en pie', () => {
   });
 
   it('el Cliente externo sólo lee, y el Conductor lee y pide', () => {
-    // Esta prueba empezó diciendo «los dos sólo leen» y ha cambiado tres
+    // Esta prueba empezó diciendo «los dos sólo leen» y ha cambiado cuatro
     // veces, todas a propósito y con el §5 delante, que al Conductor le da
     // literalmente «registra EVENTOS, GASTOS y evidencias» — más los cambios de
-    // ruta del §2C, que pide y no resuelve.
+    // ruta del §2C, que pide y no resuelve, y la telemetría de su propio móvil,
+    // que MANDA y no consulta.
     // Se ENUMERA lo que puede escribir en vez de contar permisos, porque contar
     // deja pasar el siguiente que se cuele.
     const externo = [...(concedidos.get('Cliente externo') ?? [])];
@@ -239,6 +240,6 @@ describe('las separaciones del §7 siguen en pie', () => {
 
     const conductor = [...(concedidos.get('Conductor') ?? [])];
     expect(conductor.filter(c => !c.endsWith(':leer')).sort())
-      .toEqual(['eventos:crear', 'gastos:crear', 'solicitudesruta:crear']);
+      .toEqual(['eventos:crear', 'gastos:crear', 'gps:ingerir', 'solicitudesruta:crear']);
   });
 });
