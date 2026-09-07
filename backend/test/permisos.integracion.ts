@@ -204,16 +204,29 @@ describe('las separaciones del §7 siguen en pie', () => {
     expect(infractores).toEqual([]);
   });
 
+  it('nadie registra un gasto Y lo aprueba, salvo el Administrador', () => {
+    // Si el conductor que pone el peaje pudiera aprobárselo, «gasto aprobado»
+    // no significaría nada, y la liquidación del §10.6 estaría sumando lo que
+    // él decidió cobrarse. Tercera vez que esta misma forma aparece —viajes,
+    // entregas, solicitudes— y por el mismo §7.
+    const infractores = [...concedidos.entries()]
+      .filter(([rol]) => rol !== 'Administrador')
+      .filter(([, p]) => p.has('gastos:crear') && p.has('gastos:aprobar'))
+      .map(([rol]) => rol);
+    expect(infractores).toEqual([]);
+  });
+
   it('el Cliente externo sólo lee, y el Conductor lee y pide', () => {
-    // Antes esta prueba decía «los dos sólo leen», y el §2C la cambió a
-    // propósito: el Conductor gana `solicitudesruta:crear` y NADA más. Se
-    // enumera lo que puede escribir en vez de contar permisos, porque contar
+    // Esta prueba empezó diciendo «los dos sólo leen» y ha cambiado dos veces,
+    // las dos a propósito y con el §5 delante: el Conductor pide cambios de
+    // ruta (§2C) y registra gastos («registra eventos, GASTOS y evidencias»).
+    // Se ENUMERA lo que puede escribir en vez de contar permisos, porque contar
     // deja pasar el siguiente que se cuele.
     const externo = [...(concedidos.get('Cliente externo') ?? [])];
     expect(externo.filter(c => !c.endsWith(':leer'))).toEqual([]);
 
     const conductor = [...(concedidos.get('Conductor') ?? [])];
     expect(conductor.filter(c => !c.endsWith(':leer')).sort())
-      .toEqual(['solicitudesruta:crear']);
+      .toEqual(['gastos:crear', 'solicitudesruta:crear']);
   });
 });

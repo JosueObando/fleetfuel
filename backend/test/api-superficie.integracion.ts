@@ -554,6 +554,44 @@ describe('solicitudes de cambio de ruta · las cinco rutas del §2C', () => {
 });
 
 /*
+ * §7.17 · Gastos de viaje. Igual que con las solicitudes, aquí sólo hay un
+ * usuario: aprobar el propio gasto devuelve 409, que es la respuesta correcta y
+ * la que se exige. La ruta feliz vive en `gastos.integracion.ts`.
+ */
+describe('gastos de viaje · las seis rutas del §7.17', () => {
+  it('registrar, listar, totales y toparse con la separación al aprobar', async () => {
+    const { viaje } = await viajeHasta('transito_estacion', sello());
+
+    const gasto = (await ruta('POST /gastos/viaje/:viajeId',
+      api().post(`/api/gastos/viaje/${viaje.id}`).set(cabPost()).send({
+        categoria: 'peaje', descripcion: 'Peaje de la Vía Panamericana',
+        monto: 12.5, pagadoPor: 'conductor', reembolsable: true,
+      }), [201])).body;
+    expect(gasto.estado).toBe('pendiente');
+
+    await ruta('GET /gastos/:id', api().get(`/api/gastos/${gasto.id}`).set(cab()), [200]);
+    const delViaje = await ruta('GET /gastos/viaje/:viajeId',
+      api().get(`/api/gastos/viaje/${viaje.id}`).set(cab()), [200]);
+    expect(delViaje.body).toHaveLength(1);
+
+    const pendientes = await ruta('GET /gastos/pendientes',
+      api().get('/api/gastos/pendientes').set(cab()), [200]);
+    expect(pendientes.body.map((g: { id: string }) => String(g.id))).toContain(String(gasto.id));
+
+    // Antes de aprobar nada, el total aprobado es 0 y lo pendiente son 12,50.
+    const totales = await ruta('GET /gastos/viaje/:viajeId/totales',
+      api().get(`/api/gastos/viaje/${viaje.id}/totales`).set(cab()), [200]);
+    expect(Number(totales.body.totalAprobado)).toBe(0);
+    expect(Number(totales.body.totalPendiente)).toBe(12.5);
+
+    // 409: este token es el de quien lo registró.
+    await ruta('PATCH /gastos/:id',
+      api().patch(`/api/gastos/${gasto.id}`).set(cab())
+        .send({ estado: 'aprobado', motivo: 'Intento de aprobarme a mí mismo' }), [409]);
+  }, 120_000);
+});
+
+/*
  * ─────────────────────────────────────────────────────────────────────────────
  * Que no se quede ninguna ruta fuera, y que eso lo diga una prueba.
  *

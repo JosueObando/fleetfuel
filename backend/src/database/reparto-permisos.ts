@@ -40,7 +40,7 @@ const LEER_CATALOGOS = CATALOGOS.map(m => `${m}:leer`);
 /** Leer el flujo de la Fase 1B. */
 const LEER_OPERACION = [
   'ordenes:leer', 'viajes:leer', 'plancarga:leer', 'entregas:leer',
-  'solicitudesruta:leer',
+  'solicitudesruta:leer', 'gastos:leer',
 ];
 
 export const REPARTO: Record<string, string[]> = {
@@ -57,6 +57,7 @@ export const REPARTO: Record<string, string[]> = {
     ...TODOS('plancarga', ['leer', 'crear', 'actualizar', 'cancelar']),
     ...TODOS('entregas', ['leer', 'crear', 'aprobar']),
     ...TODOS('solicitudesruta', ['leer', 'crear', 'resolver']),
+    ...TODOS('gastos', ['leer', 'crear', 'aprobar']),
   ],
 
   'Supervisor de operaciones': [
@@ -70,7 +71,7 @@ export const REPARTO: Record<string, string[]> = {
     'entregas:aprobar',
     // §5: «Monitorea rutas, retrasos, alertas y diferencias». Resolver un
     // cambio de ruta es exactamente eso.
-    'solicitudesruta:resolver',
+    'solicitudesruta:resolver', 'gastos:aprobar',
   ],
 
   'Planificador de flota': [
@@ -124,9 +125,13 @@ export const REPARTO: Record<string, string[]> = {
   ],
 
   // Ve conductores por las tarifas que alimentan las liquidaciones.
+  // §5: «Revisa costos, rentabilidad y pagos a conductores». Aprobar gastos es
+  // literalmente su trabajo, y es el rol que la liquidación del §10 va a
+  // necesitar cuando llegue.
   'Finanzas': [
     'usuarios:leer', 'auditoria:leer', 'empresas:leer',
     'clientes:leer', 'conductores:leer', ...LEER_OPERACION,
+    'gastos:aprobar',
   ],
 
   // §5: «Consulta viajes, registra eventos, gastos y evidencias». Quien FIRMA
@@ -137,8 +142,12 @@ export const REPARTO: Record<string, string[]> = {
   // Pide cambios de ruta —es quien está en la carretera y ve el desvío— y NO
   // los resuelve. Esa asimetría es el módulo entero: si pudiera resolverlos,
   // «solicitud de cambio de ruta» sería el conductor autorizándose el desvío.
+  // §5, literal: «Consulta viajes, registra eventos, GASTOS y evidencias». Los
+  // registra y no los aprueba: si pudiera lo segundo, «gasto aprobado» no
+  // significaría nada y la liquidación sumaría lo que él decidió cobrarse.
   'Conductor': ['viajes:leer', 'entregas:leer',
-                'solicitudesruta:leer', 'solicitudesruta:crear'],
+                'solicitudesruta:leer', 'solicitudesruta:crear',
+                'gastos:leer', 'gastos:crear'],
   // §5: «Consulta órdenes y entregas autorizadas».
   'Cliente externo': ['ordenes:leer', 'entregas:leer'],
 };
