@@ -580,9 +580,13 @@ rehacer liquidaciones contra un modelo de viaje que la operación real cambió.
       no registraba nada—. Append-only, con corrección en vez de borrado y
       cadena de hashes verificable
 - [ ] React Native + Expo (§8)
-- [ ] SQLite local (`expo-sqlite`) + **cola de salida**
-- [ ] Sincronización idempotente contra la infraestructura del ADR 004 — la
-      Fase 0 ya dejó la firma de todo `POST` preparada para esto
+- [ ] SQLite local (`expo-sqlite`) + **cola de salida** — falta el lado del
+      móvil; el del servidor ya está
+- [x] **Sincronización idempotente** — `POST /sincronizacion/eventos`
+      (2026-09-07). La idempotencia es POR ELEMENTO y no por petición: un
+      reintento de cola no reenvía la misma petición, trae lo que no confirmó
+      más lo que se acumuló mientras tanto. Éxito parcial con savepoints, para
+      que un elemento inválido no atasque la cola ni tumbe a los demás
 - [ ] Checklists · Fotografías · Firma digital
 
 ## 2B · Ingesta GPS, geocercas y alertas — 30 d

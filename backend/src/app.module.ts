@@ -36,6 +36,7 @@ import { GastosModule } from './modules/gastos/gastos.module';
 import { InformesModule } from './modules/informes/informes.module';
 import { LiquidacionesModule } from './modules/liquidaciones/liquidaciones.module';
 import { EventosModule } from './modules/eventos/eventos.module';
+import { SincronizacionModule } from './modules/sincronizacion/sincronizacion.module';
 
 @Module({
   imports: [
@@ -50,6 +51,7 @@ import { EventosModule } from './modules/eventos/eventos.module';
     InformesModule,
     LiquidacionesModule,
     EventosModule,
+    SincronizacionModule,
     ConfigModule.forRoot({
       isGlobal: true,
       load: [configuration],

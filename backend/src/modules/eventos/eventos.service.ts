@@ -9,6 +9,7 @@ const CAMPOS = `e.evento_id AS id, e.viaje_id AS "viajeId", e.tipo_evento AS "ti
                 e.origen_dato AS "origenDato", e.observacion, e.evidencia,
                 e.anula_evento_id AS "anulaEventoId",
                 e.hash_anterior AS "hashAnterior", e.hash_evento AS "hashEvento",
+                e.id_cliente AS "idCliente",
                 e.creado_en AS "creadoEn"`;
 
 /**
@@ -62,7 +63,12 @@ export class EventosService {
     return fila;
   }
 
-  async registrar(viajeId: string, dto: RegistrarEventoDto) {
+  /**
+   * @param idCliente identificador generado por el DISPOSITIVO, cuando el
+   * evento viene de la cola de salida de la app (2A). Es lo que permite
+   * reconocer un reintento; los eventos creados desde la web no lo traen.
+   */
+  async registrar(viajeId: string, dto: RegistrarEventoDto, idCliente?: string) {
     const [viaje] = await gestor().query(
       `SELECT viaje_id FROM viajes WHERE viaje_id = $1`, [viajeId]);
     if (!viaje) throw new NotFoundException('Viaje no encontrado');
@@ -76,7 +82,7 @@ export class EventosService {
       fechaHora: dto.fechaHora ?? new Date().toISOString(),
       latitud: dto.latitud, longitud: dto.longitud, velocidad: dto.velocidad,
       odometro: dto.odometro, dispositivoId: dto.dispositivoId,
-      observacion: dto.observacion, evidencia: dto.evidencia,
+      observacion: dto.observacion, evidencia: dto.evidencia, idCliente,
     });
   }
 
@@ -162,19 +168,22 @@ export class EventosService {
         `INSERT INTO eventos_viaje
            (empresa_id, viaje_id, tipo_evento, fecha_hora, latitud, longitud, velocidad,
             odometro, usuario_id, dispositivo_id, origen_dato, observacion, evidencia,
-            anula_evento_id, hash_anterior, hash_evento)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+            anula_evento_id, hash_anterior, hash_evento, id_cliente)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
          RETURNING evento_id`,
         [ctx.empresaId, viajeId, datos.tipoEvento, datos.fechaHora,
          datos.latitud ?? null, datos.longitud ?? null, datos.velocidad ?? null,
          datos.odometro ?? null, ctx.usuarioId, datos.dispositivoId ?? null,
          datos.origenDato, datos.observacion ?? null, datos.evidencia ?? null,
-         datos.anulaEventoId ?? null, hashAnterior, hashEvento]);
+         datos.anulaEventoId ?? null, hashAnterior, hashEvento,
+         datos.idCliente ?? null]);
     } catch (e) {
       const restriccion = (e as { constraint?: string })?.constraint ?? '';
       if (restriccion === 'uq_eventos_encadenado')
         throw new ConflictException(
           'Otro evento se encadeno primero en este viaje; vuelva a intentarlo');
+      if (restriccion === 'uq_eventos_id_cliente')
+        throw new ConflictException('Ese elemento de la cola ya se sincronizo');
       if (restriccion === 'uq_eventos_hash')
         throw new ConflictException('Ese evento ya esta registrado, identico y en el mismo punto');
       throw e;

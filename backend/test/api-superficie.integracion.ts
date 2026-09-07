@@ -703,6 +703,40 @@ describe('eventos de viaje · las cinco rutas del §7.15', () => {
 });
 
 /*
+ * Fase 2A · El drenaje de la cola de salida. Una sola ruta, y responde 200 con
+ * el resultado de cada elemento aunque alguno se rechace: si devolviera 4xx, la
+ * app no sabría cuáles aterrizaron y su cola quedaría atascada.
+ */
+describe('sincronización · la cola de salida del móvil', () => {
+  it('un lote con un elemento bueno y uno malo entra a medias, y lo dice', async () => {
+    const { viaje } = await viajeHasta('transito_estacion', sello());
+    const uuid = () => randomUUID();
+
+    const r = await ruta('POST /sincronizacion/eventos',
+      api().post('/api/sincronizacion/eventos').set(cab()).send({
+        eventos: [
+          { idCliente: uuid(), viajeId: String(viaje.id), tipoEvento: 'salida',
+            origenDato: 'movil', latitud: 8.9824, longitud: -79.5199 },
+          { idCliente: uuid(), viajeId: '999999999', tipoEvento: 'parada',
+            origenDato: 'movil' },
+        ],
+      }), [200, 201]);
+
+    expect(r.body).toMatchObject({ recibidos: 2, creados: 1, rechazados: 1 });
+    expect(r.body.resultados[1].error).toMatch(/no encontrado/i);
+
+    // Sin `Idempotency-Key`: la protección es por elemento, no por petición.
+    // Reenviar lo mismo no duplica.
+    const otra = await api().post('/api/sincronizacion/eventos').set(cab())
+      .send({ eventos: [{ ...r.body.resultados[0] && {
+        idCliente: r.body.resultados[0].idCliente, viajeId: String(viaje.id),
+        tipoEvento: 'salida', origenDato: 'movil', latitud: 8.9824, longitud: -79.5199 } }] })
+      .expect(201);
+    expect(otra.body).toMatchObject({ creados: 0, duplicados: 1 });
+  }, 120_000);
+});
+
+/*
  * ─────────────────────────────────────────────────────────────────────────────
  * Que no se quede ninguna ruta fuera, y que eso lo diga una prueba.
  *
