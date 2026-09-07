@@ -12,12 +12,18 @@ muere y se lleva por delante la costumbre.
 
 Así que es un **trinquete**: se puso justo por debajo de lo que ya había.
 
-| | al ponerlo | catálogos | administración | superficie API | plan de carga | reserva | cierre | umbral |
-|---|---|---|---|---|---|---|---|---|
-| Sentencias | 63,47 % | 74,36 % | 89,41 % | 94,27 % | 96,30 % | 97,35 % | **97,92 %** | 97 |
-| Ramas | 42,52 % | 60,24 % | 71,95 % | 80,00 % | 84,50 % | 87,97 % | **89,38 %** | 89 |
-| Funciones | 46,48 % | 59,66 % | 79,67 % | 98,68 % | 98,71 % | 100 % | **100 %** | 99 |
-| Líneas | 66,18 % | 77,55 % | 92,10 % | 95,35 % | 97,43 % | 98,55 % | **98,89 %** | 98 |
+| | al ponerlo | catálogos | administr. | superficie | plan carga | reserva | cierre | entregas | umbral |
+|---|---|---|---|---|---|---|---|---|---|
+| Sentencias | 63,47 % | 74,36 % | 89,41 % | 94,27 % | 96,30 % | 97,35 % | 97,92 % | **97,78 %** | 97 |
+| Ramas | 42,52 % | 60,24 % | 71,95 % | 80,00 % | 84,50 % | 87,97 % | 89,38 % | **89,25 %** | 89 |
+| Funciones | 46,48 % | 59,66 % | 79,67 % | 98,68 % | 98,71 % | 100 % | 100 % | **100 %** | 99 |
+| Líneas | 66,18 % | 77,55 % | 92,10 % | 95,35 % | 97,43 % | 98,55 % | 98,89 % | **98,72 %** | 98 |
+
+La columna «entregas» es la primera que BAJA un poco, y el umbral no se mueve.
+Es lo que pasa cuando entra un módulo nuevo: 443 pruebas contra 411, con un
+servicio de 250 líneas recién escrito. Mientras siga por encima del umbral, el
+trinquete ha hecho su trabajo — impedir que el módulo nuevo entre sin pruebas,
+no exigir que entre siendo el mejor cubierto del repositorio.
 
 El trinquete ha subido ocho veces, que es exactamente para lo que está.
 
@@ -34,6 +40,25 @@ escribirla. El trinquete frena la erosión, no prohíbe escribir.
 > columna que falta no se reconstruye —no hay medida guardada de ese día— y se
 > deja dicho en vez de inventarla. Si el documento que gobierna cuándo se sube
 > el umbral se queda atrás, la regla se erosiona sin que nadie la derogue.
+
+La ronda «entregas» es la primera que no cierra huecos sino que construye: el
+módulo de entregas de la Fase 1C, escrito con las pruebas por delante. 31 casos
+de servicio, el recorrido HTTP de sus 5 rutas y dos pruebas de reparto de
+permisos. Dejó tres lecciones que valen más que el porcentaje:
+
+- **La prueba de superficie se ganó el sueldo.** Al registrar el módulo nuevo,
+  falló sola nombrando las cinco rutas que nadie había recorrido. Nadie tuvo que
+  acordarse.
+- **`borrarEmpresa` llevaba `.catch(() => undefined)` en cada DELETE**, así que
+  al añadir la tabla `entregas` —que faltaba en su lista— la limpieza empezó a
+  fallar en silencio. El síntoma no salía ahí: salía DOS ejecuciones después,
+  como un «duplicate key» en un `beforeAll` de otro fichero. Ahora falla fuerte,
+  las dos tablas de unión se borran por su propia clave, y `sembrarEmpresa` es
+  idempotente para que una suite interrumpida no envenene la siguiente.
+- **La decisión de no bloquear el exceso de volumen recibido.** Rechazar la
+  lectura obligaría a quien captura a redondear hasta que el sistema la acepte,
+  y eso no evita el descuadre: lo borra. Justo el descuadre es la señal de
+  fraude del §7.
 
 La ronda «cierre» atacó lo que quedaba nombrado en la auditoría, y dos de sus
 tres piezas son del mismo tipo: **caminos que sólo existen fuera de la máquina

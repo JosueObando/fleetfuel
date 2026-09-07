@@ -30,6 +30,7 @@ import { CisternasModule } from './modules/cisternas/cisternas.module';
 import { ConductoresModule } from './modules/conductores/conductores.module';
 import { OrdenesModule } from './modules/ordenes/ordenes.module';
 import { ViajesModule } from './modules/viajes/viajes.module';
+import { EntregasModule } from './modules/entregas/entregas.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { ViajesModule } from './modules/viajes/viajes.module';
     VehiculosModule, CisternasModule, ConductoresModule,
     // Fase 1B · órdenes, viajes y plan de carga
     OrdenesModule, ViajesModule,
+    EntregasModule,
     ConfigModule.forRoot({
       isGlobal: true,
       load: [configuration],

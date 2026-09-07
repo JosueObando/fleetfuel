@@ -38,7 +38,7 @@ const CATALOGOS = ['clientes', 'estaciones', 'productos', 'vehiculos', 'cisterna
 /** Leer los seis catálogos, sin tocar nada. */
 const LEER_CATALOGOS = CATALOGOS.map(m => `${m}:leer`);
 /** Leer el flujo de la Fase 1B. */
-const LEER_OPERACION = ['ordenes:leer', 'viajes:leer', 'plancarga:leer'];
+const LEER_OPERACION = ['ordenes:leer', 'viajes:leer', 'plancarga:leer', 'entregas:leer'];
 
 export const REPARTO: Record<string, string[]> = {
   // Administración de la propia empresa, más TODO lo operativo. No es un rol
@@ -52,6 +52,7 @@ export const REPARTO: Record<string, string[]> = {
     ...TODOS('ordenes', ['leer', 'crear', 'actualizar', 'cancelar']),
     ...TODOS('viajes', ['leer', 'crear', 'actualizar', 'cancelar', 'autorizar']),
     ...TODOS('plancarga', ['leer', 'crear', 'actualizar', 'cancelar']),
+    ...TODOS('entregas', ['leer', 'crear', 'aprobar']),
   ],
 
   'Supervisor de operaciones': [
@@ -59,6 +60,10 @@ export const REPARTO: Record<string, string[]> = {
     ...LEER_CATALOGOS, ...LEER_OPERACION,
     'vehiculos:actualizar', 'cisternas:actualizar', 'conductores:actualizar',
     'ordenes:actualizar', 'viajes:actualizar', 'viajes:cancelar', 'viajes:autorizar',
+    // Aprueba la diferencia de volumen y NO la captura: quien registra una
+    // entrega no puede ser quien perdona su merma. Es la separación del §7
+    // llevada al fraude de volumen, la misma que separa armar de autorizar.
+    'entregas:aprobar',
   ],
 
   'Planificador de flota': [
@@ -102,7 +107,11 @@ export const REPARTO: Record<string, string[]> = {
     ...LEER_CATALOGOS, ...LEER_OPERACION,
   ],
 
-  'Responsable de estación': ['estaciones:leer', 'productos:leer', 'ordenes:leer'],
+  // §5: «Valida recepción y firma entrega». Captura la entrega; no la aprueba.
+  'Responsable de estación': [
+    'estaciones:leer', 'productos:leer', 'ordenes:leer',
+    'entregas:leer', 'entregas:crear',
+  ],
 
   // Ve conductores por las tarifas que alimentan las liquidaciones.
   'Finanzas': [
@@ -110,8 +119,14 @@ export const REPARTO: Record<string, string[]> = {
     'clientes:leer', 'conductores:leer', ...LEER_OPERACION,
   ],
 
-  'Conductor': ['viajes:leer'],
-  'Cliente externo': ['ordenes:leer'],
+  // §5: «Consulta viajes, registra eventos, gastos y evidencias». Quien FIRMA
+  // la entrega es el Responsable de estación, no él: por eso lee entregas y no
+  // las crea. Cuando la Fase 2A traiga la app del conductor —evidencias, fotos
+  // y firma— será un permiso propio y una decisión explícita, no un
+  // ensanchamiento silencioso de éste.
+  'Conductor': ['viajes:leer', 'entregas:leer'],
+  // §5: «Consulta órdenes y entregas autorizadas».
+  'Cliente externo': ['ordenes:leer', 'entregas:leer'],
 };
 
 /**

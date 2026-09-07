@@ -169,6 +169,29 @@ describe('las separaciones del §7 siguen en pie', () => {
     expect(infractores).toEqual([]);
   });
 
+  it('nadie captura una entrega Y aprueba su diferencia, salvo el Administrador', () => {
+    // La misma separación que arriba, aplicada donde el §7 dice que está el
+    // riesgo REAL de este negocio: el fraude de volumen. Quien registra cuánto
+    // llegó no puede ser quien perdona que no cuadre; si lo fuera, la merma
+    // dejaría de ser un control y pasaría a ser un trámite.
+    const infractores = [...concedidos.entries()]
+      .filter(([rol]) => rol !== 'Administrador')
+      .filter(([, p]) => p.has('entregas:crear') && p.has('entregas:aprobar'))
+      .map(([rol]) => rol);
+    expect(infractores).toEqual([]);
+  });
+
+  it('quien firma la entrega es el Responsable de estación, no el Conductor', () => {
+    // §5: el Conductor «consulta viajes, registra eventos, gastos y
+    // evidencias»; el Responsable de estación «valida recepción y firma
+    // entrega». Cuando la Fase 2A traiga la app del conductor, dar de alta ahí
+    // una entrega tendrá que ser una decisión escrita —y esta prueba es la que
+    // obliga a que lo sea, en vez de que el permiso se ensanche de paso.
+    expect(concedidos.get('Responsable de estación')?.has('entregas:crear')).toBe(true);
+    expect(concedidos.get('Conductor')?.has('entregas:crear')).toBe(false);
+    expect(concedidos.get('Conductor')?.has('entregas:leer')).toBe(true);
+  });
+
   it('el Conductor y el Cliente externo sólo leen lo suyo', () => {
     for (const rol of ['Conductor', 'Cliente externo']) {
       const suyos = [...(concedidos.get(rol) ?? [])];

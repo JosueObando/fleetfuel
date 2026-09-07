@@ -54,12 +54,31 @@ export interface UsuarioDePrueba {
   clave: string;
 }
 
-/** Crea una empresa con un usuario que puede iniciar sesión de verdad. */
+/**
+ * Crea una empresa con un usuario que puede iniciar sesión de verdad.
+ *
+ * IDEMPOTENTE A PROPÓSITO: arrasa primero con lo que haya quedado de una
+ * ejecución anterior con el mismo RUC.
+ *
+ * Sin eso, una suite interrumpida —un `Ctrl-C`, un `timeout`, un fallo en el
+ * propio `beforeAll`— deja la empresa y su usuario a medias, y la ejecución
+ * SIGUIENTE muere con «duplicate key value violates uq_usuarios_correo_global»
+ * en un sitio que no tiene nada que ver con lo que se estaba probando. Cuesta
+ * más entender ese mensaje que arreglar el fallo real que lo provocó.
+ *
+ * Un fixture que sólo funciona sobre una base virgen no es un fixture: es una
+ * suposición.
+ */
 export async function sembrarEmpresa(
   dueño: DataSource,
   opciones: { ruc: string; correo: string; clave?: string; mfa?: boolean; estado?: string } ,
 ): Promise<{ empresa: string; usuario: UsuarioDePrueba }> {
   const clave = opciones.clave ?? 'ClaveDePrueba123';
+
+  const [previa] = await dueño.query(
+    `SELECT empresa_id FROM empresas WHERE ruc = $1`, [opciones.ruc]);
+  if (previa) await borrarEmpresa(dueño, String(previa.empresa_id), opciones.ruc);
+
   const [e] = await dueño.query(
     `INSERT INTO empresas (nombre, ruc) VALUES ($1,$2)
      ON CONFLICT (ruc) DO UPDATE SET nombre = EXCLUDED.nombre RETURNING empresa_id`,
@@ -79,13 +98,34 @@ export async function sembrarEmpresa(
 
 /** Deja la base como estaba. El orden importa: las claves foráneas mandan. */
 export async function borrarEmpresa(dueño: DataSource, empresa: string, ruc: string): Promise<void> {
+  // Las dos tablas de unión no llevan `empresa_id` —son (usuario, rol) y
+  // (rol, permiso)—, así que se borran por su propia clave y no por la empresa.
+  // Antes iban en la lista de abajo y su error se tragaba con un
+  // `.catch(() => undefined)`, que también se tragaba los fallos DE VERDAD.
+  await dueño.query(
+    `DELETE FROM usuarios_roles WHERE usuario_id IN
+       (SELECT usuario_id FROM usuarios WHERE empresa_id = $1)`, [empresa]);
+  await dueño.query(
+    `DELETE FROM roles_permisos WHERE rol_id IN
+       (SELECT rol_id FROM roles WHERE empresa_id = $1)`, [empresa]);
+
   for (const t of ['intentos_login', 'auditoria', 'claves_idempotencia', 'dispositivos',
-                   'plan_carga', 'viaje_ordenes', 'viajes', 'detalles_orden',
+                   'entregas', 'plan_carga', 'viaje_ordenes', 'viajes', 'detalles_orden',
                    'ordenes_abastecimiento', 'estaciones_servicio', 'clientes',
                    'productos_combustible', 'compartimentos_cisterna', 'cisternas',
-                   'vehiculos', 'conductores', 'usuarios_roles', 'roles_permisos',
-                   'roles', 'usuarios']) {
-    await dueño.query(`DELETE FROM ${t} WHERE empresa_id = $1`, [empresa]).catch(() => undefined);
+                   'vehiculos', 'conductores', 'roles', 'usuarios']) {
+    // SIN `.catch(() => undefined)`, y es un cambio con historia: lo llevaba, y
+    // por eso una limpieza incompleta no fallaba aquí sino DOS ejecuciones
+    // después y en otro fichero, como un «duplicate key» en
+    // `uq_usuarios_correo_global` dentro de un `beforeAll` que no tenía nada que
+    // ver. Pasó exactamente eso al añadir `entregas`: la tabla nueva no estaba
+    // en la lista, el DELETE de `viajes` chocaba contra su clave foránea, el
+    // fallo se tragaba, y la empresa de prueba sobrevivía para reventar la
+    // ejecución siguiente.
+    //
+    // Una limpieza que falla en silencio es peor que no limpiar: no limpiar se
+    // nota enseguida.
+    await dueño.query(`DELETE FROM ${t} WHERE empresa_id = $1`, [empresa]);
   }
   await dueño.query(`DELETE FROM empresas WHERE ruc = $1`, [ruc]);
 }

@@ -415,6 +415,90 @@ describe('los seis catálogos, ruta por ruta', () => {
 });
 
 /*
+ * Las entregas de la Fase 1C. Van al final porque necesitan el viaje entero
+ * armado: orden validada, asignada, plan de carga y el viaje descargando.
+ */
+describe('entregas · el eslabón que cierra orden → carga → viaje → entrega', () => {
+  it('registrar, leer, y aprobar una diferencia fuera de tolerancia', async () => {
+    const s = sello();
+    const cliente = (await api().post('/api/clientes').set(cabPost())
+      .send({ nombre: `Cliente ent ${s}` }).expect(201)).body;
+    const estacion = (await api().post('/api/estaciones').set(cabPost())
+      .send({ clienteId: String(cliente.id), nombre: `Estación ent ${s}` }).expect(201)).body;
+    const producto = (await api().post('/api/productos').set(cabPost())
+      .send({ codigo: `ENT-${s}`, nombre: `Diésel ${s}` }).expect(201)).body;
+    const vehiculo = (await api().post('/api/vehiculos').set(cabPost())
+      .send({ tipoVehiculo: 'cisterna', placa: `ENT-${s}` }).expect(201)).body;
+    const cisterna = (await api().post('/api/cisternas').set(cabPost()).send({
+      vehiculoId: String(vehiculo.id), capacidadTotal: 10000,
+      compartimentos: [{ numero: 1, capacidadNominal: 5000, capacidadCalibrada: 4980 }],
+    }).expect(201)).body;
+    const conductor = (await api().post('/api/conductores').set(cabPost()).send({
+      nombreCompleto: `Chofer ent ${s}`, documento: `ENTD-${s}`, licencia: `ENTL-${s}`,
+    }).expect(201)).body;
+
+    const orden = (await api().post('/api/ordenes').set(cabPost()).send({
+      clienteId: String(cliente.id), estacionId: String(estacion.id),
+      detalles: [{ productoId: String(producto.id), volumenSolicitado: 4000, tolerancia: 1 }],
+    }).expect(201)).body;
+    await api().patch(`/api/ordenes/${orden.id}/estado`).set(cab())
+      .send({ estado: 'validada' }).expect(200);
+
+    const viaje = (await api().post('/api/viajes').set(cabPost()).send({
+      codigoViaje: `ENT-${s}`, tipoViaje: 'simple', cisternaId: String(cisterna.id),
+      conductorId: String(conductor.id), fechaProgramada: '2030-03-01T08:00:00Z',
+    }).expect(201)).body;
+    await api().post(`/api/viajes/${viaje.id}/ordenes`).set(cabPost())
+      .send({ ordenId: String(orden.id), secuenciaEntrega: 1 }).expect(201);
+
+    const detalle = (await api().get(`/api/ordenes/${orden.id}`).set(cab()).expect(200))
+      .body.detalles[0];
+    await api().post(`/api/viajes/${viaje.id}/plan-carga`).set(cabPost()).send({
+      compartimentoId: String(cisterna.compartimentos[0].id),
+      detalleOrdenId: String(detalle.id), volumenPlanificado: 3000,
+    }).expect(201);
+
+    // Hasta `descargando` por la máquina de estados, sin atajos por SQL: es el
+    // único camino que un operador tiene, y probarlo aquí comprueba de paso que
+    // el flujo del §8.2 llega de verdad hasta la descarga.
+    await api().patch(`/api/viajes/${viaje.id}/estado`).set(cab())
+      .send({ estado: 'programado' }).expect(200);
+    await api().post(`/api/viajes/${viaje.id}/autorizar`).set(cabPost()).send({});
+    for (const estado of ['desplazamiento_terminal', 'espera_carga', 'cargando', 'cargado',
+                          'transito_estacion', 'descargando']) {
+      await api().patch(`/api/viajes/${viaje.id}/estado`).set(cab()).send({ estado }).expect(200);
+    }
+
+    // 2850 de 3000 son un 5 % de merma sobre una tolerancia del 1 %: entra
+    // pendiente, que es lo que la regla 9 pide.
+    const entrega = (await ruta('POST /entregas/viaje/:viajeId',
+      api().post(`/api/entregas/viaje/${viaje.id}`).set(cabPost()).send({
+        detalleOrdenId: String(detalle.id),
+        compartimentoId: String(cisterna.compartimentos[0].id),
+        volumenRecibido: 2850, receptorNombre: 'Ana Receptora',
+        latitud: 8.9824, longitud: -79.5199,
+      }), [201])).body;
+    expect(entrega.estado).toBe('pendiente');
+
+    await ruta('GET /entregas/:id',
+      api().get(`/api/entregas/${entrega.id}`).set(cab()), [200]);
+    const lista = await ruta('GET /entregas/viaje/:viajeId',
+      api().get(`/api/entregas/viaje/${viaje.id}`).set(cab()), [200]);
+    expect(lista.body).toHaveLength(1);
+
+    const aprobada = await ruta('POST /entregas/:id/aprobar',
+      api().post(`/api/entregas/${entrega.id}/aprobar`).set(cabPost())
+        .send({ motivo: 'Merma verificada contra el medidor de la terminal' }), [200, 201]);
+    expect(aprobada.body.estado).toBe('aceptada');
+
+    // Una ya aprobada no se rechaza: la ruta existe y responde con su conflicto.
+    await ruta('POST /entregas/:id/rechazar',
+      api().post(`/api/entregas/${entrega.id}/rechazar`).set(cabPost())
+        .send({ motivo: 'Ya estaba aceptada, esto tiene que dar conflicto' }), [409]);
+  }, 180_000);
+});
+
+/*
  * ─────────────────────────────────────────────────────────────────────────────
  * Que no se quede ninguna ruta fuera, y que eso lo diga una prueba.
  *

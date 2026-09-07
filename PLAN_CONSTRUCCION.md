@@ -117,7 +117,7 @@ uso enseña más sobre lo que falta que tres módulos a medio terminar.»*
 | 1A · Catálogos | 25 d | ✅ **cerrada** | Criterio de salida verificado DESDE LA UI: alta de cliente, conductor, vehículo y cisterna con compartimentos, las cuatro en auditoría |
 | UX-1 · Shell y catálogos | — | 🟢 **código completo** | 3 columnas, 5 breakpoints, estado en la URL, CRUD de los 6 catálogos |
 | 1B · Órdenes → viaje | 35 d | 🟢 **código verificado** | 5 tablas, exclusiones del §5.1, 14 rutas, 16 pruebas y el flujo completo recorrido desde la UI. Falta solo la compuerta de producción |
-| 1C · Entregas, liquidación | 30 d | ⬜ | Después de producción |
+| 1C · Entregas, liquidación | 30 d | 🟡 **parcial** | Entregas y conciliación de volúmenes construidas y probadas (2026-09-07). Gastos, liquidaciones e informes siguen tras la compuerta 🏁 |
 | 2A · App del conductor | 45 d | ⬜ | |
 | 2B · GPS, geocercas, alertas | 30 d | ⬜ | |
 | UX-2 · Panel de tracking | ~35 d | ⬜ | Compuerta dura: 2B |
@@ -508,11 +508,34 @@ catálogo y la URL restaura la vista exacta tras recargar.
 
 **Puerta de entrada:** la compuerta 🏁 superada.
 
-- [ ] Entregas, con evidencia fotográfica y documentos
+- [x] **Entregas** — §7.14 completa, 5 rutas, 25 pruebas (2026-09-07)
+- [ ] Evidencia fotográfica y documentos de la entrega — llega con 2A, que es
+      donde el conductor captura evidencias (§5)
 - [ ] Gastos
 - [ ] Liquidaciones, con los cálculos del §10
-- [ ] Conciliación de volúmenes (§17 de arquitectura) y merma con tolerancia
+- [x] **Conciliación de volúmenes** (§17) y merma con tolerancia — §10.4 y §10.5
 - [ ] Reportes básicos (§14)
+
+### Por qué esta parte se adelantó a la compuerta, y el resto no
+
+La compuerta protege lo que la operación real puede cambiar de forma. El §19 lo
+dice de las liquidaciones —«se diseñan mucho mejor cuando ya existen viajes
+reales que liquidar»— y el apartado de riesgo de abajo avisa del coste de
+rehacerlas.
+
+**Las entregas no son eso.** Sus campos son los del §7.14 uno a uno, sus
+fórmulas las del §10.4 y §10.5, y su comportamiento las reglas 7, 8, 9 y 20 del
+§11. Nada de eso se aprende operando: está escrito. Lo que sí espera son gastos,
+liquidaciones e informes, que son justo donde la operación enseña.
+
+Una decisión de diseño que conviene conocer antes de tocar el módulo: **no se
+bloquea recibir más volumen del que se cargó.** Los medidores de la terminal y
+de la estación no coinciden nunca al litro, y rechazar la lectura obliga a quien
+captura a redondear hasta que el sistema la acepte. Eso no evita el descuadre,
+lo BORRA — y el descuadre es la señal de fraude de volumen que el §7 llama el
+riesgo principal de este negocio. Se acepta, se calcula la merma (en valor
+absoluto, para ver los dos lados) y la regla 9 la manda a aprobación de otro
+rol. El único tope duro es el de la regla 20, y vive en la base.
 
 **Criterio de salida:** un viaje real recorre orden → carga → entrega →
 liquidación y cuadra contra la conciliación de volúmenes, con la merma dentro de
