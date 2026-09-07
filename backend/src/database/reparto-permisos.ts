@@ -59,6 +59,7 @@ export const REPARTO: Record<string, string[]> = {
     ...TODOS('solicitudesruta', ['leer', 'crear', 'resolver']),
     ...TODOS('gastos', ['leer', 'crear', 'aprobar']),
     'informes:leer',
+    ...TODOS('liquidaciones', ['leer', 'calcular', 'aprobar', 'pagar']),
   ],
 
   'Supervisor de operaciones': [
@@ -73,6 +74,7 @@ export const REPARTO: Record<string, string[]> = {
     // §5: «Monitorea rutas, retrasos, alertas y diferencias». Resolver un
     // cambio de ruta es exactamente eso.
     'solicitudesruta:resolver', 'gastos:aprobar',
+    'liquidaciones:leer', 'liquidaciones:aprobar',
   ],
 
   'Planificador de flota': [
@@ -116,7 +118,7 @@ export const REPARTO: Record<string, string[]> = {
   // independiente de lo que audita.
   'Auditor': [
     'usuarios:leer', 'roles:leer', 'dispositivos:leer', 'auditoria:leer', 'empresas:leer',
-    ...LEER_CATALOGOS, ...LEER_OPERACION,
+    ...LEER_CATALOGOS, ...LEER_OPERACION, 'liquidaciones:leer',
   ],
 
   // §5: «Valida recepción y firma entrega». Captura la entrega; no la aprueba.
@@ -133,6 +135,10 @@ export const REPARTO: Record<string, string[]> = {
     'usuarios:leer', 'auditoria:leer', 'empresas:leer',
     'clientes:leer', 'conductores:leer', ...LEER_OPERACION,
     'gastos:aprobar',
+    // Calcula y paga, pero NO aprueba: quien arma el importe no lo firma, y
+    // quien lo firma no mueve el dinero. Tres actos y tres manos, que es lo que
+    // el §7.18 dibuja al darles fechas separadas.
+    'liquidaciones:leer', 'liquidaciones:calcular', 'liquidaciones:pagar',
   ],
 
   // §5: «Consulta viajes, registra eventos, gastos y evidencias». Quien FIRMA
@@ -148,7 +154,9 @@ export const REPARTO: Record<string, string[]> = {
   // significaría nada y la liquidación sumaría lo que él decidió cobrarse.
   'Conductor': ['viajes:leer', 'entregas:leer',
                 'solicitudesruta:leer', 'solicitudesruta:crear',
-                'gastos:leer', 'gastos:crear'],
+                'gastos:leer', 'gastos:crear',
+                // Ve lo suyo: es a quien se le paga.
+                'liquidaciones:leer'],
   // §5: «Consulta órdenes y entregas autorizadas».
   'Cliente externo': ['ordenes:leer', 'entregas:leer'],
 };

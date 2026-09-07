@@ -623,6 +623,43 @@ describe('informes · las cuatro rutas del §14', () => {
 });
 
 /*
+ * §7.18 · Liquidaciones. El recorrido llega hasta donde puede con un solo
+ * usuario: calcular sí, aprobar no —quien calculó no aprueba, y responde 409—.
+ * Las tres firmas se prueban en `liquidaciones.integracion.ts`.
+ */
+describe('liquidaciones · las seis rutas del §7.18', () => {
+  it('calcular, listar, leer y toparse con la separación al aprobar', async () => {
+    const { viaje } = await viajeHasta('descargando', sello());
+    // Liquidar exige el viaje CERRADO (regla 12). Se recorre por la máquina de
+    // estados, que es el único camino que un operador tiene.
+    for (const estado of ['retornando', 'pendiente_liquidacion', 'cerrado']) {
+      await api().patch(`/api/viajes/${viaje.id}/estado`).set(cab())
+        .send({ estado }).expect(200);
+    }
+
+    const liq = (await ruta('POST /liquidaciones/viaje/:viajeId',
+      api().post(`/api/liquidaciones/viaje/${viaje.id}`).set(cabPost()).send({}), [201])).body;
+    expect(liq.estado).toBe('pendiente');
+
+    await ruta('GET /liquidaciones/:id',
+      api().get(`/api/liquidaciones/${liq.id}`).set(cab()), [200]);
+    await ruta('GET /liquidaciones/viaje/:viajeId',
+      api().get(`/api/liquidaciones/viaje/${viaje.id}`).set(cab()), [200]);
+    const lista = await ruta('GET /liquidaciones',
+      api().get('/api/liquidaciones?estado=pendiente').set(cab()), [200]);
+    expect(lista.body.map((l: { id: string }) => String(l.id))).toContain(String(liq.id));
+
+    // 409: este token es el de quien la calculó.
+    await ruta('POST /liquidaciones/:id/aprobar',
+      api().post(`/api/liquidaciones/${liq.id}/aprobar`).set(cabPost()).send({}), [409]);
+    // Y sin aprobar no se paga, aunque el permiso esté.
+    await ruta('POST /liquidaciones/:id/pagar',
+      api().post(`/api/liquidaciones/${liq.id}/pagar`).set(cabPost())
+        .send({ referenciaPago: 'TRF-SUP-001' }), [409]);
+  }, 120_000);
+});
+
+/*
  * ─────────────────────────────────────────────────────────────────────────────
  * Que no se quede ninguna ruta fuera, y que eso lo diga una prueba.
  *
