@@ -40,7 +40,7 @@ const LEER_CATALOGOS = CATALOGOS.map(m => `${m}:leer`);
 /** Leer el flujo de la Fase 1B. */
 const LEER_OPERACION = [
   'ordenes:leer', 'viajes:leer', 'plancarga:leer', 'entregas:leer',
-  'solicitudesruta:leer', 'gastos:leer', 'informes:leer',
+  'solicitudesruta:leer', 'gastos:leer', 'informes:leer', 'eventos:leer',
 ];
 
 export const REPARTO: Record<string, string[]> = {
@@ -60,6 +60,7 @@ export const REPARTO: Record<string, string[]> = {
     ...TODOS('gastos', ['leer', 'crear', 'aprobar']),
     'informes:leer',
     ...TODOS('liquidaciones', ['leer', 'calcular', 'aprobar', 'pagar']),
+    ...TODOS('eventos', ['leer', 'crear', 'anular']),
   ],
 
   'Supervisor de operaciones': [
@@ -75,6 +76,10 @@ export const REPARTO: Record<string, string[]> = {
     // cambio de ruta es exactamente eso.
     'solicitudesruta:resolver', 'gastos:aprobar',
     'liquidaciones:leer', 'liquidaciones:aprobar',
+    // Anula y NO registra: el §5 le da «monitorea rutas, retrasos, alertas y
+    // diferencias», que es vigilancia y no captura. Si tuviera las dos, quien
+    // retira de la traza podría también haberla escrito.
+    'eventos:anular',
   ],
 
   'Planificador de flota': [
@@ -155,6 +160,8 @@ export const REPARTO: Record<string, string[]> = {
   'Conductor': ['viajes:leer', 'entregas:leer',
                 'solicitudesruta:leer', 'solicitudesruta:crear',
                 'gastos:leer', 'gastos:crear',
+                // §5, literal: «registra EVENTOS, gastos y evidencias».
+                'eventos:leer', 'eventos:crear',
                 // Ve lo suyo: es a quien se le paga.
                 'liquidaciones:leer'],
   // §5: «Consulta órdenes y entregas autorizadas».

@@ -35,6 +35,7 @@ import { SolicitudesRutaModule } from './modules/solicitudes-ruta/solicitudes-ru
 import { GastosModule } from './modules/gastos/gastos.module';
 import { InformesModule } from './modules/informes/informes.module';
 import { LiquidacionesModule } from './modules/liquidaciones/liquidaciones.module';
+import { EventosModule } from './modules/eventos/eventos.module';
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { LiquidacionesModule } from './modules/liquidaciones/liquidaciones.modul
     GastosModule,
     InformesModule,
     LiquidacionesModule,
+    EventosModule,
     ConfigModule.forRoot({
       isGlobal: true,
       load: [configuration],

@@ -216,10 +216,22 @@ describe('las separaciones del §7 siguen en pie', () => {
     expect(infractores).toEqual([]);
   });
 
+  it('nadie registra un evento Y lo anula, salvo el Administrador', () => {
+    // Cuarta vez que esta forma aparece —viajes, entregas, solicitudes, gastos—
+    // y aquí es la que sostiene la traza: si quien registra pudiera retirar de
+    // la traza lo que registró, «base de la trazabilidad» sería un borrador.
+    const infractores = [...concedidos.entries()]
+      .filter(([rol]) => rol !== 'Administrador')
+      .filter(([, p]) => p.has('eventos:crear') && p.has('eventos:anular'))
+      .map(([rol]) => rol);
+    expect(infractores).toEqual([]);
+  });
+
   it('el Cliente externo sólo lee, y el Conductor lee y pide', () => {
-    // Esta prueba empezó diciendo «los dos sólo leen» y ha cambiado dos veces,
-    // las dos a propósito y con el §5 delante: el Conductor pide cambios de
-    // ruta (§2C) y registra gastos («registra eventos, GASTOS y evidencias»).
+    // Esta prueba empezó diciendo «los dos sólo leen» y ha cambiado tres
+    // veces, todas a propósito y con el §5 delante, que al Conductor le da
+    // literalmente «registra EVENTOS, GASTOS y evidencias» — más los cambios de
+    // ruta del §2C, que pide y no resuelve.
     // Se ENUMERA lo que puede escribir en vez de contar permisos, porque contar
     // deja pasar el siguiente que se cuele.
     const externo = [...(concedidos.get('Cliente externo') ?? [])];
@@ -227,6 +239,6 @@ describe('las separaciones del §7 siguen en pie', () => {
 
     const conductor = [...(concedidos.get('Conductor') ?? [])];
     expect(conductor.filter(c => !c.endsWith(':leer')).sort())
-      .toEqual(['gastos:crear', 'solicitudesruta:crear']);
+      .toEqual(['eventos:crear', 'gastos:crear', 'solicitudesruta:crear']);
   });
 });

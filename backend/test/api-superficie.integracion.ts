@@ -660,6 +660,49 @@ describe('liquidaciones · las seis rutas del §7.18', () => {
 });
 
 /*
+ * §7.15 · Eventos de viaje, la base de la trazabilidad. La ruta que más importa
+ * aquí es `/integridad`: un hash que nadie puede comprobar desde fuera no
+ * prueba nada a nadie.
+ */
+describe('eventos de viaje · las cinco rutas del §7.15', () => {
+  it('registrar, listar, verificar la cadena y anular con corrección', async () => {
+    const { viaje } = await viajeHasta('transito_estacion', sello());
+
+    const salida = (await ruta('POST /eventos/viaje/:viajeId',
+      api().post(`/api/eventos/viaje/${viaje.id}`).set(cabPost()).send({
+        tipoEvento: 'salida', origenDato: 'movil',
+        latitud: 8.9824, longitud: -79.5199, observacion: 'Salida de la terminal',
+      }), [201])).body;
+    expect(salida.hashAnterior).toBeNull();
+
+    const parada = (await api().post(`/api/eventos/viaje/${viaje.id}`).set(cabPost()).send({
+      tipoEvento: 'parada', origenDato: 'gps', latitud: 8.99, longitud: -79.52,
+    }).expect(201)).body;
+    // El segundo eslabón apunta al primero: la cadena existe de verdad.
+    expect(parada.hashAnterior).toBe(salida.hashEvento);
+
+    await ruta('GET /eventos/:id', api().get(`/api/eventos/${salida.id}`).set(cab()), [200]);
+    const lista = await ruta('GET /eventos/viaje/:viajeId',
+      api().get(`/api/eventos/viaje/${viaje.id}`).set(cab()), [200]);
+    expect(lista.body).toHaveLength(2);
+
+    const integridad = await ruta('GET /eventos/viaje/:viajeId/integridad',
+      api().get(`/api/eventos/viaje/${viaje.id}/integridad`).set(cab()), [200]);
+    expect(integridad.body).toEqual({ integra: true, eventos: 2, rotoEn: null });
+
+    const correccion = (await ruta('POST /eventos/:id/anular',
+      api().post(`/api/eventos/${parada.id}/anular`).set(cabPost())
+        .send({ motivo: 'Parada registrada por error del GPS' }), [200, 201])).body;
+    expect(correccion.tipoEvento).toBe('correccion');
+
+    // Anular añade: la traza pasa de dos a tres y sigue íntegra.
+    const despues = await api().get(`/api/eventos/viaje/${viaje.id}/integridad`)
+      .set(cab()).expect(200);
+    expect(despues.body).toEqual({ integra: true, eventos: 3, rotoEn: null });
+  }, 120_000);
+});
+
+/*
  * ─────────────────────────────────────────────────────────────────────────────
  * Que no se quede ninguna ruta fuera, y que eso lo diga una prueba.
  *

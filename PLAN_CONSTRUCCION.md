@@ -574,6 +574,11 @@ rehacer liquidaciones contra un modelo de viaje que la operación real cambió.
 
 **Puerta de entrada:** 1B cerrada.
 
+- [x] **Base de la trazabilidad** (§7.15) — `eventos_viaje` construida el
+      2026-09-07, antes que la app y a propósito: un registro de trazabilidad
+      añadido tarde nace con un hueco —los meses en que el sistema ya operaba y
+      no registraba nada—. Append-only, con corrección en vez de borrado y
+      cadena de hashes verificable
 - [ ] React Native + Expo (§8)
 - [ ] SQLite local (`expo-sqlite`) + **cola de salida**
 - [ ] Sincronización idempotente contra la infraestructura del ADR 004 — la
