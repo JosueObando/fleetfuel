@@ -12,12 +12,12 @@ muere y se lleva por delante la costumbre.
 
 Así que es un **trinquete**: se puso justo por debajo de lo que ya había.
 
-| | al ponerlo | catálogos | administr. | superficie | plan carga | reserva | cierre | entregas | umbral |
-|---|---|---|---|---|---|---|---|---|---|
-| Sentencias | 63,47 % | 74,36 % | 89,41 % | 94,27 % | 96,30 % | 97,35 % | 97,92 % | **97,98 %** | 97 |
-| Ramas | 42,52 % | 60,24 % | 71,95 % | 80,00 % | 84,50 % | 87,97 % | 89,38 % | **90,67 %** | 90 |
-| Funciones | 46,48 % | 59,66 % | 79,67 % | 98,68 % | 98,71 % | 100 % | 100 % | **100 %** | 99 |
-| Líneas | 66,18 % | 77,55 % | 92,10 % | 95,35 % | 97,43 % | 98,55 % | 98,89 % | **98,88 %** | 98 |
+| | al ponerlo | catálogos | admin. | superficie | plan carga | reserva | cierre | entregas | §2C | umbral |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Sentencias | 63,47 % | 74,36 % | 89,41 % | 94,27 % | 96,30 % | 97,35 % | 97,92 % | 97,98 % | **98,05 %** | 98 |
+| Ramas | 42,52 % | 60,24 % | 71,95 % | 80,00 % | 84,50 % | 87,97 % | 89,38 % | 90,67 % | **90,85 %** | 90 |
+| Funciones | 46,48 % | 59,66 % | 79,67 % | 98,68 % | 98,71 % | 100 % | 100 % | 100 % | **100 %** | 99 |
+| Líneas | 66,18 % | 77,55 % | 92,10 % | 95,35 % | 97,43 % | 98,55 % | 98,89 % | 98,88 % | **98,92 %** | 98 |
 
 La columna «entregas» bajó unas décimas al entrar el módulo nuevo —443 pruebas
 contra 411, con un servicio de 250 líneas recién escrito— y el umbral no se
@@ -41,6 +41,15 @@ escribirla. El trinquete frena la erosión, no prohíbe escribir.
 > columna que falta no se reconstruye —no hay medida guardada de ese día— y se
 > deja dicho en vez de inventarla. Si el documento que gobierna cuándo se sube
 > el umbral se queda atrás, la regla se erosiona sin que nadie la derogue.
+
+La columna «§2C» trae las solicitudes de cambio de ruta, y su servicio entra al
+**100 % en las cuatro métricas** porque se escribió con las pruebas por delante
+de la primera línea. Dejó además una red permanente: `borrarEmpresa` se quedó
+corta por SEGUNDA vez —le faltaba `solicitudes_ruta`, como antes le faltó
+`entregas`— y ahora hay una prueba en `cimientos.integracion.ts` que le pregunta
+a Postgres qué tablas llevan `empresa_id` y exige que la lista las tenga todas.
+La primera vez el fallo se escondió; la segunda se vio al instante porque ya no
+había `.catch`; la tercera no va a existir.
 
 El cierre de esa misma columna se llevó tres deudas que llevaban semanas
 apuntadas, y las tres eran de la misma familia —**caminos que sólo existen fuera

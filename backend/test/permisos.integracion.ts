@@ -192,11 +192,28 @@ describe('las separaciones del §7 siguen en pie', () => {
     expect(concedidos.get('Conductor')?.has('entregas:leer')).toBe(true);
   });
 
-  it('el Conductor y el Cliente externo sólo leen lo suyo', () => {
-    for (const rol of ['Conductor', 'Cliente externo']) {
-      const suyos = [...(concedidos.get(rol) ?? [])];
-      expect(suyos.filter(c => !c.endsWith(':leer'))).toEqual([]);
-      expect(suyos.length).toBeLessThanOrEqual(2);
-    }
+  it('nadie pide un cambio de ruta Y lo resuelve, salvo el Administrador', () => {
+    // El §2C entero se sostiene sobre esta asimetría: el Conductor PIDE el
+    // desvío —es quien está en la carretera y lo ve— y otro lo resuelve. Si un
+    // rol pudiera las dos cosas, «solicitud de cambio de ruta» sería el
+    // conductor autorizándose el desvío, y la traza que deja no probaría nada.
+    const infractores = [...concedidos.entries()]
+      .filter(([rol]) => rol !== 'Administrador')
+      .filter(([, p]) => p.has('solicitudesruta:crear') && p.has('solicitudesruta:resolver'))
+      .map(([rol]) => rol);
+    expect(infractores).toEqual([]);
+  });
+
+  it('el Cliente externo sólo lee, y el Conductor lee y pide', () => {
+    // Antes esta prueba decía «los dos sólo leen», y el §2C la cambió a
+    // propósito: el Conductor gana `solicitudesruta:crear` y NADA más. Se
+    // enumera lo que puede escribir en vez de contar permisos, porque contar
+    // deja pasar el siguiente que se cuele.
+    const externo = [...(concedidos.get('Cliente externo') ?? [])];
+    expect(externo.filter(c => !c.endsWith(':leer'))).toEqual([]);
+
+    const conductor = [...(concedidos.get('Conductor') ?? [])];
+    expect(conductor.filter(c => !c.endsWith(':leer')).sort())
+      .toEqual(['solicitudesruta:crear']);
   });
 });

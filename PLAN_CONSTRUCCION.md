@@ -574,9 +574,9 @@ rehacer liquidaciones contra un modelo de viaje que la operación real cambió.
       autorizada, pérdida de GPS, sello inconsistente, diferencia de volumen,
       merma sobre tolerancia, vencimientos
 
-### ⚠ 2C · Solicitudes de cambio de ruta — ALCANCE NUEVO
+### 2C · Solicitudes de cambio de ruta — 🟡 decidido y construido a medias
 
-**Esto no está en el PRD y hay que decidirlo antes de que UX-2 empiece.**
+**No está en el PRD.** Se decidió el 2026-09-07: entra.
 
 El spec define `RouteRequest { type: "detour"|"extra_stop"|"cancel", requestedBy,
 reason, state: "pending"|"approved"|"rejected", resolvedBy, resolvedAt }` y el
@@ -587,10 +587,57 @@ reactivo, no un flujo de aprobación.
 También aparece `driver.chatChannelId` en el modelo y un botón de chat en
 `MapControl`. **La palabra «chat» no existe en el PRD.**
 
-- [ ] **Decisión requerida:** ¿entran ambos al alcance, o el panel v1 sale sin
-      `RequestList` ni chat?
-- [ ] Si entran: entidad, endpoints, permisos y notificación a la app del conductor
-- [ ] Si no entran: marcarlos como diferidos en el spec, no dejarlos dibujados
+- [x] **Decisión tomada el 2026-09-07: los dos entran al alcance.**
+- [x] `RouteRequest` — tabla `solicitudes_ruta`, 5 rutas, 15 pruebas de servicio
+      y el recorrido HTTP. Los tres tipos del spec (`detour`, `extra_stop`,
+      `cancel`) y sus tres estados
+- [x] Permisos `solicitudesruta:leer/crear/resolver`, repartidos
+- [ ] Notificación a la app del conductor — **necesita la Fase 2A**, que es
+      donde esa app existe. Lo que falta es el aviso, no el modelo
+- [x] Chat · `conductores.canal_chat`, que es LO ÚNICO que el spec define
+- [ ] Chat · **el transporte sigue sin decidir**, y sin eso no hay nada más que
+      construir. Ver abajo
+
+### La regla que hace que `RouteRequest` sea un control y no un formulario
+
+**Quien pide no resuelve**, y va además del permiso: el permiso dice qué puede
+hacer un ROL, y la regla dice qué no puede hacer una PERSONA con su propia
+solicitud. Un despachador que pide un desvío sigue sin poder aprobárselo aunque
+su rol resuelva los de los demás. Sin eso, «solicitud de cambio de ruta» es el
+conductor autorizándose el desvío y la traza que deja no prueba nada.
+
+El reparto lo refleja: el **Conductor** pide —es quien está en la carretera y ve
+el problema— y el **Despachador** y el **Supervisor de operaciones** resuelven,
+que es literalmente lo que el §5 les asigna.
+
+Y no sustituye a la alerta de desvío del §22: aquella es reactiva —el sistema se
+entera de que el camión se salió— y ésta es un permiso pedido de antemano. El
+desvío que nadie pidió sigue siendo el que más interesa vigilar.
+
+### Chat: lo que el spec NO dice, y por eso queda abierto
+
+El spec pide `driver.chatChannelId` y un botón en `MapControl`. **Eso es todo:**
+no define mensajes, ni almacenamiento, ni transporte, ni quién puede escribir a
+quién. El identificador está construido —es el mismo campo en cualquiera de los
+caminos posibles— pero lo que falta no es código, es una decisión:
+
+1. **Enlace a una mensajería existente** (WhatsApp, Telegram). El campo guarda
+   un enlace, el botón lo abre y FleetFuel no almacena ni un mensaje. Es lo más
+   barato con diferencia, y lo que ya usa media flota del país. A cambio, la
+   conversación queda FUERA de la auditoría del §21 — y en un sistema cuyo
+   riesgo declarado es el fraude de volumen, «cámbiame la ruta, te lo digo por
+   WhatsApp» es exactamente lo que no debería quedar sin rastro.
+2. **Mensajería propia dentro de FleetFuel.** Entra en la auditoría y se ata a
+   los permisos, pero es un subsistema entero: tabla de mensajes, tiempo real,
+   notificaciones, no leídos, adjuntos. No cabe en 2C; es una fase.
+3. **Ninguna de las dos: el botón se quita del spec.** Si toda instrucción al
+   conductor tiene que ser auditable, `solicitudes_ruta` ya cubre el caso de
+   uso real —pedir y autorizar un cambio— y el chat sobra.
+
+Mi recomendación es la **3 para el panel v1** y decidir entre 1 y 2 cuando la
+app del conductor (2A) exista y se sepa qué se necesita decirle de verdad. Un
+botón dibujado que abre WhatsApp es la opción que parece gratis y deja la
+decisión tomada sin que nadie la tome.
 
 **Criterio de salida de la Fase 2:** un conductor real recorre un viaje con la
 app sin cobertura durante un tramo, la cola de salida se drena al recuperar

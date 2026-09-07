@@ -38,7 +38,10 @@ const CATALOGOS = ['clientes', 'estaciones', 'productos', 'vehiculos', 'cisterna
 /** Leer los seis catálogos, sin tocar nada. */
 const LEER_CATALOGOS = CATALOGOS.map(m => `${m}:leer`);
 /** Leer el flujo de la Fase 1B. */
-const LEER_OPERACION = ['ordenes:leer', 'viajes:leer', 'plancarga:leer', 'entregas:leer'];
+const LEER_OPERACION = [
+  'ordenes:leer', 'viajes:leer', 'plancarga:leer', 'entregas:leer',
+  'solicitudesruta:leer',
+];
 
 export const REPARTO: Record<string, string[]> = {
   // Administración de la propia empresa, más TODO lo operativo. No es un rol
@@ -53,6 +56,7 @@ export const REPARTO: Record<string, string[]> = {
     ...TODOS('viajes', ['leer', 'crear', 'actualizar', 'cancelar', 'autorizar']),
     ...TODOS('plancarga', ['leer', 'crear', 'actualizar', 'cancelar']),
     ...TODOS('entregas', ['leer', 'crear', 'aprobar']),
+    ...TODOS('solicitudesruta', ['leer', 'crear', 'resolver']),
   ],
 
   'Supervisor de operaciones': [
@@ -64,6 +68,9 @@ export const REPARTO: Record<string, string[]> = {
     // entrega no puede ser quien perdona su merma. Es la separación del §7
     // llevada al fraude de volumen, la misma que separa armar de autorizar.
     'entregas:aprobar',
+    // §5: «Monitorea rutas, retrasos, alertas y diferencias». Resolver un
+    // cambio de ruta es exactamente eso.
+    'solicitudesruta:resolver',
   ],
 
   'Planificador de flota': [
@@ -83,6 +90,9 @@ export const REPARTO: Record<string, string[]> = {
   'Despachador': [
     'empresas:leer', ...LEER_CATALOGOS, ...LEER_OPERACION,
     'viajes:actualizar', 'viajes:autorizar',
+    // §5: «Autoriza salida y verifica documentos». Quien deja salir el viaje es
+    // quien decide si puede salirse de la ruta.
+    'solicitudesruta:resolver',
   ],
 
   'Operador de órdenes': [
@@ -124,7 +134,11 @@ export const REPARTO: Record<string, string[]> = {
   // las crea. Cuando la Fase 2A traiga la app del conductor —evidencias, fotos
   // y firma— será un permiso propio y una decisión explícita, no un
   // ensanchamiento silencioso de éste.
-  'Conductor': ['viajes:leer', 'entregas:leer'],
+  // Pide cambios de ruta —es quien está en la carretera y ve el desvío— y NO
+  // los resuelve. Esa asimetría es el módulo entero: si pudiera resolverlos,
+  // «solicitud de cambio de ruta» sería el conductor autorizándose el desvío.
+  'Conductor': ['viajes:leer', 'entregas:leer',
+                'solicitudesruta:leer', 'solicitudesruta:crear'],
   // §5: «Consulta órdenes y entregas autorizadas».
   'Cliente externo': ['ordenes:leer', 'entregas:leer'],
 };

@@ -97,6 +97,22 @@ export async function sembrarEmpresa(
 }
 
 /** Deja la base como estaba. El orden importa: las claves foráneas mandan. */
+/**
+ * Las tablas que se limpian por `empresa_id`, EN ORDEN de claves foráneas.
+ *
+ * Se exporta para que una prueba pueda comprobar que no le falta ninguna. Ya se
+ * quedó corta dos veces —al entrar `entregas` y al entrar `solicitudes_ruta`—,
+ * y la segunda vez el fallo se vio al instante sólo porque la primera nos quitó
+ * el `.catch(() => undefined)` que lo escondía.
+ */
+export const TABLAS_POR_EMPRESA = [
+  'intentos_login', 'auditoria', 'claves_idempotencia', 'dispositivos',
+  'solicitudes_ruta', 'entregas', 'plan_carga', 'viaje_ordenes', 'viajes',
+  'detalles_orden', 'ordenes_abastecimiento', 'estaciones_servicio', 'clientes',
+  'productos_combustible', 'compartimentos_cisterna', 'cisternas',
+  'vehiculos', 'conductores', 'roles', 'usuarios',
+] as const;
+
 export async function borrarEmpresa(dueño: DataSource, empresa: string, ruc: string): Promise<void> {
   // Las dos tablas de unión no llevan `empresa_id` —son (usuario, rol) y
   // (rol, permiso)—, así que se borran por su propia clave y no por la empresa.
@@ -109,11 +125,7 @@ export async function borrarEmpresa(dueño: DataSource, empresa: string, ruc: st
     `DELETE FROM roles_permisos WHERE rol_id IN
        (SELECT rol_id FROM roles WHERE empresa_id = $1)`, [empresa]);
 
-  for (const t of ['intentos_login', 'auditoria', 'claves_idempotencia', 'dispositivos',
-                   'entregas', 'plan_carga', 'viaje_ordenes', 'viajes', 'detalles_orden',
-                   'ordenes_abastecimiento', 'estaciones_servicio', 'clientes',
-                   'productos_combustible', 'compartimentos_cisterna', 'cisternas',
-                   'vehiculos', 'conductores', 'roles', 'usuarios']) {
+  for (const t of TABLAS_POR_EMPRESA) {
     // SIN `.catch(() => undefined)`, y es un cambio con historia: lo llevaba, y
     // por eso una limpieza incompleta no fallaba aquí sino DOS ejecuciones
     // después y en otro fichero, como un «duplicate key» en

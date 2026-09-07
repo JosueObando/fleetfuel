@@ -420,54 +420,7 @@ describe('los seis catálogos, ruta por ruta', () => {
  */
 describe('entregas · el eslabón que cierra orden → carga → viaje → entrega', () => {
   it('registrar, leer, y aprobar una diferencia fuera de tolerancia', async () => {
-    const s = sello();
-    const cliente = (await api().post('/api/clientes').set(cabPost())
-      .send({ nombre: `Cliente ent ${s}` }).expect(201)).body;
-    const estacion = (await api().post('/api/estaciones').set(cabPost())
-      .send({ clienteId: String(cliente.id), nombre: `Estación ent ${s}` }).expect(201)).body;
-    const producto = (await api().post('/api/productos').set(cabPost())
-      .send({ codigo: `ENT-${s}`, nombre: `Diésel ${s}` }).expect(201)).body;
-    const vehiculo = (await api().post('/api/vehiculos').set(cabPost())
-      .send({ tipoVehiculo: 'cisterna', placa: `ENT-${s}` }).expect(201)).body;
-    const cisterna = (await api().post('/api/cisternas').set(cabPost()).send({
-      vehiculoId: String(vehiculo.id), capacidadTotal: 10000,
-      compartimentos: [{ numero: 1, capacidadNominal: 5000, capacidadCalibrada: 4980 }],
-    }).expect(201)).body;
-    const conductor = (await api().post('/api/conductores').set(cabPost()).send({
-      nombreCompleto: `Chofer ent ${s}`, documento: `ENTD-${s}`, licencia: `ENTL-${s}`,
-    }).expect(201)).body;
-
-    const orden = (await api().post('/api/ordenes').set(cabPost()).send({
-      clienteId: String(cliente.id), estacionId: String(estacion.id),
-      detalles: [{ productoId: String(producto.id), volumenSolicitado: 4000, tolerancia: 1 }],
-    }).expect(201)).body;
-    await api().patch(`/api/ordenes/${orden.id}/estado`).set(cab())
-      .send({ estado: 'validada' }).expect(200);
-
-    const viaje = (await api().post('/api/viajes').set(cabPost()).send({
-      codigoViaje: `ENT-${s}`, tipoViaje: 'simple', cisternaId: String(cisterna.id),
-      conductorId: String(conductor.id), fechaProgramada: '2030-03-01T08:00:00Z',
-    }).expect(201)).body;
-    await api().post(`/api/viajes/${viaje.id}/ordenes`).set(cabPost())
-      .send({ ordenId: String(orden.id), secuenciaEntrega: 1 }).expect(201);
-
-    const detalle = (await api().get(`/api/ordenes/${orden.id}`).set(cab()).expect(200))
-      .body.detalles[0];
-    await api().post(`/api/viajes/${viaje.id}/plan-carga`).set(cabPost()).send({
-      compartimentoId: String(cisterna.compartimentos[0].id),
-      detalleOrdenId: String(detalle.id), volumenPlanificado: 3000,
-    }).expect(201);
-
-    // Hasta `descargando` por la máquina de estados, sin atajos por SQL: es el
-    // único camino que un operador tiene, y probarlo aquí comprueba de paso que
-    // el flujo del §8.2 llega de verdad hasta la descarga.
-    await api().patch(`/api/viajes/${viaje.id}/estado`).set(cab())
-      .send({ estado: 'programado' }).expect(200);
-    await api().post(`/api/viajes/${viaje.id}/autorizar`).set(cabPost()).send({});
-    for (const estado of ['desplazamiento_terminal', 'espera_carga', 'cargando', 'cargado',
-                          'transito_estacion', 'descargando']) {
-      await api().patch(`/api/viajes/${viaje.id}/estado`).set(cab()).send({ estado }).expect(200);
-    }
+    const { viaje, detalle, cisterna } = await viajeHasta('descargando', sello());
 
     // 2850 de 3000 son un 5 % de merma sobre una tolerancia del 1 %: entra
     // pendiente, que es lo que la regla 9 pide.
@@ -496,6 +449,111 @@ describe('entregas · el eslabón que cierra orden → carga → viaje → entre
       api().post(`/api/entregas/${entrega.id}/rechazar`).set(cabPost())
         .send({ motivo: 'Ya estaba aceptada, esto tiene que dar conflicto' }), [409]);
   }, 180_000);
+});
+
+
+/**
+ * Arma por HTTP un viaje completo y lo lleva hasta `estado`.
+ *
+ * Cliente, estación, producto, vehículo, cisterna, conductor, orden validada,
+ * viaje, orden asignada y plan de carga: son diez altas y ninguna se puede
+ * saltar, porque `autorizar` exige plan de carga y conductor. Estaba escrito
+ * dos veces —una por recorrido— y la segunda copia se equivocó justo aquí: se
+ * saltó el plan de carga, `autorizar` devolvió 409 y el viaje se quedó en
+ * `programado`.
+ */
+async function viajeHasta(estado: string, marca: string) {
+  const cliente = (await api().post('/api/clientes').set(cabPost())
+    .send({ nombre: `Cliente ${marca}` }).expect(201)).body;
+  const estacion = (await api().post('/api/estaciones').set(cabPost())
+    .send({ clienteId: String(cliente.id), nombre: `Estación ${marca}` }).expect(201)).body;
+  const producto = (await api().post('/api/productos').set(cabPost())
+    .send({ codigo: `X-${marca}`, nombre: `Combustible ${marca}` }).expect(201)).body;
+  const vehiculo = (await api().post('/api/vehiculos').set(cabPost())
+    .send({ tipoVehiculo: 'cisterna', placa: `X-${marca}` }).expect(201)).body;
+  const cisterna = (await api().post('/api/cisternas').set(cabPost()).send({
+    vehiculoId: String(vehiculo.id), capacidadTotal: 10000,
+    compartimentos: [{ numero: 1, capacidadNominal: 5000, capacidadCalibrada: 4980 }],
+  }).expect(201)).body;
+  const conductor = (await api().post('/api/conductores').set(cabPost()).send({
+    nombreCompleto: `Chofer ${marca}`, documento: `D-${marca}`, licencia: `L-${marca}`,
+    // §2C: el canal de chat es texto opaco; se comprueba que va y vuelve.
+    canalChat: `wa:+507${marca}`,
+  }).expect(201)).body;
+  expect(conductor.canalChat).toBe(`wa:+507${marca}`);
+
+  const orden = (await api().post('/api/ordenes').set(cabPost()).send({
+    clienteId: String(cliente.id), estacionId: String(estacion.id),
+    detalles: [{ productoId: String(producto.id), volumenSolicitado: 4000, tolerancia: 1 }],
+  }).expect(201)).body;
+  await api().patch(`/api/ordenes/${orden.id}/estado`).set(cab())
+    .send({ estado: 'validada' }).expect(200);
+
+  const viaje = (await api().post('/api/viajes').set(cabPost()).send({
+    codigoViaje: `X-${marca}`, tipoViaje: 'simple', cisternaId: String(cisterna.id),
+    conductorId: String(conductor.id), fechaProgramada: '2031-05-01T08:00:00Z',
+  }).expect(201)).body;
+  await api().post(`/api/viajes/${viaje.id}/ordenes`).set(cabPost())
+    .send({ ordenId: String(orden.id), secuenciaEntrega: 1 }).expect(201);
+
+  const detalle = (await api().get(`/api/ordenes/${orden.id}`).set(cab()).expect(200))
+    .body.detalles[0];
+  await api().post(`/api/viajes/${viaje.id}/plan-carga`).set(cabPost()).send({
+    compartimentoId: String(cisterna.compartimentos[0].id),
+    detalleOrdenId: String(detalle.id), volumenPlanificado: 3000,
+  }).expect(201);
+
+  // Por la máquina de estados, sin atajos por SQL: es el único camino que un
+  // operador tiene, y recorrerlo comprueba de paso que el §8.2 llega hasta ahí.
+  await api().patch(`/api/viajes/${viaje.id}/estado`).set(cab())
+    .send({ estado: 'programado' }).expect(200);
+  if (estado === 'programado') return { viaje, detalle, cisterna };
+
+  await api().post(`/api/viajes/${viaje.id}/autorizar`).set(cabPost()).send({}).expect(201);
+  const CAMINO = ['desplazamiento_terminal', 'espera_carga', 'cargando', 'cargado',
+                  'transito_estacion', 'descargando'];
+  for (const paso of CAMINO) {
+    await api().patch(`/api/viajes/${viaje.id}/estado`).set(cab())
+      .send({ estado: paso }).expect(200);
+    if (paso === estado) break;
+  }
+  return { viaje, detalle, cisterna };
+}
+
+/*
+ * §2C · Solicitudes de cambio de ruta.
+ *
+ * Ojo al detalle que este recorrido NO puede probar: que quien pide no
+ * resuelve. Aquí sólo hay un usuario, así que resolver su propia solicitud
+ * devuelve 409 — y eso es justamente lo que se exige, porque es la respuesta
+ * correcta. La ruta feliz de la resolución vive en
+ * `solicitudes-ruta.integracion.ts`, que sí puede cambiar de actor.
+ */
+describe('solicitudes de cambio de ruta · las cinco rutas del §2C', () => {
+  it('pedir, listar, leer y toparse con la separación al resolver', async () => {
+    const { viaje } = await viajeHasta('transito_estacion', sello());
+
+    const solicitud = (await ruta('POST /solicitudes-ruta/viaje/:viajeId',
+      api().post(`/api/solicitudes-ruta/viaje/${viaje.id}`).set(cabPost())
+        .send({ tipo: 'desvio', motivo: 'Vía Centenario cerrada por accidente' }), [201])).body;
+    expect(solicitud.estado).toBe('pendiente');
+
+    await ruta('GET /solicitudes-ruta/:id',
+      api().get(`/api/solicitudes-ruta/${solicitud.id}`).set(cab()), [200]);
+    const delViaje = await ruta('GET /solicitudes-ruta/viaje/:viajeId',
+      api().get(`/api/solicitudes-ruta/viaje/${viaje.id}`).set(cab()), [200]);
+    expect(delViaje.body).toHaveLength(1);
+
+    const pendientes = await ruta('GET /solicitudes-ruta/pendientes',
+      api().get('/api/solicitudes-ruta/pendientes').set(cab()), [200]);
+    expect(pendientes.body.map((p: { id: string }) => String(p.id)))
+      .toContain(String(solicitud.id));
+
+    // 409 y no 200: este token es el de quien la pidió.
+    await ruta('PATCH /solicitudes-ruta/:id',
+      api().patch(`/api/solicitudes-ruta/${solicitud.id}`).set(cab())
+        .send({ estado: 'aprobada', motivo: 'Intento de aprobarme a mí mismo' }), [409]);
+  }, 120_000);
 });
 
 /*

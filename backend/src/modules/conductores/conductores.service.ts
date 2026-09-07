@@ -22,7 +22,7 @@ const CAMPOS = `conductor_id AS id, usuario_id AS "usuarioId", nombre_completo A
                 telefono, correo, estado, tarifa_base AS "tarifaBase", tarifa_km AS "tarifaKm",
                 tarifa_viaje AS "tarifaViaje", tarifa_entrega AS "tarifaEntrega",
                 (cuenta_bancaria_cifrada IS NOT NULL) AS "tieneCuentaBancaria",
-                contacto_emergencia AS "contactoEmergencia",
+                contacto_emergencia AS "contactoEmergencia", canal_chat AS "canalChat",
                 (fecha_vencimiento_licencia IS NOT NULL
                  AND fecha_vencimiento_licencia < current_date) AS "licenciaVencida"`;
 
@@ -57,13 +57,13 @@ export class ConductoresService {
       `INSERT INTO conductores
          (empresa_id, usuario_id, nombre_completo, documento, licencia, categoria,
           fecha_vencimiento_licencia, telefono, correo, tarifa_base, tarifa_km,
-          tarifa_viaje, tarifa_entrega, contacto_emergencia)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+          tarifa_viaje, tarifa_entrega, contacto_emergencia, canal_chat)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
        RETURNING ${CAMPOS}`,
       [ctx.empresaId, dto.usuarioId ?? null, dto.nombreCompleto, dto.documento, dto.licencia,
        dto.categoria ?? null, dto.fechaVencimientoLicencia ?? null, dto.telefono ?? null,
        dto.correo ?? null, dto.tarifaBase ?? null, dto.tarifaKm ?? null, dto.tarifaViaje ?? null,
-       dto.tarifaEntrega ?? null, dto.contactoEmergencia ?? null]);
+       dto.tarifaEntrega ?? null, dto.contactoEmergencia ?? null, dto.canalChat ?? null]);
 
     auditar({ entidad: 'conductores', entidadId: String(creado.id), valorNuevo: creado });
     return creado;
@@ -82,6 +82,7 @@ export class ConductoresService {
       correo: dto.correo, tarifa_base: dto.tarifaBase, tarifa_km: dto.tarifaKm,
       tarifa_viaje: dto.tarifaViaje, tarifa_entrega: dto.tarifaEntrega,
       contacto_emergencia: dto.contactoEmergencia, estado: dto.estado,
+      canal_chat: dto.canalChat,
     };
     const presentes = Object.entries(columnas).filter(([, v]) => v !== undefined);
     const asignaciones = presentes.map(([c], i) => `${c} = $${i + 2}`);

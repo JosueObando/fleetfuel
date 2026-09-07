@@ -3,6 +3,8 @@ import { config as cargarEnv } from 'dotenv';
 import { DataSource } from 'typeorm';
 import { join } from 'path';
 
+import { TABLAS_POR_EMPRESA } from './apoyo/aplicacion';
+
 cargarEnv({ path: join(__dirname, '../../.env') });
 
 /**
@@ -182,5 +184,51 @@ describe('login sin aflojar la RLS', () => {
     const filas = await comoEmpresa(null, (q) =>
       q.query(`SELECT correo FROM usuarios WHERE correo = 'ana@a.test'`));
     expect(filas).toHaveLength(0);
+  });
+});
+
+/*
+ * ─────────────────────────────────────────────────────────────────────────────
+ * La limpieza de las pruebas conoce TODAS las tablas de negocio.
+ *
+ * `borrarEmpresa` borra por `empresa_id` en orden de claves foráneas, y su
+ * lista está escrita a mano. Se quedó corta dos veces —al entrar `entregas` y
+ * al entrar `solicitudes_ruta`— y las dos veces el síntoma apareció lejos del
+ * origen: un DELETE de `viajes` chocando contra una clave foránea de la tabla
+ * que faltaba.
+ *
+ * Esto lo cierra por donde se cierra de verdad: se le pregunta a Postgres qué
+ * tablas llevan `empresa_id` y se exige que la lista las tenga todas. Añadir una
+ * tabla de negocio sin añadirla aquí pasa a ser un fallo inmediato y con nombre,
+ * en vez de una limpieza a medias que envenena la ejecución siguiente.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+describe('el andamiaje de las pruebas se mantiene al día solo', () => {
+  it('toda tabla con empresa_id está en la lista de limpieza', async () => {
+    const filas = await dueño.query(
+      `SELECT t.tablename FROM pg_tables t
+         JOIN information_schema.columns c
+           ON c.table_name = t.tablename AND c.column_name = 'empresa_id'
+        WHERE t.schemaname = 'public'`);
+    const conEmpresa: string[] = filas
+      .map((f: { tablename: string }) => f.tablename)
+      // `empresas` sale porque su `empresa_id` es su propia clave primaria: no
+      // es una tabla de negocio DE una empresa, es la empresa. `borrarEmpresa`
+      // la borra aparte y al final, por RUC.
+      .filter((t: string) => t !== 'empresas');
+
+    // Guarda contra volverse vacía si algún día cambia el catálogo: son 20 y
+    // pico, no dos.
+    expect(conEmpresa.length).toBeGreaterThan(15);
+
+    const faltan = conEmpresa.filter((t) => !TABLAS_POR_EMPRESA.includes(t as never));
+    expect(faltan).toEqual([]);
+  });
+
+  it('la lista no arrastra tablas que ya no existen', async () => {
+    const filas = await dueño.query(
+      `SELECT tablename FROM pg_tables WHERE schemaname = 'public'`);
+    const vivas = new Set(filas.map((f: { tablename: string }) => f.tablename));
+    expect([...TABLAS_POR_EMPRESA].filter((t) => !vivas.has(t))).toEqual([]);
   });
 });

@@ -31,6 +31,7 @@ import { ConductoresModule } from './modules/conductores/conductores.module';
 import { OrdenesModule } from './modules/ordenes/ordenes.module';
 import { ViajesModule } from './modules/viajes/viajes.module';
 import { EntregasModule } from './modules/entregas/entregas.module';
+import { SolicitudesRutaModule } from './modules/solicitudes-ruta/solicitudes-ruta.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { EntregasModule } from './modules/entregas/entregas.module';
     // Fase 1B · órdenes, viajes y plan de carga
     OrdenesModule, ViajesModule,
     EntregasModule,
+    SolicitudesRutaModule,
     ConfigModule.forRoot({
       isGlobal: true,
       load: [configuration],
