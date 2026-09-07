@@ -66,6 +66,15 @@ El compose apunta a la etapa `development` de la imagen: conserva las
 devDependencies y `src/`, que es lo que hace que los comandos de arriba
 funcionen dentro del contenedor.
 
+Además monta `backend/src` y `backend/test` encima de la imagen, y esa parte no
+es comodidad: sin el montaje el contenedor corre lo que se construyó la última
+vez, así que `npm run start:dev` vigila ficheros que no cambian y
+`docker compose exec backend npm run test:cobertura` mide una copia congelada
+—midiendo verde sobre código que ya no existe—. Lo que sigue viniendo de la
+imagen es `package.json` y la configuración de TypeScript: tocarlos exige
+`docker compose up -d --build`, que es lo correcto, porque cambiar dependencias
+no es un cambio en caliente.
+
 Para la imagen de producción, que se construye con `npm ci --omit=dev` y sin
 fuentes, los comandos equivalentes operan sobre el código compilado:
 
@@ -93,13 +102,37 @@ npm run start:dev       # como aplicación
 ```bash
 cd backend
 npm run typecheck        # compilación estricta
+npm run lint             # ESLint con reglas CON TIPOS
 npm test                 # unitarias — no necesitan base de datos
+npm run test:watch       # las mismas, en vigilancia, mientras se desarrolla
 npm run test:integracion # RLS, append-only e idempotencia contra Postgres real
+npm run test:cobertura   # unitarias + integración en UNA pasada, con umbral
 ```
 
 Las de integración **requieren un Postgres real y migrado**. Es intencional: RLS,
 unicidad bajo concurrencia y los permisos de tabla son comportamiento del motor;
 probarlos contra un doble es probar el doble.
+
+`lint` usa la variante con tipos de typescript-eslint. Cuesta unos segundos más
+y a cambio ve la clase de fallo que aquí se paga caro: `no-floating-promises`
+—una promesa perdida es un INSERT que no ocurrió dentro de la transacción de la
+petición— y `no-console`, porque el registro de este backend es **una línea JSON
+por petición** y un `console.log` suelto rompe el análisis de Promtail sin que
+nada falle. Al ponerlo encontró dos cosas reales: `bootstrap()` sin manejador de
+rechazo y un `String(id)` que metía «[object Object]» en la bitácora.
+
+### La puerta previa al commit
+
+```bash
+git config core.hooksPath githooks   # UNA vez por clon
+```
+
+`githooks/pre-commit` corre tipos, estilo y unitarias **sólo de la carpeta que
+el commit toca** (~33 s si es el backend). No corre integración ni cobertura a
+propósito: necesitan Postgres y Redis, y un gancho que falla con Docker parado
+se convierte en `--no-verify` por costumbre en una semana. Eso vive en CI, que
+sí garantiza el entorno. Para saltárselo puntualmente, `git commit --no-verify`:
+que sea una decisión visible y por commit.
 
 ## Endpoints
 

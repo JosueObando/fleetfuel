@@ -245,7 +245,7 @@ describe('usuarios · alta y suspensión', () => {
       ruc: `SUSP-${unico()}`, correo, clave: 'ClaveDePrueba123' });
     await dueño.query(`UPDATE usuarios SET estado='suspendido' WHERE usuario_id=$1`,
       [otro.usuario.id]);
-    await expect(auth.login({ correo, clave: 'ClaveDePrueba123' } as never))
+    await expect(auth.login({ correo, clave: 'ClaveDePrueba123' }))
       .rejects.toThrow(/Usuario suspendido/);
     await borrarEmpresa(dueño, otro.empresa, `SUSP-${unico()}`.replace(/\d+$/, ''));
     await dueño.query(`DELETE FROM empresas WHERE empresa_id = $1`, [otro.empresa])

@@ -46,6 +46,24 @@ services:
       REDIS_PORT: 6379
     ports:
       - "${BACKEND_PORT:-4100}:4100"
+    # El árbol de trabajo, montado encima de la imagen.
+    #
+    # Sin esto el contenedor corre lo que se construyó la última vez: `start:dev
+    # --watch` vigila ficheros que no cambian nunca, y
+    # `docker compose exec backend npm run test:cobertura` —el comando que
+    # documenta el README— mide una copia congelada. Se descubrió el 2026-09-06
+    # auditando la suite: la copia de `test/` dentro del contenedor tenía 395
+    # líneas y la del disco 615, y una prueba de mutación que parecía demostrar
+    # algo no había llegado a tocar el código mutado.
+    #
+    # Se montan `src/` y `test/` y NO `/app` entero a propósito: montar la raíz
+    # taparía `node_modules`, que se instala DENTRO de la imagen con `npm ci`.
+    # Como contrapartida, `package.json`, `tsconfig.json` y `nest-cli.json`
+    # siguen viniendo de la imagen: tocarlos sigue exigiendo `--build`, que es
+    # lo correcto —cambiar dependencias no es un cambio en caliente—.
+    volumes:
+      - ./backend/src:/app/src
+      - ./backend/test:/app/test
     depends_on:
       db:
         condition: service_healthy

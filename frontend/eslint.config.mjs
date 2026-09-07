@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // El informe de cobertura es código GENERADO por istanbul: linterlo sólo
+    // produce avisos sobre ficheros que nadie edita.
+    "coverage/**",
   ]),
 ]);
 

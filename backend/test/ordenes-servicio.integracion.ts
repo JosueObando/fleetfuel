@@ -168,7 +168,7 @@ describe('cambiarEstado · el flujo del §8.1', () => {
   it('rechaza un salto que no está en el flujo', async () => {
     await enServicio(async s => {
       const o = await s.crear(ordenBase());
-      await expect(s.cambiarEstado(String(o.id), { estado: 'entregada' } as never))
+      await expect(s.cambiarEstado(String(o.id), { estado: 'entregada' }))
         .rejects.toThrow(/No se puede pasar de "recibida" a "entregada"/);
     });
   });
@@ -179,7 +179,7 @@ describe('cambiarEstado · el flujo del §8.1', () => {
     await enServicio(async s => {
       const o = await s.crear(ordenBase());
       for (const estado of ['rechazada', 'cancelada', 'suspendida']) {
-        await expect(s.cambiarEstado(String(o.id), { estado } as never))
+        await expect(s.cambiarEstado(String(o.id), { estado }))
           .rejects.toThrow(new RegExp(`Pasar a "${estado}" exige indicar el motivo`));
       }
     });
@@ -189,7 +189,7 @@ describe('cambiarEstado · el flujo del §8.1', () => {
     await enServicio(async s => {
       const o = await s.crear(ordenBase());
       const r = await s.cambiarEstado(String(o.id),
-        { estado: 'rechazada', motivo: 'La estación está en obra' } as never);
+        { estado: 'rechazada', motivo: 'La estación está en obra' });
       expect(r.estado).toBe('rechazada');
     });
   });
@@ -197,7 +197,7 @@ describe('cambiarEstado · el flujo del §8.1', () => {
   it('avanzar por el camino normal NO pide motivo', async () => {
     await enServicio(async s => {
       const o = await s.crear(ordenBase());
-      const v = await s.cambiarEstado(String(o.id), { estado: 'validada' } as never);
+      const v = await s.cambiarEstado(String(o.id), { estado: 'validada' });
       expect(v.estado).toBe('validada');
     });
   });
@@ -205,8 +205,8 @@ describe('cambiarEstado · el flujo del §8.1', () => {
   it('de un estado terminal no se sale', async () => {
     await enServicio(async s => {
       const o = await s.crear(ordenBase());
-      await s.cambiarEstado(String(o.id), { estado: 'cancelada', motivo: 'Duplicada' } as never);
-      await expect(s.cambiarEstado(String(o.id), { estado: 'validada' } as never))
+      await s.cambiarEstado(String(o.id), { estado: 'cancelada', motivo: 'Duplicada' });
+      await expect(s.cambiarEstado(String(o.id), { estado: 'validada' }))
         .rejects.toThrow(/es un estado final|No se puede pasar/);
     });
   });
@@ -216,7 +216,7 @@ describe('actualizar · una orden que ya salió no se reprograma editando', () =
   it('deja editar mientras está recibida o validada', async () => {
     await enServicio(async s => {
       const o = await s.crear(ordenBase());
-      const editada = await s.actualizar(String(o.id), { prioridad: 'alta' } as never);
+      const editada = await s.actualizar(String(o.id), { prioridad: 'alta' });
       expect(editada.prioridad).toBe('alta');
     });
   });
@@ -226,9 +226,9 @@ describe('actualizar · una orden que ya salió no se reprograma editando', () =
     // por detrás dejaría el viaje y la orden contando cosas distintas.
     await enServicio(async s => {
       const o = await s.crear(ordenBase());
-      await s.cambiarEstado(String(o.id), { estado: 'validada' } as never);
-      await s.cambiarEstado(String(o.id), { estado: 'planificada' } as never);
-      await expect(s.actualizar(String(o.id), { prioridad: 'alta' } as never))
+      await s.cambiarEstado(String(o.id), { estado: 'validada' });
+      await s.cambiarEstado(String(o.id), { estado: 'planificada' });
+      await expect(s.actualizar(String(o.id), { prioridad: 'alta' }))
         .rejects.toThrow(/ya no admite cambios de programación/);
     });
   });
@@ -236,8 +236,8 @@ describe('actualizar · una orden que ya salió no se reprograma editando', () =
   it('una suspendida SÍ se puede corregir: es de lo que se vuelve', async () => {
     await enServicio(async s => {
       const o = await s.crear(ordenBase());
-      await s.cambiarEstado(String(o.id), { estado: 'suspendida', motivo: 'Falta documento' } as never);
-      const editada = await s.actualizar(String(o.id), { observaciones: 'Documento recibido' } as never);
+      await s.cambiarEstado(String(o.id), { estado: 'suspendida', motivo: 'Falta documento' });
+      const editada = await s.actualizar(String(o.id), { observaciones: 'Documento recibido' });
       expect(editada.observaciones).toBe('Documento recibido');
     });
   });

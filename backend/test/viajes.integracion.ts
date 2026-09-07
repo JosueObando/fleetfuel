@@ -33,7 +33,6 @@ const app = new DataSource({
 
 let empresa: string;
 let cisterna: string;
-let compartimento: string;
 let conductor: string;
 let otroConductor: string;
 
@@ -88,11 +87,12 @@ beforeAll(async () => {
     `INSERT INTO cisternas (empresa_id, vehiculo_id, capacidad_total) VALUES ($1,$2,10000)
      RETURNING cisterna_id`, [empresa, v.vehiculo_id]);
   cisterna = String(c.cisterna_id);
-  const [cc] = await dueño.query(
+  // El compartimento hace falta para que la cisterna sea usable, pero su id no
+  // se usa en este fichero: se inserta y se olvida.
+  await dueño.query(
     `INSERT INTO compartimentos_cisterna
        (empresa_id, cisterna_id, numero, capacidad_nominal, capacidad_calibrada)
-     VALUES ($1,$2,1,5000,4980) RETURNING compartimento_id`, [empresa, cisterna]);
-  compartimento = String(cc.compartimento_id);
+     VALUES ($1,$2,1,5000,4980)`, [empresa, cisterna]);
 
   const [cd] = await dueño.query(
     `INSERT INTO conductores (empresa_id, nombre_completo, documento, licencia)

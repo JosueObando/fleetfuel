@@ -51,7 +51,7 @@ beforeAll(async () => {
        RETURNING rol_id`, [empresa, nombre]);
     roles.set(nombre, String(r.rol_id));
   }
-  await aplicarReparto((sql, params) => dueño.query(sql, params as unknown[]), roles);
+  await aplicarReparto((sql, params) => dueño.query(sql, params), roles);
 
   const filas = await dueño.query(
     `SELECT r.nombre AS rol, p.codigo FROM roles r
@@ -116,7 +116,7 @@ describe('lo que acaba en la base tras aplicar el reparto', () => {
           `SELECT rol_id FROM roles WHERE empresa_id=$1 AND nombre=$2`, [empresa, nombre]);
         roles.set(nombre, String(r.rol_id));
       }
-      await aplicarReparto((sql, p) => dueño.query(sql, p as unknown[]), roles);
+      await aplicarReparto((sql, p) => dueño.query(sql, p), roles);
       const [{ n }] = await dueño.query(
         `SELECT count(*)::int AS n FROM roles_permisos rp
            JOIN roles r ON r.rol_id = rp.rol_id WHERE r.empresa_id = $1`, [empresa]);
@@ -128,7 +128,7 @@ describe('lo que acaba en la base tras aplicar el reparto', () => {
   it('avisa si el reparto nombra un rol que no existe', async () => {
     // Las migraciones se callaban en ese caso, y ese silencio es lo que costó
     // días de producción a medias.
-    await expect(aplicarReparto(async () => undefined, new Map()))
+    await expect(aplicarReparto(() => Promise.resolve(undefined), new Map()))
       .rejects.toThrow(/nombra un rol que no existe/);
   });
 });

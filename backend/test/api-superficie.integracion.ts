@@ -18,8 +18,8 @@ import {
  * Recorrido por TODA la superficie de la API.
  *
  * No comprueba reglas de negocio —eso está en las pruebas de cada servicio—
- * sino que las 64 rutas existan, respondan y no revienten. Es lo que atrapa lo
- * que ninguna prueba de servicio puede ver:
+ * sino que TODAS las rutas existan, respondan y no revienten. Es lo que atrapa
+ * lo que ninguna prueba de servicio puede ver:
  *
  *   · una ruta que deja de registrarse al mover un controlador de módulo
  *   · un `@Permisos()` mal escrito, que convierte un endpoint en inalcanzable
@@ -27,6 +27,11 @@ import {
  *
  * Los tres se ven idénticos desde el servicio, que sigue funcionando
  * perfectamente mientras nadie puede llegar a él.
+ *
+ * «TODAS» se hace cumplir, no se promete: el último bloque del fichero
+ * enumera las rutas que Express tiene registradas y exige que ninguna se haya
+ * quedado sin recorrer. La cabecera decía «las 64 rutas» cuando visitaba 41, y
+ * nada lo señalaba porque la afirmación estaba en un comentario.
  */
 
 const RUC = 'SUP-TEST';
@@ -41,12 +46,18 @@ const cab = () => ({ Authorization: `Bearer ${token}` });
 const cabPost = () => ({ ...cab(), 'Idempotency-Key': randomUUID() });
 const sello = () => Date.now().toString().slice(-8) + Math.floor(Math.random() * 99);
 
+/** Lo que este fichero ha recorrido de verdad, para poder exigir al final que
+ *  no se haya quedado ninguna ruta fuera. Se llena sola: quien añade un
+ *  `ruta(...)` no tiene que acordarse de nada. */
+const visitadas = new Set<string>();
+
 /** Ejercita una ruta y comprueba que responde con algo esperado. */
 async function ruta(
   descripcion: string,
   peticion: request.Test,
   aceptables: number[],
 ): Promise<request.Response> {
+  visitadas.add(descripcion);
   const r = await peticion;
   // Un 5xx se señala aparte: significa que la ruta existe y revienta, que es
   // distinto de que responda un código de negocio inesperado.
@@ -235,8 +246,16 @@ describe('órdenes y viajes, ruta por ruta', () => {
 
     // Con el viaje autorizado el plan ya no se toca: la baja de una línea tiene
     // que rechazarse, y esa es su ruta igualmente.
+    //
+    // Aceptaba `[200, 409]`, y ahí se escondía un hueco: desde un viaje
+    // autorizado el guard responde 409 SIEMPRE, así que el 200 era inalcanzable
+    // y el cuerpo de `quitarLineaPlan` —el que devuelve el volumen al
+    // acumulado— no se ejecutaba en ninguna prueba del repositorio, mientras la
+    // ruta figuraba cubierta. Un rango de estados aceptados es una aserción que
+    // se cumple sola: aquí sólo cabe una respuesta, y es la que se exige.
+    // El camino que SÍ borra se prueba en `viajes-servicio.integracion.ts`.
     await ruta('DELETE /viajes/:id/plan-carga/:planId',
-      api().delete(`/api/viajes/${viaje.id}/plan-carga/${plan.id ?? 1}`).set(cab()), [200, 409]);
+      api().delete(`/api/viajes/${viaje.id}/plan-carga/${plan.id ?? 1}`).set(cab()), [409]);
   }, 180_000);
 });
 
@@ -328,4 +347,129 @@ describe('administración, ruta por ruta', () => {
     await ruta('GET /auditoria', api().get('/api/auditoria').set(cab()), [200]);
     await ruta('GET /empresa', api().get('/api/empresa').set(cab()), [200]);
   }, 120_000);
+});
+
+/*
+ * ─────────────────────────────────────────────────────────────────────────────
+ * El CRUD de los catálogos, que era lo que faltaba por recorrer.
+ *
+ * Cinco recursos con las mismas cinco rutas cada uno. Se hacen en bucle y no a
+ * mano porque son idénticos: escribirlos veinte veces invita a que el sexto
+ * catálogo se añada sin ellos.
+ *
+ * Cada uno crea su propio registro y lo borra: así el DELETE se puede exigir
+ * en 200 seco, sin el `[200, 409]` que aceptaría cualquier cosa. Un rango de
+ * estados aceptados es una aserción que se cumple sola.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+describe('los seis catálogos, ruta por ruta', () => {
+  const CATALOGOS: Array<{
+    nombre: string;
+    cuerpo: () => Promise<Record<string, unknown>> | Record<string, unknown>;
+    edicion: Record<string, unknown>;
+  }> = [
+    { nombre: 'clientes', edicion: { telefono: '507-9999' },
+      cuerpo: () => ({ nombre: `Cliente ${sello()}` }) },
+    { nombre: 'vehiculos', edicion: { marca: 'Volvo' },
+      cuerpo: () => ({ tipoVehiculo: 'cabezal', placa: `SUP-${sello()}` }) },
+    { nombre: 'conductores', edicion: { telefono: '507-8888' },
+      cuerpo: () => ({
+        nombreCompleto: `Chofer ${sello()}`, documento: `DOC-${sello()}`,
+        licencia: `LIC-${sello()}`,
+      }) },
+    { nombre: 'productos', edicion: { colorIdentificacion: 'verde' },
+      cuerpo: () => ({ codigo: `SUP-${sello()}`, nombre: `Producto ${sello()}` }) },
+    { nombre: 'estaciones', edicion: { provincia: 'Panamá' },
+      cuerpo: async () => {
+        // Una estación cuelga de un cliente: se crea uno suyo para que el
+        // borrado del final no dependa de nada de otra prueba.
+        const cliente = await api().post('/api/clientes').set(cabPost())
+          .send({ nombre: `Cliente est ${sello()}` }).expect(201);
+        return { clienteId: String(cliente.body.id), nombre: `Estación ${sello()}` };
+      } },
+  ];
+
+  for (const c of CATALOGOS) {
+    it(`${c.nombre} · listar, obtener, crear, actualizar y desactivar`, async () => {
+      const creado = (await ruta(`POST /${c.nombre}`,
+        api().post(`/api/${c.nombre}`).set(cabPost()).send(await c.cuerpo()), [201])).body;
+
+      const lista = await ruta(`GET /${c.nombre}`, api().get(`/api/${c.nombre}`).set(cab()), [200]);
+      expect(Array.isArray(lista.body)).toBe(true);
+
+      const uno = await ruta(`GET /${c.nombre}/:id`,
+        api().get(`/api/${c.nombre}/${creado.id}`).set(cab()), [200]);
+      expect(String(uno.body.id)).toBe(String(creado.id));
+
+      await ruta(`PATCH /${c.nombre}/:id`,
+        api().patch(`/api/${c.nombre}/${creado.id}`).set(cab()).send(c.edicion), [200]);
+
+      await ruta(`DELETE /${c.nombre}/:id`,
+        api().delete(`/api/${c.nombre}/${creado.id}`).set(cab()), [200]);
+
+      // Dado de baja significa que deja de estar: si siguiera apareciendo, la
+      // baja lógica no lo sería.
+      await api().get(`/api/${c.nombre}/${creado.id}`).set(cab()).expect(404);
+    }, 60_000);
+  }
+});
+
+/*
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Que no se quede ninguna ruta fuera, y que eso lo diga una prueba.
+ *
+ * Hasta aquí, «recorre toda la superficie» era una afirmación en un comentario:
+ * decía 64 y recorría 41, y nadie podía notarlo. Y el umbral de cobertura de
+ * funciones tolera tres sin cubrir, así que un controlador nuevo con dos o tres
+ * rutas sin probar pasaba CI sin decir una palabra.
+ *
+ * Esto lo cierra por el otro lado: se le pregunta a Express qué rutas tiene
+ * registradas de verdad —no a un listado escrito a mano, que se desactualiza
+ * igual que el comentario— y se exige que todas hayan pasado por `ruta()`.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+describe('la superficie declarada y la recorrida coinciden', () => {
+  /** Las rutas que Express tiene montadas, en el mismo formato que `ruta()`. */
+  function declaradas(): string[] {
+    const express = app.getHttpAdapter().getInstance() as {
+      _router?: { stack: unknown[] }; router?: { stack: unknown[] };
+    };
+    const pila = (express._router ?? express.router)?.stack ?? [];
+    const salida: string[] = [];
+    for (const capa of pila as Array<{ route?: { path: string; methods: Record<string, boolean> } }>) {
+      if (!capa.route) continue;
+      const camino = capa.route.path.replace(/^\/api/, '');
+      for (const [metodo, activo] of Object.entries(capa.route.methods)) {
+        if (activo && metodo !== '_all') salida.push(`${metodo.toUpperCase()} ${camino}`);
+      }
+    }
+    return [...new Set(salida)].sort();
+  }
+
+  /**
+   * Rutas que este fichero NO recorre porque su sitio natural es otro, con el
+   * fichero donde viven. No es una lista de perdonadas: es una lista de
+   * remitidas, y cada entrada dice adónde.
+   */
+  const EN_OTRO_FICHERO = new Map<string, string>([
+    ['POST /auth/login', 'api.integracion.ts y freno-login.integracion.ts: aquí se usa para obtener el token, no se prueba'],
+  ]);
+
+  it('toda ruta registrada se ha recorrido en alguna prueba', () => {
+    const todas = declaradas();
+    // Sin esto la prueba se vuelve VACÍA en silencio el día que Nest o Express
+    // cambien dónde guardan la pila de rutas: `declaradas()` devolvería [], el
+    // filtro no encontraría nada que reprochar y el verde no significaría nada.
+    // El número exacto no importa; que sean muchas, sí.
+    expect(todas.length).toBeGreaterThan(50);
+
+    const faltan = todas.filter((r) => !visitadas.has(r) && !EN_OTRO_FICHERO.has(r));
+    expect(faltan).toEqual([]);
+  });
+
+  it('la lista de remitidas no acumula rutas que ya no existen', () => {
+    // Una excepción que sobrevive a su ruta es cómo una lista así se pudre.
+    const vivas = new Set(declaradas());
+    expect([...EN_OTRO_FICHERO.keys()].filter((r) => !vivas.has(r))).toEqual([]);
+  });
 });

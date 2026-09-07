@@ -126,7 +126,7 @@ export function huellaDe(peticion: { method?: string; url?: string; body?: unkno
 function ordenar(valor: unknown): unknown {
   if (Array.isArray(valor)) return valor.map(ordenar);
   if (valor && typeof valor === 'object') {
-    return Object.keys(valor as Record<string, unknown>)
+    return Object.keys(valor)
       .sort()
       .reduce<Record<string, unknown>>((acc, k) => {
         acc[k] = ordenar((valor as Record<string, unknown>)[k]);

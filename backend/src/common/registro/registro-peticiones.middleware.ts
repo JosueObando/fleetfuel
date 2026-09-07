@@ -73,7 +73,15 @@ function nivelPara(estado: number): 'error' | 'aviso' | 'info' {
   return 'info';
 }
 
-function recortar(valor: string | undefined, ancho = 160): string | undefined {
+/**
+ * Recorta el `user-agent` para que una línea de registro no se vuelva ilegible.
+ *
+ * El caso que importa no es el navegador normal, es el bot: cadenas de cientos
+ * de caracteres que empujan el resto del objeto JSON fuera de la vista en
+ * Grafana. Se exporta para poder afirmar el recorte, que era la rama que ninguna
+ * prueba de integración tocaba —ningún cliente de prueba manda un agente largo—.
+ */
+export function recortar(valor: string | undefined, ancho = 160): string | undefined {
   if (!valor) return undefined;
   return valor.length > ancho ? `${valor.slice(0, ancho)}…` : valor;
 }

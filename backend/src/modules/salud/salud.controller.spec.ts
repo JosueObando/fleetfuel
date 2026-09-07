@@ -29,7 +29,7 @@ function respuestaFalsa() {
 }
 
 const controladorCon = (salud: Salud) =>
-  new SaludController({ revisar: async () => salud } as unknown as SaludService);
+  new SaludController({ revisar: () => Promise.resolve(salud) } as unknown as SaludService);
 
 describe('SaludController', () => {
   it('responde 200 cuando todo está sano', async () => {

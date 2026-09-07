@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "typecheck": "tsc --noEmit",
     "auditar:contraste": "node scripts/auditar-contraste.mjs",
     "test": "jest",
     "test:watch": "jest --watch",

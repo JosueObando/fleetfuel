@@ -8,7 +8,6 @@ import { AppModule } from '../src/app.module';
 import { REDIS } from '../src/modules/auth/tokens.service';
 import { AuthService } from '../src/modules/auth/auth.service';
 import { CifradoService } from '../src/modules/auth/cifrado.service';
-import { TokensService } from '../src/modules/auth/tokens.service';
 import { conexionDueño, conexionRedis, sembrarEmpresa, borrarEmpresa, darPermisos } from './apoyo/aplicacion';
 
 /**
@@ -35,7 +34,6 @@ const CORREO = 'auth-prueba@ejemplo.test';
 let modulo: TestingModule;
 let auth: AuthService;
 let cifrado: CifradoService;
-let tokens: TokensService;
 let dueño: DataSource;
 let redis: Redis;
 let empresa: string;
@@ -57,14 +55,13 @@ beforeAll(async () => {
   await modulo.init();
   auth = modulo.get(AuthService);
   cifrado = modulo.get(CifradoService);
-  tokens = modulo.get(TokensService);
 }, 60_000);
 
 afterAll(async () => {
   // El cliente de Redis lo crea una factoría, no un proveedor con ciclo de
   // vida, así que `modulo.close()` no lo cierra y el proceso de Jest se queda
   // colgado al terminar. Taparlo con `--forceExit` habría escondido esto.
-  await (modulo?.get(REDIS) as Redis | undefined)?.quit().catch(() => undefined);
+  await (modulo?.get(REDIS))?.quit().catch(() => undefined);
   await modulo?.close();
   await dueño.query(`DELETE FROM intentos_login WHERE correo LIKE '%@ejemplo.test'`);
   await borrarEmpresa(dueño, empresa, RUC);
@@ -80,9 +77,9 @@ beforeEach(async () => {
 
 describe('el login no puede ser un directorio de correos', () => {
   it('da el MISMO mensaje si el correo no existe y si la clave está mal', async () => {
-    const inexistente = await auth.login({ correo: 'nadie@ejemplo.test', clave: 'loquesea1' } as never)
+    const inexistente = await auth.login({ correo: 'nadie@ejemplo.test', clave: 'loquesea1' })
       .catch(e => e);
-    const claveMala = await auth.login({ correo: CORREO, clave: 'claveequivocada' } as never)
+    const claveMala = await auth.login({ correo: CORREO, clave: 'claveequivocada' })
       .catch(e => e);
 
     expect(inexistente.message).toBe('Credenciales inválidas');
@@ -102,7 +99,7 @@ describe('el login no puede ser un directorio de correos', () => {
     // ahí, no cronometrar con precisión.
     const cronometrar = async (correo: string) => {
       const t = process.hrtime.bigint();
-      await auth.login({ correo, clave: 'claveequivocada' } as never).catch(() => undefined);
+      await auth.login({ correo, clave: 'claveequivocada' }).catch(() => undefined);
       return Number(process.hrtime.bigint() - t) / 1e6;
     };
     // El freno vive en el guard del controlador, no en el servicio, así que
@@ -127,14 +124,14 @@ describe('el login no puede ser un directorio de correos', () => {
 
 describe('los cinco caminos dejan su motivo real', () => {
   it('correo desconocido · sin empresa ni usuario, que es la información', async () => {
-    await auth.login({ correo: 'fantasma@ejemplo.test', clave: 'loquesea1' } as never).catch(() => undefined);
+    await auth.login({ correo: 'fantasma@ejemplo.test', clave: 'loquesea1' }).catch(() => undefined);
     const [f] = await fallos();
     expect(f.motivo).toBe('correo_desconocido');
     expect(f.usuario_id).toBeNull();
   });
 
   it('clave incorrecta · con empresa y usuario, porque el correo sí resolvió', async () => {
-    await auth.login({ correo: CORREO, clave: 'claveequivocada' } as never).catch(() => undefined);
+    await auth.login({ correo: CORREO, clave: 'claveequivocada' }).catch(() => undefined);
     const [f] = await fallos();
     expect(f.motivo).toBe('clave_incorrecta');
     expect(String(f.usuario_id)).toBe(usuario.id);
@@ -144,7 +141,7 @@ describe('los cinco caminos dejan su motivo real', () => {
     // Distinguirlo aquí SÍ es correcto: quien llega hasta este punto ya
     // demostró saber la clave, así que no se le está revelando nada.
     await dueño.query(`UPDATE usuarios SET estado='suspendido' WHERE usuario_id=$1`, [usuario.id]);
-    const e = await auth.login({ correo: CORREO, clave: usuario.clave } as never).catch(x => x);
+    const e = await auth.login({ correo: CORREO, clave: usuario.clave }).catch(x => x);
     expect(e.getStatus()).toBe(403);
     const [f] = await fallos();
     expect(f.motivo).toBe('usuario_suspendido');
@@ -152,7 +149,7 @@ describe('los cinco caminos dejan su motivo real', () => {
 
   it('MFA ausente · con la clave correcta pero sin código', async () => {
     await activarMfa();
-    const e = await auth.login({ correo: CORREO, clave: usuario.clave } as never).catch(x => x);
+    const e = await auth.login({ correo: CORREO, clave: usuario.clave }).catch(x => x);
     expect(e.message).toBe('Se requiere el código MFA');
     const [f] = await fallos();
     expect(f.motivo).toBe('mfa_ausente');
@@ -161,7 +158,7 @@ describe('los cinco caminos dejan su motivo real', () => {
   it('MFA incorrecto · el código no cuadra', async () => {
     await activarMfa();
     const e = await auth.login(
-      { correo: CORREO, clave: usuario.clave, codigoTotp: '000000' } as never).catch(x => x);
+      { correo: CORREO, clave: usuario.clave, codigoTotp: '000000' }).catch(x => x);
     expect(e.message).toBe('Código MFA incorrecto');
     const [f] = await fallos();
     expect(f.motivo).toBe('mfa_incorrecto');
@@ -171,7 +168,7 @@ describe('los cinco caminos dejan su motivo real', () => {
     await dueño.query(`UPDATE usuarios SET mfa_habilitado=true, mfa_secreto=NULL WHERE usuario_id=$1`,
       [usuario.id]);
     const e = await auth.login(
-      { correo: CORREO, clave: usuario.clave, codigoTotp: '123456' } as never).catch(x => x);
+      { correo: CORREO, clave: usuario.clave, codigoTotp: '123456' }).catch(x => x);
     expect(e.getStatus()).toBe(403);
     const [f] = await fallos();
     expect(f.motivo).toBe('mfa_sin_secreto');
@@ -180,7 +177,7 @@ describe('los cinco caminos dejan su motivo real', () => {
 
 describe('el camino que SÍ entra', () => {
   it('emite los dos tokens y no deja rastro de fallo', async () => {
-    const sesion = await auth.login({ correo: CORREO, clave: usuario.clave } as never);
+    const sesion = await auth.login({ correo: CORREO, clave: usuario.clave });
     expect(sesion).toHaveProperty('accessToken');
     expect(sesion).toHaveProperty('refreshToken');
     expect((sesion as { usuario: { correo: string } }).usuario.correo).toBe(CORREO);
@@ -191,14 +188,14 @@ describe('el camino que SÍ entra', () => {
     const secreto = await activarMfa();
     const sesion = await auth.login({
       correo: CORREO, clave: usuario.clave, codigoTotp: authenticator.generate(secreto),
-    } as never);
+    });
     expect(sesion).toHaveProperty('accessToken');
     expect(await fallos()).toHaveLength(0);
   });
 
   it('deja el acceso en la auditoría, con su IP', async () => {
     await dueño.query(`DELETE FROM auditoria WHERE empresa_id = $1`, [empresa]);
-    await auth.login({ correo: CORREO, clave: usuario.clave } as never, '203.0.113.9');
+    await auth.login({ correo: CORREO, clave: usuario.clave }, '203.0.113.9');
     const [a] = await dueño.query(
       `SELECT accion, ruta, host(ip) AS ip FROM auditoria WHERE empresa_id=$1 ORDER BY auditoria_id DESC`,
       [empresa]);
@@ -231,7 +228,7 @@ async function sesionAbierta(dispositivo?: string) {
   await dueño.query(`UPDATE usuarios SET mfa_habilitado=false, mfa_secreto=NULL, estado='activo'
                       WHERE usuario_id = $1`, [usuario.id]);
   return (await auth.login(
-    { correo: CORREO, clave: usuario.clave, ...(dispositivo ? { dispositivo } : {}) } as never,
+    { correo: CORREO, clave: usuario.clave, ...(dispositivo ? { dispositivo } : {}) },
   )) as { accessToken: string; refreshToken: string };
 }
 
@@ -349,7 +346,7 @@ describe('el dispositivo se registra al entrar', () => {
     await auth.login({
       correo: CORREO, clave: usuario.clave,
       dispositivo: 'tableta-1', dispositivoNombre: 'Tableta del despachador',
-    } as never);
+    });
     const [d] = await dueño.query(
       `SELECT identificador, nombre FROM dispositivos WHERE usuario_id = $1`, [usuario.id]);
     expect(d.identificador).toBe('tableta-1');
@@ -361,7 +358,7 @@ describe('el dispositivo se registra al entrar', () => {
     // añadiría un «dispositivo» y la pantalla de revocación sería inservible.
     await dueño.query(`DELETE FROM dispositivos WHERE usuario_id = $1`, [usuario.id]);
     for (let i = 0; i < 3; i++) {
-      await auth.login({ correo: CORREO, clave: usuario.clave, dispositivo: 'tableta-1' } as never);
+      await auth.login({ correo: CORREO, clave: usuario.clave, dispositivo: 'tableta-1' });
     }
     const [{ n }] = await dueño.query(
       `SELECT count(*)::int AS n FROM dispositivos WHERE usuario_id = $1`, [usuario.id]);
@@ -370,12 +367,12 @@ describe('el dispositivo se registra al entrar', () => {
 
   it('entrar con un dispositivo REVOCADO se rechaza', async () => {
     await dueño.query(`DELETE FROM dispositivos WHERE usuario_id = $1`, [usuario.id]);
-    await auth.login({ correo: CORREO, clave: usuario.clave, dispositivo: 'robado' } as never);
+    await auth.login({ correo: CORREO, clave: usuario.clave, dispositivo: 'robado' });
     await dueño.query(
       `UPDATE dispositivos SET revocado_en = now() WHERE usuario_id=$1 AND identificador='robado'`,
       [usuario.id]);
     await expect(auth.login(
-      { correo: CORREO, clave: usuario.clave, dispositivo: 'robado' } as never))
+      { correo: CORREO, clave: usuario.clave, dispositivo: 'robado' }))
       .rejects.toThrow(/dispositivo fue revocado/);
   }, 30_000);
 });

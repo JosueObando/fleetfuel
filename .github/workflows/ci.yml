@@ -58,6 +58,12 @@ jobs:
       - run: npm ci
       - name: Compilación de tipos
         run: npm run typecheck
+      # El backend no tuvo ESLint hasta el 2026-09-07: el frontend sí y él no,
+      # y nadie lo echaba de menos porque CI no lo pedía. Va con reglas CON
+      # TIPOS —`no-floating-promises` es la que importa aquí: una promesa
+      # perdida es un INSERT que no ocurrió dentro de la transacción—.
+      - name: Estilo
+        run: npm run lint
       # Las migraciones van ANTES de las pruebas: la mitad de la suite corre
       # contra el motor de verdad y necesita las tablas puestas.
       - name: Migraciones contra Postgres real
@@ -92,7 +98,17 @@ jobs:
 
       - run: npm ci
       - name: Compilación de tipos
-        run: npx tsc --noEmit
+        run: npm run typecheck
+      # `npm run lint` NO entra aquí todavía, y es deuda declarada: el frontend
+      # arrastra 12 errores propios —8 `react-hooks/set-state-in-effect` en
+      # cinco componentes, más `no-unused-vars` y `no-explicit-any` en ficheros
+      # de prueba— anteriores a que hubiera puerta ninguna. Añadirlo hoy dejaría
+      # `main` en rojo por algo que ningún commit nuevo rompe, y de ahí sale
+      # siempre la misma salida: quitar el paso. Cuando esos 12 estén en cero,
+      # este paso y la línea `frontend` de `githooks/pre-commit` entran juntos.
+      #
+      # El backend sí lo tiene, y es lo que impide que la deuda crezca por el
+      # lado que hoy está limpio.
       # Criterio de salida de UX-0. Falla el build si un token deja de cumplir
       # AA: es lo que impide que la accesibilidad se erosione token a token
       # cuando nadie recuerde por qué --fg-muted tenía ese valor exacto.

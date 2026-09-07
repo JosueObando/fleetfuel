@@ -1,0 +1,64 @@
+#!/bin/sh
+#
+# Puerta rápida antes de cada commit: tipos, estilo y pruebas unitarias.
+#
+# POR QUÉ EXISTE
+#
+# La lista del skill de TDD pide `<test> && <lint>` en pre-commit, y era la
+# única sección que este repositorio nunca había tenido: ni gancho, ni —en el
+# backend— ESLint siquiera. CI lo atrapaba todo, pero horas después y con el
+# commit ya empujado.
+#
+# QUÉ NO HACE, Y POR QUÉ
+#
+# No corre las pruebas de integración ni la cobertura. Necesitan Postgres y
+# Redis levantados, y un gancho que falla cuando Docker está parado se
+# convierte en `--no-verify` por costumbre en una semana. Eso vive en CI, que
+# sí puede garantizar el entorno.
+#
+# ALCANCE POR CARPETA
+#
+# Sólo se comprueba lo que el commit toca. Un commit de backend paga ~31 s
+# (tipos 4 s, estilo 11 s, unitarias 16 s) y no arrastra al frontend.
+#
+# Para saltárselo en un caso puntual: `git commit --no-verify`. Que sea una
+# decisión visible y por commit, no un interruptor que alguien apaga y olvida.
+
+set -e
+
+raiz=$(git rev-parse --show-toplevel)
+tocados=$(git diff --cached --name-only --diff-filter=ACMR)
+
+if [ -z "$tocados" ]; then
+  exit 0
+fi
+
+puerta() {
+  carpeta=$1
+  shift
+  echo "── $carpeta ──────────────────────────────────────────"
+  cd "$raiz/$carpeta"
+  for paso in "$@"; do
+    npm run --silent "$paso"
+  done
+}
+
+if echo "$tocados" | grep -q '^backend/'; then
+  puerta backend typecheck lint test
+fi
+
+# El frontend NO pasa por `lint` todavía, y es deuda declarada, no descuido:
+# arrastra 12 errores propios —8 `react-hooks/set-state-in-effect` en cinco
+# componentes, más `no-unused-vars` y `no-explicit-any` en ficheros de prueba—
+# que existen desde antes de que hubiera gancho. Ponerlo aquí hoy bloquearía
+# cualquier commit de frontend por algo que ese commit no rompió, y la salida
+# de eso siempre es `--no-verify` por costumbre.
+#
+# Cuando esos 12 estén en cero, esta línea pasa a `typecheck lint test` y el
+# paso equivalente entra en el trabajo `frontend` de CI. Las dos cosas van
+# juntas: un lint que sólo corre en un sitio se erosiona en el otro.
+if echo "$tocados" | grep -q '^frontend/'; then
+  puerta frontend typecheck test
+fi
+
+echo "✓ puerta previa al commit superada"

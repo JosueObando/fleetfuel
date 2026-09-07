@@ -9,6 +9,7 @@
     "start:dev": "nest start --watch",
     "start:prod": "node dist/main.js",
     "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "eslint",
     "typeorm": "typeorm-ts-node-commonjs -d src/database/data-source.ts",
     "migration:run": "npm run typeorm -- migration:run",
     "migration:run:dist": "typeorm migration:run -d dist/database/data-source.js",
@@ -16,6 +17,7 @@
     "migration:revert": "npm run typeorm -- migration:revert",
     "seed": "ts-node src/database/seeds/seed.ts",
     "test": "jest --config test/jest.unit.json",
+    "test:watch": "jest --config test/jest.unit.json --watch",
     "test:integracion": "jest --config test/jest.integracion.json --runInBand",
     "test:cov": "jest --config test/jest.cobertura.json --runInBand --coverage",
     "test:cobertura": "jest --config test/jest.cobertura.json --runInBand --coverage"
@@ -43,6 +45,7 @@
     "typeorm": "^0.3.20"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@nestjs/cli": "^10.4.5",
     "@nestjs/testing": "^10.4.4",
     "@types/bcryptjs": "^2.4.6",
@@ -51,10 +54,12 @@
     "@types/node": "^22.7.4",
     "@types/passport-jwt": "^4.0.1",
     "@types/supertest": "^6.0.2",
+    "eslint": "^10.10.0",
     "jest": "^29.7.0",
     "supertest": "^7.0.0",
     "ts-jest": "^29.2.5",
     "ts-node": "^10.9.2",
-    "typescript": "^5.6.2"
+    "typescript": "^5.6.2",
+    "typescript-eslint": "^8.69.0"
   }
 }

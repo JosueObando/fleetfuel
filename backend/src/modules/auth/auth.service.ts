@@ -179,7 +179,7 @@ export class AuthService {
       // un token robado sirva una vez y su uso delate al ladrón o al legítimo.
       await this.tokens.revocar(carga.jti as string);
       return this.emitir(
-        { empresa_id: usuario.empresa_id, usuario_id: usuario.usuario_id, nombre: usuario.nombre } as FilaLogin,
+        { empresa_id: usuario.empresa_id, usuario_id: usuario.usuario_id, nombre: usuario.nombre },
         usuario.correo ?? '',
         roles, permisos, carga.disp ?? null,
       );

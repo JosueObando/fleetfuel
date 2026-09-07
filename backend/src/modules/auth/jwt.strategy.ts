@@ -27,6 +27,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
+  /* `async` sin `await` a propósito, y por eso se silencia la regla: los
+     rechazos de aquí son `throw` SÍNCRONOS, y con `async` llegan a Passport
+     como promesa rechazada —que es lo que sabe convertir en 401—. Sin `async`
+     saldrían como excepción síncrona dentro de su callback de verificación,
+     que es otro camino y otro resultado. */
+  // eslint-disable-next-line @typescript-eslint/require-await
   async validate(carga: CargaJwt): Promise<UsuarioAutenticado> {
     // Un refresh token está firmado con otro secreto, así que no debería llegar
     // aquí; la comprobación es barata y cubre el día que alguien unifique los
