@@ -298,10 +298,28 @@ export class ViajesService {
 
     // El acumulado de la línea se actualiza aquí y no se recalcula al leer:
     // es lo que la regla 4 consulta en la siguiente asignación.
-    await gestor().query(
-      `UPDATE detalles_orden
-          SET volumen_planificado = volumen_planificado + $2, actualizado_en = now()
-        WHERE detalle_orden_id = $1`, [dto.detalleOrdenId, dto.volumenPlanificado]);
+    //
+    // Se escribe `volumen_planificado + $2` y NO un total precalculado a
+    // propósito: en READ COMMITTED, una segunda petición que espere el cerrojo
+    // de esta fila reevalúa la suma sobre la versión ya confirmada. Es lo que
+    // hace que `ck_detalles_planificado_cabe` vea el total verdadero y cierre
+    // la carrera que la regla 4, por sí sola, no puede cerrar.
+    try {
+      await gestor().query(
+        `UPDATE detalles_orden
+            SET volumen_planificado = volumen_planificado + $2, actualizado_en = now()
+          WHERE detalle_orden_id = $1`, [dto.detalleOrdenId, dto.volumenPlanificado]);
+    } catch (e) {
+      // La cota de la base saltando aquí sólo puede significar una cosa: otra
+      // petición planificó parte de esta misma línea entre que la regla 4 leyó
+      // el acumulado y este UPDATE lo escribió. Es un conflicto de negocio
+      // perfectamente normal, y sin esta traducción sería un 500 —el mismo
+      // motivo por el que `traducirSolapamiento` existe para el 23P01—.
+      if ((e as { constraint?: string }).constraint === 'ck_detalles_planificado_cabe')
+        throw new ConflictException(
+          'Otra planificación ocupó ese volumen mientras se guardaba esta; vuelva a consultar lo que queda por planificar');
+      throw e;
+    }
 
     auditar({ entidad: 'plan_carga', entidadId: String(viajeId), valorNuevo: { ...dto } });
     return this.obtener(viajeId);

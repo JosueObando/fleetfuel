@@ -76,13 +76,13 @@ async function viajeCompleto(s: ViajesService, estado = 'borrador') {
     cisternaId: cisterna,
     conductorId: conductor,
     fechaProgramada: '2027-03-01T08:00:00Z',
-  } as never);
+  });
   // El plan de carga sólo admite líneas de órdenes YA asignadas al viaje: una
   // línea que apunte a una orden ajena sería carga sin destinatario.
-  await s.asignarOrden(String(v.id), { ordenId: orden, secuenciaEntrega: 1 } as never);
+  await s.asignarOrden(String(v.id), { ordenId: orden, secuenciaEntrega: 1 });
   await s.agregarLineaPlan(String(v.id), {
     compartimentoId: compartimento, detalleOrdenId: detalleOrden, volumenPlanificado: 1000,
-  } as never);
+  });
   if (estado !== 'borrador') await forzarEstado(String(v.id), estado);
   return String(v.id);
 }
@@ -96,8 +96,8 @@ async function viajeConOrden(s: ViajesService) {
     cisternaId: cisterna,
     conductorId: conductor,
     fechaProgramada: '2027-05-01T08:00:00Z',
-  } as never);
-  await s.asignarOrden(String(v.id), { ordenId: orden, secuenciaEntrega: 1 } as never);
+  });
+  await s.asignarOrden(String(v.id), { ordenId: orden, secuenciaEntrega: 1 });
   return String(v.id);
 }
 
@@ -218,7 +218,7 @@ describe('cambiarEstado · la máquina que la base no puede vigilar', () => {
       const id = await viajeCompleto(s);
       // borrador → cargando se salta media operación: el camión estaría
       // cargando sin haber sido autorizado ni haber llegado a la terminal.
-      await expect(s.cambiarEstado(id, { estado: 'cargando' } as never))
+      await expect(s.cambiarEstado(id, { estado: 'cargando' }))
         .rejects.toThrow(/No se puede pasar de "borrador" a "cargando"/);
     });
   });
@@ -227,7 +227,7 @@ describe('cambiarEstado · la máquina que la base no puede vigilar', () => {
     // Un «no se puede» a secas obliga a leer el código para saber qué hacer.
     await enServicio(async s => {
       const id = await viajeCompleto(s);
-      await expect(s.cambiarEstado(id, { estado: 'cargando' } as never))
+      await expect(s.cambiarEstado(id, { estado: 'cargando' }))
         .rejects.toThrow(/Posibles: programado, cancelado/);
     });
   });
@@ -235,7 +235,7 @@ describe('cambiarEstado · la máquina que la base no puede vigilar', () => {
   it('desde un estado final no se sale, y lo dice como tal', async () => {
     await enServicio(async s => {
       const id = await viajeCompleto(s, 'cerrado');
-      await expect(s.cambiarEstado(id, { estado: 'programado' } as never))
+      await expect(s.cambiarEstado(id, { estado: 'programado' }))
         .rejects.toThrow(/"cerrado" es un estado final/);
     });
   });
@@ -245,7 +245,7 @@ describe('cambiarEstado · la máquina que la base no puede vigilar', () => {
     // viaje no ocurrió.
     await enServicio(async s => {
       const id = await viajeCompleto(s);
-      await expect(s.cambiarEstado(id, { estado: 'cancelado' } as never))
+      await expect(s.cambiarEstado(id, { estado: 'cancelado' }))
         .rejects.toThrow(/exige indicar el motivo/);
     });
   });
@@ -253,7 +253,7 @@ describe('cambiarEstado · la máquina que la base no puede vigilar', () => {
   it('cancelar con motivo se acepta y el motivo queda guardado', async () => {
     await enServicio(async s => {
       const id = await viajeCompleto(s);
-      const v = await s.cambiarEstado(id, { estado: 'cancelado', motivo: 'Avería del cabezal' } as never);
+      const v = await s.cambiarEstado(id, { estado: 'cancelado', motivo: 'Avería del cabezal' });
       expect(v.estado).toBe('cancelado');
       expect(v.motivoCancelacion).toBe('Avería del cabezal');
     });
@@ -266,9 +266,9 @@ describe('cambiarEstado · la máquina que la base no puede vigilar', () => {
         codigoViaje: `SRV-SINPLAN-${Math.random().toString(36).slice(2, 7)}`,
         tipoViaje: 'simple', cisternaId: cisterna, conductorId: conductor,
         fechaProgramada: '2027-04-01T08:00:00Z',
-      } as never);
+      });
       await forzarEstado(String(v.id), 'autorizado');
-      await expect(s.cambiarEstado(String(v.id), { estado: 'desplazamiento_terminal' } as never))
+      await expect(s.cambiarEstado(String(v.id), { estado: 'desplazamiento_terminal' }))
         .rejects.toThrow(/no tiene plan de carga/);
     });
   });
@@ -281,7 +281,7 @@ describe('cambiarEstado · la máquina que la base no puede vigilar', () => {
       const antes = await s.obtener(id);
       expect(antes.fechaInicio).toBeNull();
 
-      const despues = await s.cambiarEstado(id, { estado: 'desplazamiento_terminal' } as never);
+      const despues = await s.cambiarEstado(id, { estado: 'desplazamiento_terminal' });
       expect(despues.fechaInicio).not.toBeNull();
       expect(Math.abs(Date.now() - new Date(despues.fechaInicio).getTime())).toBeLessThan(60_000);
     });
@@ -339,7 +339,7 @@ describe('autorizar · la separación entre quien planifica y quien deja salir',
         codigoViaje: `SRV-AUT-${Math.random().toString(36).slice(2, 7)}`,
         tipoViaje: 'simple', cisternaId: cisterna, conductorId: conductor,
         fechaProgramada: '2027-07-01T08:00:00Z',
-      } as never);
+      });
       await forzarEstado(String(v.id), 'programado');
       await expect(s.autorizar(String(v.id))).rejects.toThrow(/no tiene plan de carga/);
     });
@@ -380,7 +380,7 @@ describe('autorizar · la separación entre quien planifica y quien deja salir',
         codigoViaje: `SRV-LIBRE-${Math.random().toString(36).slice(2, 7)}`,
         tipoViaje: 'simple', cisternaId: cisterna, conductorId: conductor,
         fechaProgramada: '2027-11-01T08:00:00Z',
-      } as never);
+      });
       const sinCisterna = await s.actualizar(String(v.id), { cisternaId: null } as never);
       expect(sinCisterna.cisternaId).toBeNull();
     });
@@ -407,12 +407,12 @@ describe('el solapamiento del §5.1 llega como error de negocio, no como 500', (
         codigoViaje: `SRV-OC1-${Math.random().toString(36).slice(2, 7)}`,
         tipoViaje: 'simple', cisternaId: cisterna,
         fechaProgramada: '2027-09-01T08:00:00Z', fechaFin: '2027-09-01T18:00:00Z',
-      } as never);
+      });
       await expect(s.crear({
         codigoViaje: `SRV-OC2-${Math.random().toString(36).slice(2, 7)}`,
         tipoViaje: 'simple', cisternaId: cisterna,
         fechaProgramada: '2027-09-01T12:00:00Z', fechaFin: '2027-09-01T20:00:00Z',
-      } as never)).rejects.toThrow(/La cisterna ya tiene otro viaje que se superpone/);
+      })).rejects.toThrow(/La cisterna ya tiene otro viaje que se superpone/);
     });
   });
 
@@ -422,12 +422,12 @@ describe('el solapamiento del §5.1 llega como error de negocio, no como 500', (
         codigoViaje: `SRV-OC3-${Math.random().toString(36).slice(2, 7)}`,
         tipoViaje: 'simple', conductorId: conductor,
         fechaProgramada: '2027-10-01T08:00:00Z', fechaFin: '2027-10-01T18:00:00Z',
-      } as never);
+      });
       await expect(s.crear({
         codigoViaje: `SRV-OC4-${Math.random().toString(36).slice(2, 7)}`,
         tipoViaje: 'simple', conductorId: conductor,
         fechaProgramada: '2027-10-01T12:00:00Z', fechaFin: '2027-10-01T20:00:00Z',
-      } as never)).rejects.toThrow(/El conductor ya tiene otro viaje que se superpone/);
+      })).rejects.toThrow(/El conductor ya tiene otro viaje que se superpone/);
     });
   });
 });
@@ -467,7 +467,7 @@ describe('asignarOrden · qué órdenes entran en un viaje y cuáles no', () => 
       const v = await viajeConOrden(s);
       await expect(s.asignarOrden(v, {
         ordenId: '999999999', secuenciaEntrega: 2,
-      } as never)).rejects.toThrow('La orden indicada no existe');
+      })).rejects.toThrow('La orden indicada no existe');
     });
   });
 
@@ -476,7 +476,7 @@ describe('asignarOrden · qué órdenes entran en un viaje y cuáles no', () => 
     // la calle un pedido que nadie ha confirmado.
     await enServicio(async (s) => {
       const v = await viajeConOrden(s);
-      await expect(s.asignarOrden(v, { ordenId: ordenRecibida, secuenciaEntrega: 2 } as never))
+      await expect(s.asignarOrden(v, { ordenId: ordenRecibida, secuenciaEntrega: 2 }))
         .rejects.toThrow(/no se puede asignar a un viaje; debe estar validada/);
     });
   });
@@ -484,7 +484,7 @@ describe('asignarOrden · qué órdenes entran en un viaje y cuáles no', () => 
   it('el rechazo dice en qué estado ESTÁ la orden, no sólo que no vale', async () => {
     await enServicio(async (s) => {
       const v = await viajeConOrden(s);
-      await expect(s.asignarOrden(v, { ordenId: ordenRecibida, secuenciaEntrega: 2 } as never))
+      await expect(s.asignarOrden(v, { ordenId: ordenRecibida, secuenciaEntrega: 2 }))
         .rejects.toThrow(/"recibida"/);
     });
   });
@@ -492,7 +492,7 @@ describe('asignarOrden · qué órdenes entran en un viaje y cuáles no', () => 
   it('la misma orden dos veces en el mismo viaje se rechaza', async () => {
     await enServicio(async (s) => {
       const v = await viajeConOrden(s);
-      await expect(s.asignarOrden(v, { ordenId: orden, secuenciaEntrega: 2 } as never))
+      await expect(s.asignarOrden(v, { ordenId: orden, secuenciaEntrega: 2 }))
         .rejects.toThrow(/ya está en el viaje, o esa secuencia ya está ocupada/);
     });
   });
@@ -503,7 +503,7 @@ describe('asignarOrden · qué órdenes entran en un viaje y cuáles no', () => 
     await enServicio(async (s) => {
       const v = await viajeConOrden(s);
       await forzarEstado(v, 'autorizado');
-      await expect(s.asignarOrden(v, { ordenId: orden, secuenciaEntrega: 2 } as never))
+      await expect(s.asignarOrden(v, { ordenId: orden, secuenciaEntrega: 2 }))
         .rejects.toThrow(/ya no admite órdenes nuevas/);
     });
   });
@@ -516,7 +516,7 @@ describe('agregarLineaPlan · lo que impide que un camión salga mal cargado', (
       await expect(s.agregarLineaPlan(v, {
         compartimentoId: '999999999',
         detalleOrdenId: detalleOrden, volumenPlanificado: 100,
-      } as never)).rejects.toThrow('El compartimento indicado no existe');
+      })).rejects.toThrow('El compartimento indicado no existe');
     });
   });
 
@@ -527,7 +527,7 @@ describe('agregarLineaPlan · lo que impide que un camión salga mal cargado', (
       const v = await viajeConOrden(s);
       await expect(s.agregarLineaPlan(v, {
         compartimentoId: compartimentoAjeno, detalleOrdenId: detalleOrden, volumenPlanificado: 100,
-      } as never)).rejects.toThrow('Ese compartimento no pertenece a la cisterna del viaje');
+      })).rejects.toThrow('Ese compartimento no pertenece a la cisterna del viaje');
     });
   });
 
@@ -538,7 +538,7 @@ describe('agregarLineaPlan · lo que impide que un camión salga mal cargado', (
       const v = await viajeConOrden(s);
       await expect(s.agregarLineaPlan(v, {
         compartimentoId: compartimento, detalleOrdenId: detalleAjeno, volumenPlanificado: 100,
-      } as never)).rejects.toThrow(/no pertenece a ninguna orden asignada a este viaje/);
+      })).rejects.toThrow(/no pertenece a ninguna orden asignada a este viaje/);
     });
   });
 
@@ -549,7 +549,7 @@ describe('agregarLineaPlan · lo que impide que un camión salga mal cargado', (
       const v = await viajeConOrden(s);
       await expect(s.agregarLineaPlan(v, {
         compartimentoId: compartimento, detalleOrdenId: detalleOrden, volumenPlanificado: 4990,
-      } as never)).rejects.toThrow(/admite 4980/);
+      })).rejects.toThrow(/admite 4980/);
     });
   });
 
@@ -558,11 +558,11 @@ describe('agregarLineaPlan · lo que impide que un camión salga mal cargado', (
       const v = await viajeConOrden(s);
       await s.agregarLineaPlan(v, {
         compartimentoId: compartimento, detalleOrdenId: detalleOrden, volumenPlanificado: 4000,
-      } as never);
+      });
       // Pedidos 5000, planificados 4000: quedan 1000 y se piden 1500.
       await expect(s.agregarLineaPlan(v, {
         compartimentoId: compartimentoSoloDiesel, detalleOrdenId: detalleOrden, volumenPlanificado: 1500,
-      } as never)).rejects.toThrow(/le quedan 1000 por planificar/);
+      })).rejects.toThrow(/le quedan 1000 por planificar/);
     });
   });
 
@@ -573,7 +573,7 @@ describe('agregarLineaPlan · lo que impide que un camión salga mal cargado', (
       const v = await viajeConOrden(s);
       await expect(s.agregarLineaPlan(v, {
         compartimentoId: compartimentoSoloDiesel, detalleOrdenId: detalleOrden, volumenPlanificado: 500,
-      } as never)).rejects.toThrow('Ese compartimento no admite el producto de esa línea');
+      })).rejects.toThrow('Ese compartimento no admite el producto de esa línea');
     });
   });
 
@@ -582,10 +582,10 @@ describe('agregarLineaPlan · lo que impide que un camión salga mal cargado', (
       const v = await viajeConOrden(s);
       await s.agregarLineaPlan(v, {
         compartimentoId: compartimento, detalleOrdenId: detalleOrden, volumenPlanificado: 500,
-      } as never);
+      });
       await expect(s.agregarLineaPlan(v, {
         compartimentoId: compartimento, detalleOrdenId: detalleOrden, volumenPlanificado: 500,
-      } as never)).rejects.toThrow(/ya tiene carga asignada en este viaje/);
+      })).rejects.toThrow(/ya tiene carga asignada en este viaje/);
     });
   });
 
@@ -595,11 +595,11 @@ describe('agregarLineaPlan · lo que impide que un camión salga mal cargado', (
         codigoViaje: `NOC-${Math.random().toString(36).slice(2, 9)}`,
         tipoViaje: 'simple', conductorId: conductor,
         fechaProgramada: '2027-06-01T08:00:00Z',
-      } as never);
-      await s.asignarOrden(String(v.id), { ordenId: orden, secuenciaEntrega: 1 } as never);
+      });
+      await s.asignarOrden(String(v.id), { ordenId: orden, secuenciaEntrega: 1 });
       await expect(s.agregarLineaPlan(String(v.id), {
         compartimentoId: compartimento, detalleOrdenId: detalleOrden, volumenPlanificado: 100,
-      } as never)).rejects.toThrow('El viaje no tiene cisterna asignada');
+      })).rejects.toThrow('El viaje no tiene cisterna asignada');
     });
   });
 
@@ -609,7 +609,269 @@ describe('agregarLineaPlan · lo que impide que un camión salga mal cargado', (
       await forzarEstado(v, 'cargando');
       await expect(s.agregarLineaPlan(v, {
         compartimentoId: compartimento, detalleOrdenId: detalleOrden, volumenPlanificado: 100,
-      } as never)).rejects.toThrow(/el plan de carga ya está cerrado/);
+      })).rejects.toThrow(/el plan de carga ya está cerrado/);
     });
   });
+});
+
+/** Lee el acumulado de una línea de orden DENTRO de la misma transacción. */
+async function volumenPlanificadoDe(detalleId: string): Promise<number> {
+  const { gestor } = await import('../src/common/contexto/contexto-peticion');
+  const [f] = await gestor().query(
+    `SELECT volumen_planificado FROM detalles_orden WHERE detalle_orden_id = $1`, [detalleId]);
+  return Number(f.volumen_planificado);
+}
+
+/*
+ * ─────────────────────────────────────────────────────────────────────────────
+ * El acumulado `detalles_orden.volumen_planificado`.
+ *
+ * Lo escriben dos sitios —`agregarLineaPlan` suma, `quitarLineaPlan` resta— y
+ * lo lee uno: la regla 4, que decide si cabe más carga. Hasta aquí NINGUNA
+ * prueba afirmaba su VALOR: las diez de `agregarLineaPlan` son casos de rechazo
+ * y comprueban el mensaje, no el número que queda en la fila.
+ *
+ * Se midió qué tan ciego era el hueco cambiando el `-` de la devolución por un
+ * `+` —el error de signo más ordinario que existe—: 58 pruebas verdes con el
+ * fallo dentro. Estas son las que lo ven.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+describe('el acumulado de la línea de orden · el número del que depende la regla 4', () => {
+  it('planificar SUMA el volumen al acumulado de la línea', async () => {
+    await enServicio(async (s) => {
+      const v = await viajeConOrden(s);
+      expect(await volumenPlanificadoDe(detalleOrden)).toBe(0);
+      await s.agregarLineaPlan(v, {
+        compartimentoId: compartimento, detalleOrdenId: detalleOrden, volumenPlanificado: 1200,
+      });
+      expect(await volumenPlanificadoDe(detalleOrden)).toBe(1200);
+    });
+  });
+
+  it('dos compartimentos acumulan: la regla 4 lee la SUMA, no la última línea', async () => {
+    // Sin esto, un acumulado que se sobrescribiera en vez de sumar pasaría
+    // desapercibido mientras cada asignación por separado cupiera.
+    await enServicio(async (s) => {
+      const v = await viajeConOrden(s);
+      await s.agregarLineaPlan(v, {
+        compartimentoId: compartimento, detalleOrdenId: detalleOrden, volumenPlanificado: 3000,
+      });
+      await s.agregarLineaPlan(v, {
+        compartimentoId: compartimentoSoloDiesel, detalleOrdenId: detalleOrden,
+        volumenPlanificado: 1500,
+      }).catch(() => undefined); // el de diésel rechaza por producto
+      expect(await volumenPlanificadoDe(detalleOrden)).toBe(3000);
+      // Pedidos 5000, planificados 3000: la regla 4 tiene que ver 2000 libres.
+      await expect(s.agregarLineaPlan(v, {
+        compartimentoId: compartimentoAjeno, detalleOrdenId: detalleOrden, volumenPlanificado: 2500,
+      })).rejects.toThrow(/no pertenece a la cisterna/);
+    });
+  });
+
+  it('quitar una línea DEVUELVE el volumen al acumulado', async () => {
+    // El comentario del servicio promete que «si no, quedaría planificado para
+    // siempre y la orden parecería cubierta sin estarlo». Esto es lo que lo
+    // comprueba: hasta ahora ese cuerpo no se ejecutaba en ninguna prueba.
+    await enServicio(async (s) => {
+      const v = await viajeConOrden(s);
+      const conPlan = await s.agregarLineaPlan(v, {
+        compartimentoId: compartimento, detalleOrdenId: detalleOrden, volumenPlanificado: 2000,
+      });
+      expect(await volumenPlanificadoDe(detalleOrden)).toBe(2000);
+
+      await s.quitarLineaPlan(v, String(conPlan.planCarga[0].id));
+      expect(await volumenPlanificadoDe(detalleOrden)).toBe(0);
+    });
+  });
+
+  it('quitar una línea la saca del plan de carga del viaje', async () => {
+    await enServicio(async (s) => {
+      const v = await viajeConOrden(s);
+      const conPlan = await s.agregarLineaPlan(v, {
+        compartimentoId: compartimento, detalleOrdenId: detalleOrden, volumenPlanificado: 500,
+      });
+      expect(conPlan.planCarga).toHaveLength(1);
+      const sinPlan = await s.quitarLineaPlan(v, String(conPlan.planCarga[0].id));
+      expect(sinPlan.planCarga).toHaveLength(0);
+    });
+  });
+
+  it('el hueco devuelto se puede volver a planificar: es el ciclo completo', async () => {
+    // Corregir un plan de carga —quitar los 5000 mal puestos y repartirlos
+    // bien— es la operación normal de un despachador, no un caso raro. Si la
+    // devolución falla, el segundo intento choca contra la regla 4 y la orden
+    // queda imposible de planificar sin tocar la base a mano.
+    await enServicio(async (s) => {
+      const v = await viajeConOrden(s);
+      const conPlan = await s.agregarLineaPlan(v, {
+        compartimentoId: compartimento, detalleOrdenId: detalleOrden, volumenPlanificado: 4980,
+      });
+      await s.quitarLineaPlan(v, String(conPlan.planCarga[0].id));
+      await s.agregarLineaPlan(v, {
+        compartimentoId: compartimento, detalleOrdenId: detalleOrden, volumenPlanificado: 4980,
+      });
+      expect(await volumenPlanificadoDe(detalleOrden)).toBe(4980);
+    });
+  });
+
+  it('una línea que no es de este viaje no se puede quitar', async () => {
+    await enServicio(async (s) => {
+      const v = await viajeConOrden(s);
+      await expect(s.quitarLineaPlan(v, '999999999'))
+        .rejects.toThrow('Esa línea no está en el plan de carga del viaje');
+    });
+  });
+
+  it('con el viaje ya en marcha el plan no se toca, y el acumulado no se mueve', async () => {
+    await enServicio(async (s) => {
+      const v = await viajeConOrden(s);
+      const conPlan = await s.agregarLineaPlan(v, {
+        compartimentoId: compartimento, detalleOrdenId: detalleOrden, volumenPlanificado: 700,
+      });
+      await forzarEstado(v, 'cargando');
+      await expect(s.quitarLineaPlan(v, String(conPlan.planCarga[0].id)))
+        .rejects.toThrow(/el plan de carga ya está cerrado/);
+      expect(await volumenPlanificadoDe(detalleOrden)).toBe(700);
+    });
+  });
+});
+
+/*
+ * ─────────────────────────────────────────────────────────────────────────────
+ * La cota del acumulado vive TAMBIÉN en la base.
+ *
+ * La regla 4 del servicio lee el acumulado y después lo escribe. Entre esas dos
+ * cosas no hay cerrojo: dos peticiones simultáneas sobre la misma línea leen
+ * las dos 0, las dos pasan la regla con 3000 sobre una orden de 5000, y el
+ * acumulado acaba en 6000. La `ck_detalles_volumenes` original sólo exigía
+ * `>= 0`, así que nada rechazaba ese estado: la orden quedaba marcada como
+ * planificada de más y la regla 4 empezaba a rechazar carga legítima.
+ *
+ * Estas pruebas van contra la BASE a propósito, saltándose el servicio. Es la
+ * única forma de comprobar que la garantía se sostiene sola, que es justo lo
+ * que se le pide a una restricción: valer también cuando el camino que la
+ * respeta no es el que escribe.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+describe('la cota del acumulado · lo que el servicio no puede prometer solo', () => {
+  it('la base rechaza un acumulado por encima de lo solicitado', async () => {
+    await enServicio(async () => {
+      const { gestor } = await import('../src/common/contexto/contexto-peticion');
+      // La línea pide 5000. 6000 es el estado que deja la carrera de dos
+      // peticiones concurrentes, y ningún camino de la aplicación lo escribe.
+      await expect(gestor().query(
+        `UPDATE detalles_orden SET volumen_planificado = 6000 WHERE detalle_orden_id = $1`,
+        [detalleOrden])).rejects.toThrow(/ck_detalles_planificado_cabe/);
+    });
+  });
+
+  it('planificar EXACTAMENTE lo solicitado sí se permite: la cota no es estricta', async () => {
+    // Una cota mal escrita con `<` en vez de `<=` haría imposible cubrir una
+    // orden entera, que es el caso normal y no el excepcional.
+    await enServicio(async () => {
+      const { gestor } = await import('../src/common/contexto/contexto-peticion');
+      await gestor().query(
+        `UPDATE detalles_orden SET volumen_planificado = 5000 WHERE detalle_orden_id = $1`,
+        [detalleOrden]);
+      expect(await volumenPlanificadoDe(detalleOrden)).toBe(5000);
+    });
+  });
+});
+
+/*
+ * ─────────────────────────────────────────────────────────────────────────────
+ * La carrera de verdad, con dos conexiones.
+ *
+ * Las pruebas de arriba comprueban que la cota existe. Ésta comprueba lo que la
+ * migración AFIRMA de ella: que cierra la ventana entre la lectura de la regla
+ * 4 y su escritura, en vez de limitarse a denunciarla después.
+ *
+ * Necesita salirse del molde del fichero —dos conexiones y un COMMIT real, no
+ * una transacción que se deshace— porque una carrera entre transacciones no se
+ * puede simular dentro de una sola. Todo lo que confirma se limpia al final.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+describe('dos peticiones a la vez sobre la misma línea', () => {
+  it('la segunda acaba en conflicto legible, no en un acumulado imposible', async () => {
+    // El viaje tiene que estar CONFIRMADO para que la segunda conexión lo vea.
+    const [v] = await dueño.query(
+      `INSERT INTO viajes (empresa_id, codigo_viaje, tipo_viaje, cisterna_id, conductor_id,
+                           fecha_programada)
+       VALUES ($1,'CARRERA-1','simple',$2,$3,'2029-02-01T08:00:00Z') RETURNING viaje_id`,
+      [empresa, cisterna, conductor]);
+    const viaje = String(v.viaje_id);
+    await dueño.query(
+      `INSERT INTO viaje_ordenes (empresa_id, viaje_id, orden_id, secuencia_entrega)
+       VALUES ($1,$2,$3,1)`, [empresa, viaje, orden]);
+
+    const t1 = app.createQueryRunner();
+    const t2 = app.createQueryRunner();
+    try {
+      await t1.connect(); await t2.connect();
+      await t1.startTransaction(); await t2.startTransaction();
+      await t1.query(`SELECT set_config('app.empresa_id', $1, true)`, [empresa]);
+      await t2.query(`SELECT set_config('app.empresa_id', $1, true)`, [empresa]);
+      // Se pide AHORA, mientras la conexión está libre: cuando esté bloqueada
+      // en el UPDATE ya no puede responder a nada.
+      const pid2 = (await t2.query(`SELECT pg_backend_pid() AS pid`))[0].pid;
+
+      // La primera petición planifica 3000 de los 5000 y aún no confirma.
+      await t1.query(
+        `UPDATE detalles_orden SET volumen_planificado = volumen_planificado + 3000
+          WHERE detalle_orden_id = $1`, [detalleOrden]);
+
+      // La segunda entra por el servicio y lee el acumulado ANTES de que la
+      // primera confirme: ve 0, cree que quedan 5000 y deja pasar sus 3000.
+      // Su UPDATE se queda entonces esperando el cerrojo de fila de la primera.
+      const segunda = ejecutarEnContexto(
+        { empresaId: empresa, usuarioId: usuario, manager: t2.manager, cambios: [] },
+        () => servicio.agregarLineaPlan(viaje, {
+          compartimentoId: compartimento, detalleOrdenId: detalleOrden,
+          volumenPlanificado: 3000,
+        }),
+      );
+      // Se espera a que la segunda esté REALMENTE esperando el cerrojo, no un
+      // rato fijo. Un `sleep` aquí no es lentitud, es intermitencia: si bajo
+      // carga la segunda no ha llegado al UPDATE cuando la primera confirma,
+      // su regla 4 lee ya 3000, rechaza por «le quedan 2000» y la prueba falla
+      // afirmando un mensaje que en esa corrida nunca tocaba. Se vio fallar así
+      // una vez de tres en la suite completa antes de escribirlo de esta forma.
+      const esperando = await (async () => {
+        for (let i = 0; i < 400; i++) {
+          const [a] = await dueño.query(
+            `SELECT wait_event_type FROM pg_stat_activity WHERE pid = $1`, [pid2]);
+          if (a?.wait_event_type === 'Lock') return true;
+          await new Promise((r) => setTimeout(r, 25));
+        }
+        return false;
+      })();
+      // Si nunca llegó a bloquearse no hay carrera que probar, y decirlo es
+      // mejor que dejar pasar una prueba que ya no comprueba lo que dice.
+      expect(esperando).toBe(true);
+
+      // Al confirmar la primera, la segunda despierta y reevalúa su suma sobre
+      // la fila ya confirmada: 3000 + 3000 = 6000 sobre una orden de 5000.
+      await t1.commitTransaction();
+
+      await expect(segunda).rejects.toThrow(/vuelva a consultar lo que queda por planificar/);
+      if (t2.isTransactionActive) await t2.rollbackTransaction();
+
+      const [f] = await dueño.query(
+        `SELECT volumen_planificado FROM detalles_orden WHERE detalle_orden_id = $1`,
+        [detalleOrden]);
+      expect(Number(f.volumen_planificado)).toBe(3000);
+    } finally {
+      if (t2.isTransactionActive) await t2.rollbackTransaction();
+      if (t1.isTransactionActive) await t1.rollbackTransaction();
+      await t1.release(); await t2.release();
+      // Lo confirmado por t1 sobrevive al rollback de la prueba: se deshace a
+      // mano o las pruebas siguientes arrancan con la línea medio planificada.
+      await dueño.query(`DELETE FROM plan_carga WHERE viaje_id = $1`, [viaje]);
+      await dueño.query(`DELETE FROM viaje_ordenes WHERE viaje_id = $1`, [viaje]);
+      await dueño.query(`DELETE FROM viajes WHERE viaje_id = $1`, [viaje]);
+      await dueño.query(
+        `UPDATE detalles_orden SET volumen_planificado = 0 WHERE detalle_orden_id = $1`,
+        [detalleOrden]);
+    }
+  }, 30_000);
 });
