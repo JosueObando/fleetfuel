@@ -1,6 +1,29 @@
 import express from 'express';
 import request from 'supertest';
-import { listaDeProxiesDeConfianza } from './proxy-de-confianza';
+import type { NestExpressApplication } from '@nestjs/platform-express';
+import type { ConfigService } from '@nestjs/config';
+import type { Logger } from '@nestjs/common';
+import { listaDeProxiesDeConfianza, configurarProxyDeConfianza } from './proxy-de-confianza';
+
+/**
+ * Monta Express PASANDO POR la función de producción, y no repitiendo su
+ * `app.set` a mano.
+ *
+ * Esa repetición era un punto ciego con forma de prueba: todo lo de este
+ * fichero comprobaba la propiedad de la LISTA, y nada comprobaba que
+ * `configurarProxyDeConfianza` fuera quien la instalaba. Medido cambiando su
+ * `app.set('trust proxy', lista)` por `true` —el valor que su propio comentario
+ * prohíbe, y que deja a cualquiera falsificar su IP en la auditoría y esquivar
+ * el freno por IP del login—: las 373 pruebas del backend seguían en verde.
+ */
+function configurado(valor: string): express.Express {
+  const expressApp = express();
+  const app = { set: (k: string, v: unknown) => expressApp.set(k, v) } as unknown as NestExpressApplication;
+  const config = { get: () => valor } as unknown as ConfigService;
+  const log = { log: () => undefined } as unknown as Logger;
+  configurarProxyDeConfianza(app, config, log);
+  return expressApp;
+}
 
 describe('listaDeProxiesDeConfianza', () => {
   it('no confía en nadie cuando la variable está vacía o ausente', () => {
@@ -35,11 +58,8 @@ describe('listaDeProxiesDeConfianza', () => {
  */
 describe('la cadena de confianza frente a las direcciones que manda Node', () => {
   /** La función que Express compila a partir de la lista, que es la que decide. */
-  const decisorPara = (valor: string) => {
-    const app = express();
-    app.set('trust proxy', listaDeProxiesDeConfianza(valor));
-    return app.get('trust proxy fn') as (ip: string, salto: number) => boolean;
-  };
+  const decisorPara = (valor: string) =>
+    configurado(valor).get('trust proxy fn') as (ip: string, salto: number) => boolean;
 
   const confia = decisorPara('10.0.0.19');
 
@@ -75,8 +95,7 @@ describe('la cadena de confianza frente a las direcciones que manda Node', () =>
  */
 describe('la IP que acaba en la auditoría', () => {
   const appCon = (valor: string) => {
-    const app = express();
-    app.set('trust proxy', listaDeProxiesDeConfianza(valor));
+    const app = configurado(valor);
     app.get('/eco', (req, res) => { res.json({ ip: req.ip }); });
     return app;
   };
@@ -100,5 +119,51 @@ describe('la IP que acaba en la auditoría', () => {
     const r = await request(appCon(''))
       .get('/eco').set('X-Forwarded-For', '1.2.3.4');
     expect(r.body.ip).not.toBe('1.2.3.4');
+  });
+});
+
+/*
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Lo que `configurarProxyDeConfianza` le entrega a Express.
+ *
+ * Los bloques de arriba prueban el COMPORTAMIENTO resultante; éste prueba la
+ * forma del valor, porque es donde está la prohibición explícita del fichero:
+ * «Se confía en una lista explícita de proxies y NUNCA en `true`».
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+describe('lo que se le pasa a Express', () => {
+  const espiar = (valor: string) => {
+    const puestos: Array<[string, unknown]> = [];
+    const app = { set: (k: string, v: unknown) => { puestos.push([k, v]); } } as unknown as NestExpressApplication;
+    const config = { get: () => valor } as unknown as ConfigService;
+    const log = { log: () => undefined } as unknown as Logger;
+    configurarProxyDeConfianza(app, config, log);
+    return puestos;
+  };
+
+  it('instala la LISTA, nunca `true`', () => {
+    const puestos = espiar('10.0.0.19, 10.0.0.20');
+    expect(puestos).toEqual([['trust proxy', ['10.0.0.19', '10.0.0.20']]]);
+    // Dicho aparte y a propósito: es la afirmación que falla si alguien
+    // «simplifica» a `true`, y el motivo por el que este bloque existe.
+    expect(puestos[0][1]).not.toBe(true);
+  });
+
+  it('sin proxies no toca `trust proxy` en absoluto', () => {
+    // No es lo mismo instalar una lista vacía que no instalar nada: se deja el
+    // valor por omisión de Express, que es no confiar en nadie. Tocarlo para
+    // decir «nadie» sólo añade una forma más de equivocarse.
+    expect(espiar('')).toEqual([]);
+    expect(espiar('   ')).toEqual([]);
+  });
+
+  it('avisa por el registro en los dos casos, que es como se descubre en un despliegue', () => {
+    const lineas: string[] = [];
+    const log = { log: (m: string) => lineas.push(m) } as unknown as Logger;
+    const app = { set: () => undefined } as unknown as NestExpressApplication;
+    configurarProxyDeConfianza(app, { get: () => '' } as unknown as ConfigService, log);
+    configurarProxyDeConfianza(app, { get: () => '10.0.0.19' } as unknown as ConfigService, log);
+    expect(lineas[0]).toMatch(/Sin proxy de confianza/);
+    expect(lineas[1]).toMatch(/10\.0\.0\.19/);
   });
 });

@@ -5,6 +5,7 @@ import { ConfigService } from '@nestjs/config';
 import { DataSource } from 'typeorm';
 import { AppModule } from './app.module';
 import { configurarProxyDeConfianza } from './config/proxy-de-confianza';
+import { PREFIJO_API } from './common/prefijo-api';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
@@ -13,7 +14,7 @@ async function bootstrap() {
 
   await verificarRolDeAplicacion(app.get(DataSource), config, log);
 
-  app.setGlobalPrefix('api');
+  app.setGlobalPrefix(PREFIJO_API);
   app.useGlobalPipes(
     new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
   );
@@ -53,4 +54,14 @@ async function verificarRolDeAplicacion(ds: DataSource, config: ConfigService, l
   log.log(`Conectado como "${actual}" — sujeto a Row Level Security.`);
 }
 
-bootstrap();
+/*
+ * El `.catch` no es formalidad. `verificarRolDeAplicacion` se NIEGA a levantar
+ * si la aplicación se conectó como dueño de las tablas —anularía la RLS sin un
+ * solo síntoma—, y sin este manejador ese rechazo sale como una promesa no
+ * atendida: un volcado de pila sin contexto justo cuando lo que hace falta es
+ * saber por qué no arrancó. Lo encontró `no-floating-promises`.
+ */
+bootstrap().catch((e: unknown) => {
+  new Logger('FleetFuel').error(`La API no pudo arrancar: ${(e as Error).message}`);
+  process.exit(1);
+});

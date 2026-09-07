@@ -1,6 +1,7 @@
 import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from '@nestjs/common';
 import { Observable, from } from 'rxjs';
 import { CambioAuditado, Contexto, contextoOpcional } from '../contexto/contexto-peticion';
+import { PREFIJO_API } from '../prefijo-api';
 
 const MUTACIONES = new Set(['POST', 'PATCH', 'PUT', 'DELETE']);
 
@@ -98,17 +99,43 @@ export function sanear(valor: unknown): Record<string, unknown> | null {
   return salida;
 }
 
-function entidadDeRuta(peticion: { route?: { path?: string }; url?: string }): string {
+/**
+ * El recurso del que habla la petición, para cuando el servicio no lo declaró.
+ *
+ * Se salta el prefijo global: sin eso el primer tramo es SIEMPRE `api` —lo es
+ * en todas las rutas del sistema— y la bitácora dejaba constancia de que algo
+ * pasó sin decir de qué, que es lo único para lo que sirve esta columna.
+ *
+ * Se queda con el recurso RAÍZ y no con el último tramo: de
+ * `/api/viajes/:id/plan-carga` sale `viajes`, no `plan-carga`, y de
+ * `/api/viajes/:id/autorizar` sale `viajes`, no `autorizar`. La columna
+ * `entidad` contiene hoy nombres de tabla, y la rama de reserva tiene que caer
+ * dentro de ese vocabulario en vez de meter verbos justo el día en que algo ya
+ * salió mal.
+ */
+export function entidadDeRuta(peticion: { route?: { path?: string }; url?: string }): string {
   const ruta = peticion.route?.path ?? peticion.url ?? '';
-  const primer = ruta.split('?')[0].split('/').filter((s) => s && !s.startsWith(':'))[0];
-  return primer ?? 'desconocida';
+  const tramos = ruta.split('?')[0].split('/').filter((s) => s && !s.startsWith(':'));
+  // El prefijo puede no venir —una prueba de extremo a extremo, otro montaje—,
+  // así que se quita si está en vez de saltar una posición a ciegas.
+  if (tramos[0] === PREFIJO_API) tramos.shift();
+  return tramos[0] ?? 'desconocida';
 }
 
-function idDe(resultado: unknown): string | null {
+/**
+ * El identificador que queda en `entidad_id`, cuando el servicio no lo declaró.
+ *
+ * Sólo se acepta un primitivo. `String(...)` sobre un objeto devuelve la cadena
+ * literal «[object Object]», y eso en la bitácora es peor que un hueco: un
+ * hueco se ve, y «[object Object]» parece un dato. Un `bigint` sí entra, que es
+ * lo que devuelve Postgres para un id que no cabe en un `number`.
+ */
+export function idDe(resultado: unknown): string | null {
   if (!resultado || typeof resultado !== 'object') return null;
   const r = resultado as Record<string, unknown>;
   const id = r.id ?? r.usuarioId ?? r.rolId ?? r.empresaId ?? r.dispositivoId;
-  return id == null ? null : String(id);
+  if (typeof id !== 'string' && typeof id !== 'number' && typeof id !== 'bigint') return null;
+  return String(id);
 }
 
 function firstValue(obs: Observable<unknown>): Promise<unknown> {
