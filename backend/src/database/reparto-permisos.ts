@@ -41,7 +41,7 @@ const LEER_CATALOGOS = CATALOGOS.map(m => `${m}:leer`);
 const LEER_OPERACION = [
   'ordenes:leer', 'viajes:leer', 'plancarga:leer', 'entregas:leer',
   'solicitudesruta:leer', 'gastos:leer', 'informes:leer', 'eventos:leer',
-  'gps:leer',
+  'gps:leer', 'alertas:leer', 'geocercas:leer',
 ];
 
 export const REPARTO: Record<string, string[]> = {
@@ -63,6 +63,8 @@ export const REPARTO: Record<string, string[]> = {
     ...TODOS('liquidaciones', ['leer', 'calcular', 'aprobar', 'pagar']),
     ...TODOS('eventos', ['leer', 'crear', 'anular']),
     ...TODOS('gps', ['leer', 'ingerir']),
+    'geocercas:leer', 'geocercas:administrar',
+    ...TODOS('alertas', ['leer', 'evaluar', 'resolver']),
   ],
 
   'Supervisor de operaciones': [
@@ -82,6 +84,8 @@ export const REPARTO: Record<string, string[]> = {
     // diferencias», que es vigilancia y no captura. Si tuviera las dos, quien
     // retira de la traza podría también haberla escrito.
     'eventos:anular',
+    // §5, literal: «monitorea rutas, retrasos, ALERTAS y diferencias».
+    'alertas:evaluar', 'alertas:resolver', 'geocercas:administrar',
   ],
 
   'Planificador de flota': [

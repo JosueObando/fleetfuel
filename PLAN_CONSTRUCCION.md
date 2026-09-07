@@ -606,10 +606,20 @@ rehacer liquidaciones contra un modelo de viaje que la operación real cambió.
       justo el proceso que se cae y deja el banner apagado
 - [x] **Kilómetros GPS del §10.1** y su diferencia contra el odómetro,
       calculados en PostGIS
-- [ ] Geocercas
-- [ ] Las 8 alertas del §22: desvío de ruta, exceso de velocidad, parada no
-      autorizada, pérdida de GPS, sello inconsistente, diferencia de volumen,
-      merma sobre tolerancia, vencimientos
+- [x] **Geocercas** (2026-09-07) — círculo definido por centro y radio, guardado
+      siempre como polígono `geography`: guardar centro+radio obligaría a cada
+      consulta a decidir si compara contra un círculo o contra un polígono, y
+      esa bifurcación acaba escrita distinto en cada sitio
+- [x] **Siete de las ocho alertas** del §22, más tres del listado ampliado:
+      exceso de velocidad, pérdida de GPS, sello inconsistente, diferencia de
+      volumen, vencimientos, viaje sin cerrar, liquidación pendiente y gasto
+      sin comprobante
+- [ ] **Desvío de ruta y parada no autorizada** — las dos que faltan, y por el
+      mismo motivo: necesitan la RUTA PLANIFICADA como geometría.
+      `viajes.ruta_planificada` es texto libre («Vía Centenario»), no una
+      polilínea. Inventarle un corredor a partir de las geocercas de sus
+      paradas daría falsos positivos en cada desvío legítimo por tráfico, que
+      es la forma más rápida de que un despachador desactive las alertas
 
 ### 2C · Solicitudes de cambio de ruta — ✅ decidido y cerrado
 

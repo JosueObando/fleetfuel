@@ -778,6 +778,55 @@ describe('telemetría · las cinco rutas de 2B', () => {
 });
 
 /*
+ * §22 · Geocercas y alertas. Nueve rutas. La que más dice de este módulo es
+ * `POST /alertas/evaluar` llamada dos veces: la segunda no crea nada.
+ */
+describe('geocercas y alertas · las nueve rutas del §22', () => {
+  it('crear geocerca, evaluar dos veces, reconocer y resolver', async () => {
+    const s = sello();
+    const geocerca = (await ruta('POST /geocercas',
+      api().post('/api/geocercas').set(cabPost()).send({
+        nombre: `Terminal ${s}`, tipo: 'terminal',
+        latitud: 8.9450, longitud: -79.5600, radioM: 500,
+      }), [201])).body;
+    // π·500² ≈ 785 398 m²: el radio está en metros de verdad.
+    expect(Number(geocerca.areaM2)).toBeGreaterThan(770_000);
+
+    await ruta('GET /geocercas', api().get('/api/geocercas').set(cab()), [200]);
+    await ruta('GET /geocercas/:id',
+      api().get(`/api/geocercas/${geocerca.id}`).set(cab()), [200]);
+
+    const { viaje } = await viajeHasta('transito_estacion', sello());
+    await ruta('GET /geocercas/viaje/:viajeId',
+      api().get(`/api/geocercas/viaje/${viaje.id}`).set(cab()), [200]);
+
+    // El viaje está en marcha y nunca mandó posición: pérdida de GPS.
+    const primera = await ruta('POST /alertas/evaluar',
+      api().post('/api/alertas/evaluar').set(cab()).send({}), [200, 201]);
+    expect(primera.body.nuevas).toBeGreaterThan(0);
+
+    // La segunda pasada no crea nada: la deduplicación es lo que separa una
+    // alerta del ruido.
+    const segunda = await api().post('/api/alertas/evaluar').set(cab()).send({}).expect(201);
+    expect(segunda.body.nuevas).toBe(0);
+
+    const lista = await ruta('GET /alertas', api().get('/api/alertas').set(cab()), [200]);
+    const suya = lista.body.find((a: { viajeId: string }) => String(a.viajeId) === String(viaje.id));
+    expect(suya.tipo).toBe('perdida_gps');
+
+    await ruta('GET /alertas/:id', api().get(`/api/alertas/${suya.id}`).set(cab()), [200]);
+    const reconocida = await ruta('POST /alertas/:id/reconocer',
+      api().post(`/api/alertas/${suya.id}/reconocer`).set(cabPost()).send({}), [200, 201]);
+    expect(reconocida.body.estado).toBe('reconocida');
+
+    const resuelta = await ruta('POST /alertas/:id/resolver',
+      api().post(`/api/alertas/${suya.id}/resolver`).set(cabPost())
+        .send({ motivo: 'Equipo GPS reemplazado en taller' }), [200, 201]);
+    expect(resuelta.body.estado).toBe('resuelta');
+  }, 120_000);
+});
+
+/*
  * ─────────────────────────────────────────────────────────────────────────────
  * Que no se quede ninguna ruta fuera, y que eso lo diga una prueba.
  *

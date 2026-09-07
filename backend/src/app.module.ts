@@ -38,6 +38,7 @@ import { LiquidacionesModule } from './modules/liquidaciones/liquidaciones.modul
 import { EventosModule } from './modules/eventos/eventos.module';
 import { SincronizacionModule } from './modules/sincronizacion/sincronizacion.module';
 import { GpsModule } from './modules/gps/gps.module';
+import { AlertasModule } from './modules/alertas/alertas.module';
 
 @Module({
   imports: [
@@ -54,6 +55,7 @@ import { GpsModule } from './modules/gps/gps.module';
     EventosModule,
     SincronizacionModule,
     GpsModule,
+    AlertasModule,
     ConfigModule.forRoot({
       isGlobal: true,
       load: [configuration],
