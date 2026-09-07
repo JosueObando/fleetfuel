@@ -45,10 +45,23 @@ export function MapView({ cargando, resumen = 'Ruta con 4 paradas; el vehículo 
           <p className="solo-lectores">{resumen}</p>
 
           <div className={estilos.superior}>
+            {/* Sin botón de chat, y es una decisión escrita (§2C, 2026-09-07):
+                el panel v1 sale sin él. El spec lo dibujaba junto a
+                `driver.chatChannelId`, pero no definía mensajes, ni
+                almacenamiento, ni transporte — así que no había nada que
+                conectarle. La elección entre integrar una mensajería existente
+                y construir una propia espera a que exista la app del conductor
+                (2A) y se sepa qué hay que decirle.
+
+                El plan pide que lo diferido se marque como diferido y NO se
+                deje dibujado: un botón que no hace nada promete una función que
+                nadie ha decidido construir, y el hueco que deja al quitarlo es
+                lo que hace que la decisión siga a la vista. El caso de uso real
+                —pedir un cambio de ruta y que otro lo autorice, con traza— ya
+                lo cubre `solicitudes_ruta`. */}
             <MapControl etiqueta="Capas del mapa" controles={[
               { icono: 'flota', titulo: 'Capas' },
               { icono: 'seguimiento', titulo: 'Centrar en el vehículo' },
-              { icono: 'ordenes', titulo: 'Abrir chat' },
             ]} />
           </div>
           <div className={estilos.inferior}>

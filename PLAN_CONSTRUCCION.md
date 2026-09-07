@@ -574,7 +574,7 @@ rehacer liquidaciones contra un modelo de viaje que la operación real cambió.
       autorizada, pérdida de GPS, sello inconsistente, diferencia de volumen,
       merma sobre tolerancia, vencimientos
 
-### 2C · Solicitudes de cambio de ruta — 🟡 decidido y construido a medias
+### 2C · Solicitudes de cambio de ruta — ✅ decidido y cerrado
 
 **No está en el PRD.** Se decidió el 2026-09-07: entra.
 
@@ -594,9 +594,8 @@ También aparece `driver.chatChannelId` en el modelo y un botón de chat en
 - [x] Permisos `solicitudesruta:leer/crear/resolver`, repartidos
 - [ ] Notificación a la app del conductor — **necesita la Fase 2A**, que es
       donde esa app existe. Lo que falta es el aviso, no el modelo
-- [x] Chat · `conductores.canal_chat`, que es LO ÚNICO que el spec define
-- [ ] Chat · **el transporte sigue sin decidir**, y sin eso no hay nada más que
-      construir. Ver abajo
+- [x] Chat · **DIFERIDO** el 2026-09-07: el panel v1 sale sin él. Botón retirado
+      de `MapView` y columna `canal_chat` retirada del esquema (migración 1795)
 
 ### La regla que hace que `RouteRequest` sea un control y no un formulario
 
@@ -634,10 +633,31 @@ caminos posibles— pero lo que falta no es código, es una decisión:
    conductor tiene que ser auditable, `solicitudes_ruta` ya cubre el caso de
    uso real —pedir y autorizar un cambio— y el chat sobra.
 
-Mi recomendación es la **3 para el panel v1** y decidir entre 1 y 2 cuando la
-app del conductor (2A) exista y se sepa qué se necesita decirle de verdad. Un
-botón dibujado que abre WhatsApp es la opción que parece gratis y deja la
-decisión tomada sin que nadie la tome.
+**Elegida la 3 el 2026-09-07.** El panel v1 sale sin chat, y la elección entre 1
+y 2 espera a que exista la app del conductor (2A) y se sepa qué hay que decirle
+de verdad. Un botón dibujado que abre WhatsApp es la opción que parece gratis y
+deja la decisión tomada sin que nadie la tome.
+
+Lo que se retiró, y por qué se retiró en vez de dejarlo esperando:
+
+- **El botón de `MapView`.** Un botón que no hace nada promete una función que
+  nadie ha decidido construir. El hueco que deja al quitarlo es lo que mantiene
+  la decisión a la vista.
+- **La columna `conductores.canal_chat`.** Su significado depende de la decisión
+  pendiente: con una mensajería externa sería un teléfono o un enlace; con una
+  propia, el identificador interno de un hilo. No son el mismo dato con dos
+  nombres. Y una columna así no se queda vacía —alguien la rellena—: si media
+  flota apunta ahí números de WhatsApp durante seis meses y luego se elige la
+  mensajería propia, ese contenido no se migra, se tira, y hasta que alguien lo
+  note el panel muestra un canal que no lleva a ninguna parte.
+
+Cuando la decisión se tome, las dos cosas vuelven con el significado que esa
+decisión les dé. Recrearlas cuesta una migración y un botón; desenredar datos
+con dos significados cuesta bastante más.
+
+**El caso de uso real ya está cubierto:** pedir un cambio de ruta y que otro lo
+autorice, con traza y con la separación de quien pide y quien resuelve, es
+`solicitudes_ruta`.
 
 **Criterio de salida de la Fase 2:** un conductor real recorre un viaje con la
 app sin cobertura durante un tramo, la cola de salida se drena al recuperar

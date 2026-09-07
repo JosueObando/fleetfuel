@@ -477,10 +477,7 @@ async function viajeHasta(estado: string, marca: string) {
   }).expect(201)).body;
   const conductor = (await api().post('/api/conductores').set(cabPost()).send({
     nombreCompleto: `Chofer ${marca}`, documento: `D-${marca}`, licencia: `L-${marca}`,
-    // §2C: el canal de chat es texto opaco; se comprueba que va y vuelve.
-    canalChat: `wa:+507${marca}`,
   }).expect(201)).body;
-  expect(conductor.canalChat).toBe(`wa:+507${marca}`);
 
   const orden = (await api().post('/api/ordenes').set(cabPost()).send({
     clienteId: String(cliente.id), estacionId: String(estacion.id),
