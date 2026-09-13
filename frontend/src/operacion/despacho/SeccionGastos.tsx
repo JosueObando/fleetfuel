@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Button } from '@/componentes/Button/Button';
 import { Campo } from '@/componentes/Campo/Campo';
 import { api } from '@/api/cliente';
+import { useUsuarioActual, puedeDarPorBueno } from '@/api/usuario-actual';
 import estilos from './despacho.module.css';
 import { miles } from './SeccionCargas';
 import type { Fila, Accion } from './tipos';
@@ -22,6 +23,7 @@ export function SeccionGastos({ viaje, gastos, totales, accion }: {
   viaje: Fila; gastos: Fila[]; totales: Fila | null; accion: Accion;
 }) {
   const abierto = !['cerrado', 'cancelado', 'borrador', 'programado'].includes(viaje.estado);
+  const yo = useUsuarioActual();
 
   return (
     <div className={estilos.seccion}>
@@ -51,9 +53,11 @@ export function SeccionGastos({ viaje, gastos, totales, accion }: {
                 <td className={estilos.num}>{miles(g.monto)}</td>
                 <td>{g.pagadoPor}{g.reembolsable ? ' · reembolsable' : ''}</td>
                 <td>{g.estado}</td>
-                <td>{g.estado === 'pendiente'
-                  ? <ResolverGasto gasto={g} accion={accion} />
-                  : (g.motivoResolucion ?? '—')}</td>
+                {/* Quien lo registró no lo aprueba (el servidor da 409): sobre lo
+                    propio no se ofrece el gesto, y sin saber quién mira tampoco. */}
+                <td>{g.estado !== 'pendiente' ? (g.motivoResolucion ?? '—')
+                  : puedeDarPorBueno(yo, g.registradoPor) ? <ResolverGasto gasto={g} accion={accion} />
+                  : yo !== null && 'Lo registraste tú: tiene que aprobarlo otra persona.'}</td>
               </tr>
             ))}
           </tbody>

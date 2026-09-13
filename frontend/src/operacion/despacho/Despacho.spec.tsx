@@ -65,13 +65,20 @@ const ENTREGA = {
 const GASTO = {
   id: 'x1', categoria: 'peaje', descripcion: 'Peajes', monto: '18.75',
   pagadoPor: 'conductor', reembolsable: true, estado: 'pendiente', registrante: 'Ana',
+  // Quién lo registró decide si quien mira puede aprobarlo: la API lo devuelve
+  // y el servidor lo aplica. Sin este campo las pruebas no veían la regla.
+  registradoPor: 'u2',
 };
+
+/** Quien mira la pantalla en estas pruebas. Nadie de las fixtures es él. */
+const YO = 'u7';
 
 const LIQUIDACION = {
   id: 'l1', codigoViaje: 'V-001', conductor: 'Ana Pérez', estado: 'pendiente',
   tarifaBase: '0.00', pagoKilometros: '24.00', pagoEntregas: '10.00',
   reembolsos: '18.75', viaticos: '0.00', bonificaciones: '0.00', penalizaciones: '0.00',
   totalPagar: '52.75', kilometros: '120.00', entregasContadas: 2,
+  calculadaPor: 'u2',
 };
 
 /** Respuestas por defecto: viaje cargando, una carga, sin entregas ni gastos. */
@@ -107,11 +114,16 @@ function conApi(opciones: {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  window.localStorage.setItem('fleetfuel.sesion', JSON.stringify({
+    accessToken: 't', usuario: { id: YO, nombre: 'Quien mira', correo: 'yo@x', roles: [] },
+  }));
   api.crear.mockResolvedValue({ id: 'nuevo' });
   api.actualizar.mockResolvedValue({});
   api.desactivar.mockResolvedValue(undefined);
   conApi();
 });
+
+afterEach(() => window.localStorage.clear());
 
 async function abrirViaje(usuario: ReturnType<typeof userEvent.setup>) {
   await screen.findByText('V-001');
@@ -319,6 +331,44 @@ describe('quien registra no es quien da por bueno', () => {
     await waitFor(() => expect(api.actualizar).toHaveBeenCalledWith(
       '/gastos/x1', { estado: 'aprobado', motivo: 'Comprobantes verificados' }));
   });
+
+  it('un gasto que registraste TÚ no se ofrece a aprobar, y dice quién tiene que hacerlo', async () => {
+    // El servidor lo rechaza con un 409. Un botón que existe para fallar enseña
+    // que los botones mienten.
+    const usuario = userEvent.setup();
+    conApi({ estado: 'descargando', cargas: [CARGA], gastos: [{ ...GASTO, registradoPor: YO }] });
+    render(<Despacho />);
+    await abrirViaje(usuario);
+
+    expect(await screen.findByText('Lo registraste tú: tiene que aprobarlo otra persona.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Aprobar gasto/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Rechazar gasto/i })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Motivo para el gasto/i)).not.toBeInTheDocument();
+  });
+
+  it('una liquidación que calculaste TÚ no se ofrece a aprobar', async () => {
+    const usuario = userEvent.setup();
+    conApi({ estado: 'cerrado', cargas: [CARGA], entregas: [ENTREGA],
+             liquidacion: { ...LIQUIDACION, calculadaPor: YO } });
+    render(<Despacho />);
+    await abrirViaje(usuario);
+
+    expect(await screen.findByText('La calculaste tú: tiene que aprobarla otra persona.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Aprobar liquidación/i })).not.toBeInTheDocument();
+  });
+
+  it('sin saber quién mira, no se ofrece aprobar nada: también sería ofrecer lo propio', async () => {
+    const usuario = userEvent.setup();
+    window.localStorage.clear();
+    conApi({ estado: 'cerrado', cargas: [CARGA], entregas: [ENTREGA], gastos: [GASTO],
+             liquidacion: LIQUIDACION });
+    render(<Despacho />);
+    await abrirViaje(usuario);
+
+    await screen.findByRole('region', { name: /Liquidación/i });
+    expect(screen.queryByRole('button', { name: /Aprobar liquidación/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Aprobar gasto/i })).not.toBeInTheDocument();
+  });
 });
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -359,6 +409,10 @@ describe('§15.5 · liquidación del viaje', () => {
 
     const pagar = await screen.findByRole('button', { name: /Registrar el pago/i });
     expect(pagar).toBeDisabled();
+    // `PagarLiquidacionDto` pide al menos 3: con dos, el botón aún no manda nada.
+    await usuario.type(screen.getByLabelText(/Referencia/i), 'TR');
+    expect(pagar).toBeDisabled();
+    await usuario.clear(screen.getByLabelText(/Referencia/i));
     await usuario.type(screen.getByLabelText(/Referencia/i), 'TRF-9001');
     await usuario.click(pagar);
     await waitFor(() => expect(api.crear).toHaveBeenCalledWith(

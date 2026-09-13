@@ -1,9 +1,8 @@
 'use client';
 
-import { useEffect, useState, useSyncExternalStore } from 'react';
-import {
-  api, ErrorApi, instantaneaDeSesion, sesionDelServidor, suscribirseASesion,
-} from '@/api/cliente';
+import { useEffect, useState } from 'react';
+import { api, ErrorApi } from '@/api/cliente';
+import { useUsuarioActual } from '@/api/usuario-actual';
 import type { Fila } from '@/api/tipos';
 import { Button } from '@/componentes/Button/Button';
 import { Campo } from '@/componentes/Campo/Campo';
@@ -15,9 +14,8 @@ import estilos from '../bandeja.module.css';
  *
  * QUIEN PIDE NO RESUELVE: el servidor lo impide con un 409, y la pantalla ni
  * siquiera ofrece el gesto sobre lo propio. Quién es «yo» se lee de la sesión
- * con `useSyncExternalStore`, igual que la puerta: durante la hidratación la
- * instantánea es la del servidor —nula—, y con sesión nula no se ofrece
- * resolver nada. Ofrecerlo todo sería ofrecer también lo propio.
+ * con `useUsuarioActual`: durante la hidratación es nulo, y con nulo no se
+ * ofrece resolver nada. Ofrecerlo todo sería ofrecer también lo propio.
  */
 
 const TIPOS: Record<string, { nombre: string; articulo: string; genero: 'o' | 'a' }> = {
@@ -39,8 +37,7 @@ const cuando = (v: unknown) => new Date(String(v)).toLocaleString('es-PA', {
 });
 
 export function Solicitudes() {
-  const sesion = useSyncExternalStore(suscribirseASesion, instantaneaDeSesion, sesionDelServidor);
-  const yo = sesion?.usuario?.id ? String(sesion.usuario.id) : null;
+  const yo = useUsuarioActual();
 
   const [filas, setFilas] = useState<Fila[] | null>(null);
   const [version, setVersion] = useState(0);

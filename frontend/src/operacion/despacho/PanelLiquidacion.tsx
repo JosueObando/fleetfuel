@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Button } from '@/componentes/Button/Button';
 import { Campo } from '@/componentes/Campo/Campo';
 import { api } from '@/api/cliente';
+import { useUsuarioActual, puedeDarPorBueno } from '@/api/usuario-actual';
 import estilos from './despacho.module.css';
 import { miles } from './SeccionCargas';
 import { porcentaje } from './SeccionEntregas';
@@ -31,6 +32,7 @@ export function PanelLiquidacion({ viaje, liquidacion, entregas, cargas, totales
   totales: Fila | null; accion: Accion;
 }) {
   const [referencia, setReferencia] = useState('');
+  const yo = useUsuarioActual();
   const cerrado = viaje.estado === 'cerrado';
 
   const cargado = suma(cargas, 'volumenCargado');
@@ -105,18 +107,23 @@ export function PanelLiquidacion({ viaje, liquidacion, entregas, cargas, totales
               </Button>
             )}
 
-            {liquidacion?.estado === 'pendiente' && (
+            {/* Quien la calculó no la aprueba: el servidor da 409. */}
+            {liquidacion?.estado === 'pendiente' && puedeDarPorBueno(yo, liquidacion.calculadaPor) && (
               <Button onClick={() => void accion(() =>
                 api.crear(`/liquidaciones/${liquidacion.id}/aprobar`, {}))}>
                 Aprobar liquidación
               </Button>
+            )}
+            {liquidacion?.estado === 'pendiente' && yo !== null && String(liquidacion.calculadaPor) === yo && (
+              <p className={estilos.vacio}>La calculaste tú: tiene que aprobarla otra persona.</p>
             )}
 
             {liquidacion?.estado === 'aprobada' && (
               <>
                 <Campo etiqueta="Referencia del pago" valor={referencia} onCambio={setReferencia}
                        ayuda="La transferencia o el recibo con el que se pagó." />
-                <Button deshabilitado={!referencia.trim()}
+                {/* Tres caracteres como mínimo, como `PagarLiquidacionDto`. */}
+                <Button deshabilitado={referencia.trim().length < 3}
                         onClick={() => void accion(() =>
                           api.crear(`/liquidaciones/${liquidacion.id}/pagar`,
                                     { referenciaPago: referencia }))}>
