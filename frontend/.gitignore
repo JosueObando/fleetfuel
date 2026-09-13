@@ -40,5 +40,4 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-e2e/ultimo-recorrido.png
-e2e/ultimo-recorrido-1b.png
+e2e/ultimo-recorrido*.png

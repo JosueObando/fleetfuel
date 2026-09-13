@@ -79,6 +79,19 @@ export function Tablero() {
 
       <section className={estilos.tracking} aria-label="Seguimiento de la flota">
         <PanelHeader titulo="Seguimiento" />
+
+        {/* El plan pide que lo diferido se marque como diferido y NO se deje
+            dibujado como si funcionara. Seis camiones inventados con su ETA y
+            su porcentaje de carga no son una pantalla vacía: son una pantalla
+            que miente con el aplomo de un dato real. Hasta el 2026-09-12 ésta
+            era además la primera pantalla del dominio, servida sin sesión.
+
+            `note` y no `status`: el aviso no aparece, está — una región viva lo
+            anunciaría en cada render para decir algo que no ha cambiado. */}
+        <p role="note" aria-label="Boceto" className={estilos.boceto}>
+          Boceto de <strong>UX-2</strong>: estos envíos son datos de muestra.
+          Los reales llegan cuando cierre 2B (telemetría).
+        </p>
         <FilterChip
           socios={SOCIOS.map(s => ({ ...s, conteo: conteo(s.id), activo: socios.includes(s.id) }))}
           onAlternar={alternarSocio}

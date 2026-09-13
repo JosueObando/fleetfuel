@@ -47,18 +47,26 @@ if echo "$tocados" | grep -q '^backend/'; then
   puerta backend typecheck lint test
 fi
 
-# El frontend NO pasa por `lint` todavía, y es deuda declarada, no descuido:
-# arrastra 12 errores propios —8 `react-hooks/set-state-in-effect` en cinco
-# componentes, más `no-unused-vars` y `no-explicit-any` en ficheros de prueba—
-# que existen desde antes de que hubiera gancho. Ponerlo aquí hoy bloquearía
-# cualquier commit de frontend por algo que ese commit no rompió, y la salida
-# de eso siempre es `--no-verify` por costumbre.
+# El frontend YA pasa por `lint` (2026-09-12). Estuvo fuera mientras arrastró
+# 13 errores propios anteriores a que hubiera gancho; ponerlo antes habría
+# bloqueado commits por algo que no rompían, y la salida de eso es
+# `--no-verify` por costumbre.
 #
-# Cuando esos 12 estén en cero, esta línea pasa a `typecheck lint test` y el
-# paso equivalente entra en el trabajo `frontend` de CI. Las dos cosas van
-# juntas: un lint que sólo corre en un sitio se erosiona en el otro.
+# Los 13 se cerraron en el mismo día y sin silenciar nada que fuera cierto:
+#
+#   · 4 `set-state-in-effect` eran REALES —un `setState` síncrono dentro de un
+#     efecto— y se arreglaron derivando el valor en vez de vaciarlo, y leyendo
+#     la sesión con `useSyncExternalStore`;
+#   · 5 eran falsos positivos —el `setState` va tras un `await`— y el patrón,
+#     que estaba copiado cinco veces, vive ahora en `useCargaInicial`;
+#   · 3 `no-explicit-any` eran el mismo `type Fila` copiado, hoy en
+#     `src/api/tipos.ts` con la excepción declarada UNA vez y explicada;
+#   · 1 `require()` en la preparación de las pruebas pasó a `import`.
+#
+# Entra a la vez que el paso equivalente del trabajo `frontend` de CI: un lint
+# que sólo corre en un sitio se erosiona en el otro.
 if echo "$tocados" | grep -q '^frontend/'; then
-  puerta frontend typecheck test
+  puerta frontend typecheck lint test
 fi
 
 echo "✓ puerta previa al commit superada"

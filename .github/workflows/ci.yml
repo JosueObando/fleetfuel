@@ -99,16 +99,15 @@ jobs:
       - run: npm ci
       - name: Compilación de tipos
         run: npm run typecheck
-      # `npm run lint` NO entra aquí todavía, y es deuda declarada: el frontend
-      # arrastra 12 errores propios —8 `react-hooks/set-state-in-effect` en
-      # cinco componentes, más `no-unused-vars` y `no-explicit-any` en ficheros
-      # de prueba— anteriores a que hubiera puerta ninguna. Añadirlo hoy dejaría
-      # `main` en rojo por algo que ningún commit nuevo rompe, y de ahí sale
-      # siempre la misma salida: quitar el paso. Cuando esos 12 estén en cero,
-      # este paso y la línea `frontend` de `githooks/pre-commit` entran juntos.
+      # Entró el 2026-09-12, cuando los 13 errores que el frontend arrastraba
+      # llegaron a cero. Hasta entonces era deuda declarada y no descuido:
+      # añadirlo antes habría dejado `main` en rojo por algo que ningún commit
+      # nuevo rompía, y de ahí sale siempre la misma salida —quitar el paso—.
       #
-      # El backend sí lo tiene, y es lo que impide que la deuda crezca por el
-      # lado que hoy está limpio.
+      # Entra junto con la línea `frontend` de `githooks/pre-commit`: un lint
+      # que sólo corre en un sitio se erosiona en el otro.
+      - name: Estilo
+        run: npm run lint
       # Criterio de salida de UX-0. Falla el build si un token deja de cumplir
       # AA: es lo que impide que la accesibilidad se erosione token a token
       # cuando nadie recuerde por qué --fg-muted tenía ese valor exacto.
@@ -196,14 +195,20 @@ jobs:
       BACKEND_PORT: 4100
       SEED_ADMIN_CORREO: admin@fleetfuel.jop.lat
       SEED_ADMIN_CLAVE: ClaveDeCI12345
-      # El freno del login se afloja SOLO en este trabajo. Los dos recorridos
-      # inician sesión varias veces cada uno —la sonda de inscripción y la
-      # entrada por la interfaz— y con el límite de producción (5 por minuto y
-      # cuenta) un reintento del trabajo se topa con un 429 que no tiene nada
-      # que ver con lo que se está probando. Aflojarlo aquí no lo debilita en
-      # ningún sitio real: su comportamiento se prueba en `api.integracion.ts`,
-      # que sí comprueba que corta a la sexta.
-      LOGIN_LIMITE_CUENTA: 60
+      # El freno del login se afloja SOLO en este trabajo. Los CUATRO recorridos
+      # inician sesión varias veces cada uno —la sonda de inscripción, la
+      # preparación de datos y la entrada por la interfaz— y con el límite de
+      # producción (5 por minuto y cuenta) un reintento del trabajo se topa con
+      # un 429 que no tiene nada que ver con lo que se está probando. Aflojarlo
+      # aquí no lo debilita en ningún sitio real: su comportamiento se prueba en
+      # `api.integracion.ts`, que sí comprueba que corta a la sexta.
+      #
+      # Subido de 60 a 90 al entrar el recorrido de 1C, de 90 a 120 al entrar el
+      # de la puerta, y de 120 a 150 con la sonda de breakpoints: cada recorrido
+      # nuevo es otro juego de inicios de sesión sobre la MISMA cuenta, así que
+      # este número sube con ellos o CI empieza a fallar por un 429 en el
+      # recorrido que toque ir el último.
+      LOGIN_LIMITE_CUENTA: 150
       LOGIN_LIMITE_IP: 300
       # El administrador nace SIN segundo factor: el recorrido lo inscribe por
       # la API antes de entrar, igual que haría el primer usuario real. Por eso
@@ -255,12 +260,38 @@ jobs:
         run: npx playwright install --with-deps chromium
         working-directory: frontend
 
+      # Va PRIMERO y a propósito: su primer paso entra por `/`, la única ruta que
+      # ningún otro recorrido visita — los tres siguientes hacen `goto('/entrar')`
+      # directo. Hasta el 2026-09-12 la raíz servía el boceto del tablero, con
+      # datos inventados y sin pedir sesión, y ninguna de las 293 pruebas de
+      # componente podía verlo.
+      - name: Puerta · raíz, sesión, usuarios y roles
+        run: node e2e/recorrido-admin.mjs
+        working-directory: frontend
+
       - name: 1A · alta de catálogos desde la UI
         run: node e2e/recorrido.mjs
         working-directory: frontend
 
       - name: 1B · orden → plan de carga → viaje autorizado
         run: node e2e/recorrido-1b.mjs
+        working-directory: frontend
+
+      # El criterio de salida de la Fase 1C, recorrido entero desde la interfaz:
+      # carga en terminal, entrega con el precinto verificado, gasto y
+      # liquidación. Estrena su propia cisterna y su propio conductor, así que
+      # no se pisa con el recorrido de 1B aunque corran seguidos contra la misma
+      # base — reutilizar los sembrados hacía que el segundo chocara con la
+      # exclusión del §5.1, y con razón.
+      - name: 1C · carga → entrega → gasto → liquidación
+        run: node e2e/recorrido-1c.mjs
+        working-directory: frontend
+
+      # Los 5 breakpoints del spec sobre las 12 pantallas. Va al final porque no
+      # necesita datos concretos: sólo que la aplicación esté en pie. Encontró
+      # seis layouts rotos el 2026-09-12, uno de ellos a 1100 px — un portátil.
+      - name: UX-1 · los 5 breakpoints, sin scroll ni recorte
+        run: node e2e/sonda-responsive.mjs
         working-directory: frontend
 
       - name: Capturas del recorrido

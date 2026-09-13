@@ -14,7 +14,6 @@ jest.mock('@/api/cliente', () => {
     },
   };
 });
-// eslint-disable-next-line @typescript-eslint/no-var-requires
 const { api } = jest.requireMock('@/api/cliente') as {
   api: Record<'listar' | 'crear' | 'actualizar' | 'desactivar', jest.Mock>;
 };

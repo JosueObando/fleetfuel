@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { BrandBlock } from '@/componentes/BrandBlock/BrandBlock';
 import { NavItem } from '@/componentes/NavItem/NavItem';
 import { IconToolbar } from '@/componentes/IconToolbar/IconToolbar';
-import { leerSesion, guardarSesion } from '@/api/cliente';
+import { PuertaDeSesion } from '@/componentes/PuertaDeSesion/PuertaDeSesion';
+import { cerrarSesion } from '@/api/cliente';
 import type { NombreIcono } from '@/componentes/Icon/Icon';
 import estilos from './ShellApp.module.css';
 
@@ -20,6 +20,10 @@ const GRUPOS: Array<{ rotulo: string; items: Array<{ ruta: string; etiqueta: str
     items: [
       { ruta: '/operacion/ordenes', etiqueta: 'Órdenes', icono: 'ordenes' },
       { ruta: '/operacion/viajes',  etiqueta: 'Viajes',  icono: 'seguimiento' },
+      // Va DESPUÉS de viajes porque es lo que pasa después: un viaje se arma
+      // en la pantalla de arriba y se despacha, entrega y liquida en ésta.
+      { ruta: '/operacion/despacho', etiqueta: 'Despacho y cierre', icono: 'flota' },
+      { ruta: '/operacion/informes', etiqueta: 'Informes', icono: 'informes' },
     ],
   },
   {
@@ -33,49 +37,69 @@ const GRUPOS: Array<{ rotulo: string; items: Array<{ ruta: string; etiqueta: str
       { ruta: '/catalogos/conductores', etiqueta: 'Conductores', icono: 'conductores' },
     ],
   },
+  {
+    /* Existe desde el 2026-09-12. La API de usuarios y roles vive en el backend
+       desde la Fase 0.3 y NINGUNA pantalla la llamaba: dar de alta a una
+       persona exigía entrar por curl, y la compuerta pendiente del plan es
+       «producción con usuarios reales». El hueco no estaba en ninguna fase —
+       UX-1 entrega catálogos y UX-2 el panel; la administración no era de
+       nadie. */
+    rotulo: 'Administración',
+    items: [
+      { ruta: '/administracion/usuarios', etiqueta: 'Usuarios', icono: 'conductores' },
+      { ruta: '/administracion/roles',    etiqueta: 'Roles y permisos', icono: 'ajustes' },
+      // §21. La auditoría va antes que dispositivos porque es la que se
+      // consulta a diario; revocar es una operación de emergencia.
+      { ruta: '/administracion/auditoria',    etiqueta: 'Auditoría',    icono: 'informes' },
+      { ruta: '/administracion/dispositivos', etiqueta: 'Dispositivos', icono: 'flota' },
+    ],
+  },
 ];
 
 export function ShellApp({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const ruta = usePathname();
-  const [listo, setListo] = useState(false);
 
-  /* Hasta comprobar la sesión no se pinta nada: si se pintara antes, quien no
-     ha entrado vería un instante la aplicación y luego el salto. */
-  useEffect(() => {
-    if (leerSesion()) setListo(true);
-    else router.replace('/entrar');
-  }, [router]);
-
-  if (!listo) return <div className={estilos.cargando}>Comprobando la sesión…</div>;
-
+  /* La puerta ya no vive aquí: es `PuertaDeSesion`, para que también la tengan
+     las pantallas que NO llevan esta navegación —`/tablero` tiene su propio
+     shell de tres columnas y se quedó sin ella—. Aquí queda lo que sí es de
+     este componente: la navegación, que vive en un solo sitio porque dos copias
+     divergirían en cuanto se añadiera una sección. */
   return (
-    <div className={estilos.shell}>
-      <nav className={estilos.sidebar} aria-label="Navegación principal">
-        <div className={estilos.marca}><BrandBlock /></div>
+    <PuertaDeSesion>
+      <div className={estilos.shell}>
+        <nav className={estilos.sidebar} aria-label="Navegación principal">
+          <div className={estilos.marca}><BrandBlock /></div>
 
-        <div className={estilos.navegacion}>
-          {GRUPOS.map(g => (
-            <div key={g.rotulo} className={estilos.grupo}>
-              {/* El rótulo es un encabezado real, no un span con estilo: así
-                  quien navega por encabezados salta entre grupos. */}
-              <h2 className={estilos.rotulo}>{g.rotulo}</h2>
-              {g.items.map(i => (
-                <NavItem key={i.ruta} icono={i.icono} etiqueta={i.etiqueta}
-                         activo={ruta.startsWith(i.ruta)} onClick={() => router.push(i.ruta)} />
-              ))}
-            </div>
-          ))}
-        </div>
+          <div className={estilos.navegacion}>
+            {GRUPOS.map(g => (
+              <div key={g.rotulo} className={estilos.grupo}>
+                {/* El rótulo es un encabezado real, no un span con estilo: así
+                    quien navega por encabezados salta entre grupos. */}
+                <h2 className={estilos.rotulo}>{g.rotulo}</h2>
+                {g.items.map(i => (
+                  <NavItem key={i.ruta} icono={i.icono} etiqueta={i.etiqueta}
+                           activo={ruta.startsWith(i.ruta)} onClick={() => router.push(i.ruta)} />
+                ))}
+              </div>
+            ))}
+          </div>
 
-        <IconToolbar utilidades={[
-          { icono: 'campana', titulo: 'Notificaciones' },
-          { icono: 'ajustes', titulo: 'Ajustes' },
-        ]} />
-        <NavItem icono="salir" etiqueta="Cerrar sesión"
-                 onClick={() => { guardarSesion(null); router.replace('/entrar'); }} />
-      </nav>
-      <div className={estilos.contenido}>{children}</div>
-    </div>
+          <IconToolbar utilidades={[
+            { icono: 'campana', titulo: 'Notificaciones' },
+            { icono: 'ajustes', titulo: 'Ajustes' },
+          ]} />
+          {/* `cerrarSesion` y no `guardarSesion(null)`: hay que revocar el
+              refresh token en el servidor, o sigue vivo en Redis hasta vencer.
+              La navegación va DESPUÉS del await —y el await no puede fallar,
+              porque la función limpia la sesión local pase lo que pase—, así
+              que no hay camino en el que se salte de pantalla dejando la
+              sesión entera en pie. */}
+          <NavItem icono="salir" etiqueta="Cerrar sesión"
+                   onClick={() => { void cerrarSesion().then(() => router.replace('/entrar')); }} />
+        </nav>
+        <div className={estilos.contenido}>{children}</div>
+      </div>
+    </PuertaDeSesion>
   );
 }

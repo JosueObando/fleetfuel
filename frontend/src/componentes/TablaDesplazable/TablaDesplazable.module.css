@@ -1,0 +1,21 @@
+/* La tabla se desplaza; la página, no. */
+.caja {
+  overflow-x: auto;
+  /* NO es decorativo, y costó encontrarlo: los `<span class="solo-lectores">`
+     de dentro de la tabla son `position: absolute`, así que se posicionan
+     respecto al ancestro POSICIONADO más cercano. Sin este `relative` ese
+     ancestro está FUERA de la caja: el span escapa del contexto de scroll y
+     arrastra el ancho del documento entero — nueve píxeles, invisibles, y la
+     página se desplazaba en horizontal con la tabla ya perfectamente contenida.
+     Un elemento que nadie ve moviendo el layout de todos. */
+  position: relative;
+  /* Sin esto, en una rejilla o un flex la caja crece hasta el ancho de su
+     contenido en vez de desplazarlo: `min-width:auto` es el valor inicial de un
+     ítem flex/grid y gana a `overflow`. Es el motivo número uno de que este
+     patrón «no funcione» cuando se copia suelto. */
+  min-width: 0;
+  max-width: 100%;
+}
+/* El anillo de foco tiene que verse: si el contenedor es enfocable y no lo
+   señala, quien llega con el tabulador no sabe dónde está. */
+.caja:focus-visible { outline: none; box-shadow: var(--anillo-foco); }

@@ -113,3 +113,17 @@
   .destino:focus-visible { outline: none; box-shadow: var(--anillo-foco-nav); }
   .listaTarjetas { grid-template-columns: 1fr; padding: 0 var(--esp-4) var(--esp-4); }
 }
+
+/* Aviso de boceto. El texto va en --fg-default sobre --bg-surface, que es un
+   par ya auditado a 4,5:1; el ámbar queda de borde —no textual— para no
+   inventar una combinación que la auditoría de contraste tendría que aprobar. */
+.boceto {
+  margin: 0 var(--esp-4) var(--esp-3);
+  padding: var(--esp-2) var(--esp-3);
+  border-left: 3px solid var(--color-warning-500);
+  background: var(--bg-base);
+  color: var(--fg-default);
+  font-size: 12px;
+  line-height: 1.45;
+  border-radius: 0 4px 4px 0;
+}

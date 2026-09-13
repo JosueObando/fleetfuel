@@ -36,3 +36,22 @@
   color: var(--fg-default);
 }
 .info { border-left-color: var(--action); }
+
+/* Paso de inscripción del segundo factor. */
+.tituloPaso { margin: 0; font-size: 18px; font-weight: 600; color: var(--fg-strong); }
+.explicacion { margin: 0; font-size: 13px; line-height: 1.5; color: var(--fg-muted); }
+.secreto {
+  display: block;
+  padding: var(--esp-3);
+  background: var(--bg-base);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 15px;
+  letter-spacing: 0.08em;
+  color: var(--fg-strong);
+  /* Un secreto de 32 caracteres no cabe en el ancho de la tarjeta en un móvil,
+     y partirlo es preferible a un scroll horizontal dentro del formulario. */
+  overflow-wrap: anywhere;
+}
+.enlace { font-size: 13px; color: var(--action); }

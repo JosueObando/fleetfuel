@@ -7,11 +7,17 @@ const empujar = jest.fn();
 jest.mock('next/navigation', () => ({ useRouter: () => ({ push: empujar }) }));
 jest.mock('@/api/cliente', () => {
   const real = jest.requireActual('@/api/cliente');
-  return { ...real, entrar: jest.fn(), guardarSesion: jest.fn() };
+  return {
+    ...real,
+    entrar: jest.fn(), guardarSesion: jest.fn(),
+    iniciarMfa: jest.fn(), confirmarMfa: jest.fn(),
+  };
 });
-const { entrar, guardarSesion } = jest.requireMock('@/api/cliente') as {
-  entrar: jest.Mock; guardarSesion: jest.Mock;
-};
+const { entrar, guardarSesion, iniciarMfa, confirmarMfa } =
+  jest.requireMock('@/api/cliente') as {
+    entrar: jest.Mock; guardarSesion: jest.Mock;
+    iniciarMfa: jest.Mock; confirmarMfa: jest.Mock;
+  };
 
 /*
  * La única pantalla pública del sistema. Es la que ve alguien que todavía no es
@@ -84,18 +90,107 @@ describe('entrar bien', () => {
 });
 
 describe('la puerta del §7: MFA sin inscribir', () => {
+  /*
+   * Hasta el 2026-09-12 esto sólo enseñaba un aviso — y ahí se acababa el
+   * camino. `/auth/mfa/iniciar` y `/auth/mfa/confirmar` existían en la API
+   * desde la Fase 0.3 y NINGUNA pantalla los llamaba, así que un usuario nuevo
+   * no podía entrar al sistema por la interfaz: había que inscribirle el TOTP
+   * por curl. Los recorridos e2e lo hacían por la API, que es exactamente por
+   * lo que nadie lo echaba de menos.
+   */
+  beforeEach(() => {
+    entrar.mockResolvedValue({ ...SESION, debeInscribirMfa: true });
+    iniciarMfa.mockResolvedValue({ secreto: 'JBSWY3DPEHPK3PXP', otpauth: 'otpauth://totp/x' });
+    confirmarMfa.mockResolvedValue({ mfaHabilitado: true });
+  });
+
   it('NO deja pasar, aunque el login haya devuelto 200', async () => {
     // El token que devuelve ese login viene con cero permisos: dejarlo entrar
     // significaría una aplicación que responde 403 a todo, y el usuario
     // buscando el fallo en el sitio equivocado.
     const usuario = userEvent.setup();
-    entrar.mockResolvedValue({ ...SESION, debeInscribirMfa: true });
     render(<Entrar />);
     await rellenar(usuario);
 
-    expect(await screen.findByText(/segundo factor inscrito/i)).toBeInTheDocument();
+    await screen.findByRole('heading', { name: /segundo factor/i });
     expect(empujar).not.toHaveBeenCalled();
     expect(guardarSesion).not.toHaveBeenCalled();
+  });
+
+  it('pide el secreto con el token de inscripción, no con una sesión', async () => {
+    const usuario = userEvent.setup();
+    render(<Entrar />);
+    await rellenar(usuario);
+    await waitFor(() => expect(iniciarMfa).toHaveBeenCalledWith(SESION.accessToken));
+  });
+
+  it('enseña el secreto para poder escribirlo a mano', async () => {
+    /* Sin librería de QR: añadir una dependencia de terceros a la pantalla de
+       entrada —la única pública del sistema— por dibujar un cuadrado es mal
+       negocio. El secreto en claro y el enlace `otpauth://` cubren los dos
+       caminos: teclearlo, o tocarlo desde el móvil para que lo abra la
+       aplicación de autenticación. */
+    const usuario = userEvent.setup();
+    render(<Entrar />);
+    await rellenar(usuario);
+    expect(await screen.findByText(/JBSW\s?Y3DP\s?EHPK\s?3PXP/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /aplicación de autenticación/i }))
+      .toHaveAttribute('href', 'otpauth://totp/x');
+  });
+
+  it('confirma con el código y avisa de que ya puede entrar', async () => {
+    const usuario = userEvent.setup();
+    render(<Entrar />);
+    await rellenar(usuario);
+    await screen.findByRole('heading', { name: /segundo factor/i });
+
+    await usuario.type(screen.getByLabelText(/Código de 6 dígitos/), '123456');
+    await usuario.click(screen.getByRole('button', { name: /Confirmar/ }));
+
+    await waitFor(() =>
+      expect(confirmarMfa).toHaveBeenCalledWith(SESION.accessToken, '123456'));
+    expect(await screen.findByText(/Ya puedes entrar/i)).toBeInTheDocument();
+  });
+
+  it('tras confirmar NO entra sola: hace entrar de nuevo, ya con el código', async () => {
+    /* El token de inscripción sigue siendo el de cero permisos —habilitar el
+       MFA no le añade ninguno—, así que guardarlo abriría una aplicación que
+       responde 403 a todo. Se vuelve al formulario, que es donde ahora sí
+       existe el código de verificación. */
+    const usuario = userEvent.setup();
+    render(<Entrar />);
+    await rellenar(usuario);
+    await screen.findByRole('heading', { name: /segundo factor/i });
+    await usuario.type(screen.getByLabelText(/Código de 6 dígitos/), '123456');
+    await usuario.click(screen.getByRole('button', { name: /Confirmar/ }));
+
+    await screen.findByText(/Ya puedes entrar/i);
+    expect(guardarSesion).not.toHaveBeenCalled();
+    expect(empujar).not.toHaveBeenCalled();
+    expect(screen.getByLabelText(/Código de verificación/)).toBeInTheDocument();
+  });
+
+  it('un código incorrecto se dice y se puede reintentar', async () => {
+    const usuario = userEvent.setup();
+    confirmarMfa.mockRejectedValue(
+      new ErrorApi(400, 'Código incorrecto. Revisa la hora del dispositivo.'));
+    render(<Entrar />);
+    await rellenar(usuario);
+    await screen.findByRole('heading', { name: /segundo factor/i });
+
+    await usuario.type(screen.getByLabelText(/Código de 6 dígitos/), '000000');
+    await usuario.click(screen.getByRole('button', { name: /Confirmar/ }));
+
+    expect(await screen.findByText(/Revisa la hora del dispositivo/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Confirmar/ })).toBeEnabled();
+  });
+
+  it('si el secreto no llega, lo dice en vez de enseñar un hueco', async () => {
+    const usuario = userEvent.setup();
+    iniciarMfa.mockRejectedValue(new ErrorApi(500, 'No se pudo generar el secreto'));
+    render(<Entrar />);
+    await rellenar(usuario);
+    expect(await screen.findByText(/No se pudo generar el secreto/)).toBeInTheDocument();
   });
 });
 

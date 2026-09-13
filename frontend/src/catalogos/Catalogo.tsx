@@ -4,8 +4,10 @@ import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/componentes/Button/Button';
 import { Campo } from '@/componentes/Campo/Campo';
 import { api, ErrorApi } from '@/api/cliente';
+import { useCargaInicial } from '@/api/carga';
 import type { CatalogoDef } from './definiciones';
 import estilos from './Catalogo.module.css';
+import { TablaDesplazable } from '@/componentes/TablaDesplazable/TablaDesplazable';
 
 type Fila = Record<string, unknown>;
 
@@ -41,7 +43,7 @@ export function Catalogo({ def }: { def: CatalogoDef }) {
     }
   }, [def.ruta]);
 
-  useEffect(() => { void cargar(); }, [cargar]);
+  useCargaInicial(cargar);
 
   /* Las opciones de los campos de referencia se piden una vez al abrir el
      formulario, no en cada pulsación: son catálogos, no búsquedas. */
@@ -146,6 +148,7 @@ export function Catalogo({ def }: { def: CatalogoDef }) {
         ) : filas.length === 0 ? (
           <p className={estilos.vacio}>Todavía no hay {def.titulo.toLowerCase()}.</p>
         ) : (
+          <TablaDesplazable etiqueta={def.titulo}>
           <table className={estilos.tabla}>
             <thead>
               <tr>
@@ -183,6 +186,7 @@ export function Catalogo({ def }: { def: CatalogoDef }) {
               ))}
             </tbody>
           </table>
+          </TablaDesplazable>
         )}
       </div>
     </section>

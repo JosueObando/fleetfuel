@@ -5,10 +5,11 @@ import { Button } from '@/componentes/Button/Button';
 import { Campo } from '@/componentes/Campo/Campo';
 import { StatusBadge, type EstadoEnvio } from '@/componentes/StatusBadge/StatusBadge';
 import { api, ErrorApi } from '@/api/cliente';
+import { useCargaInicial } from '@/api/carga';
+import type { Fila } from '@/api/tipos';
 import catalogo from '@/catalogos/Catalogo.module.css';
 import estilos from './ordenes.module.css';
 
-type Fila = Record<string, any>;
 interface Linea { productoId: string; volumenSolicitado: string; tolerancia: string }
 
 const LINEA_VACIA: Linea = { productoId: '', volumenSolicitado: '', tolerancia: '' };
@@ -27,6 +28,11 @@ const EXIGEN_MOTIVO = new Set(['rechazada', 'cancelada', 'suspendida', 'con_inci
 export default function Ordenes() {
   const [filas, setFilas] = useState<Fila[] | null>(null);
   const [clientes, setClientes] = useState<Fila[]>([]);
+  /* TODAS las estaciones, sin filtrar. El filtro por cliente es una DERIVADA
+     —`estacionesDelCliente`, más abajo— y no un estado: guardarlo filtrado
+     obligaba a vaciarlo con un `setState` síncrono dentro de un efecto cada
+     vez que se cambiaba de cliente, que es un render de más y lo que React 19
+     señala como `set-state-in-effect`. */
   const [estaciones, setEstaciones] = useState<Fila[]>([]);
   const [productos, setProductos] = useState<Fila[]>([]);
   const [abierto, setAbierto] = useState(false);
@@ -44,23 +50,32 @@ export default function Ordenes() {
     try { setFilas(await api.listar<Fila>('/ordenes')); setError(null); }
     catch (e) { setError(e instanceof ErrorApi ? e.message : 'No se pudo cargar'); setFilas([]); }
   }, []);
-  useEffect(() => { void cargar(); }, [cargar]);
+  useCargaInicial(cargar);
 
   useEffect(() => {
     if (!abierto) return;
     void api.listar<Fila>('/clientes').then(setClientes).catch(() => undefined);
     void api.listar<Fila>('/productos').then(setProductos).catch(() => undefined);
+    void api.listar<Fila>('/estaciones').then(setEstaciones).catch(() => undefined);
   }, [abierto]);
 
   /* Las estaciones se filtran por cliente: la API exige que la estación sea
-     del cliente de la orden, así que ofrecer las demás sería ofrecer un error. */
-  useEffect(() => {
-    if (!clienteId) { setEstaciones([]); return; }
-    void api.listar<Fila>('/estaciones')
-      .then(es => setEstaciones(es.filter(e => String(e.clienteId) === clienteId)))
-      .catch(() => undefined);
+     del cliente de la orden, así que ofrecer las demás sería ofrecer un error.
+
+     El filtro se calcula al pintar y el reinicio de la estación elegida vive en
+     el manejador del cambio de cliente, no en un efecto: cambiar de cliente es
+     un EVENTO, y ajustar estado en respuesta a un evento es donde React dice
+     que hay que hacerlo. */
+  const estacionesDelCliente = clienteId
+    ? estaciones.filter(e => String(e.clienteId) === clienteId)
+    : [];
+
+  function elegirCliente(id: string) {
+    setClienteId(id);
+    // La estación elegida era de OTRO cliente: dejarla puesta mandaría a la API
+    // una pareja que rechaza.
     setEstacionId('');
-  }, [clienteId]);
+  }
 
   function tocar(i: number, campo: keyof Linea, v: string) {
     setLineas(ls => ls.map((l, j) => (j === i ? { ...l, [campo]: v } : l)));
@@ -116,11 +131,11 @@ export default function Ordenes() {
       <div className={catalogo.cuerpo}>
         {abierto && (
           <form className={catalogo.formulario} onSubmit={guardar}>
-            <Campo etiqueta="Cliente" requerido valor={clienteId} onCambio={setClienteId}
+            <Campo etiqueta="Cliente" requerido valor={clienteId} onCambio={elegirCliente}
                    opciones={clientes.map(c => ({ valor: String(c.id), etiqueta: String(c.nombre) }))} />
             <Campo etiqueta="Estación" requerido valor={estacionId} onCambio={setEstacionId}
                    ayuda={clienteId ? undefined : 'Elige primero el cliente.'}
-                   opciones={estaciones.map(e => ({ valor: String(e.id), etiqueta: String(e.nombre) }))} />
+                   opciones={estacionesDelCliente.map(e => ({ valor: String(e.id), etiqueta: String(e.nombre) }))} />
             <Campo etiqueta="N.º de orden externa" valor={externa} onCambio={setExterna} />
             <Campo etiqueta="Fecha requerida" tipo="date" valor={fechaRequerida} onCambio={setFechaRequerida} />
             <Campo etiqueta="Prioridad" valor={prioridad} onCambio={setPrioridad}

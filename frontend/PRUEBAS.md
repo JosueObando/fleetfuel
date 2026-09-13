@@ -32,7 +32,20 @@ El entorno es **jsdom** y no node: lo que se prueba aquí —`localStorage`,
 | `catalogos/cisternas` | La suma de compartimentos en vivo, el tope de doce y el filtro de vehículos |
 | `operacion/ordenes` | Que la estación dependa del cliente, y los motivos obligatorios |
 | `operacion/viajes` | Que **autorizar** sea una acción aparte del §7, no una transición más |
-| `app/entrar` | La puerta de MFA sin inscribir, y que un 200 no baste para entrar |
+| `operacion/despacho` | Toda la Fase 1C: qué momento abre cada estado del §8.2, y que la pantalla **no deje declarar un precinto intacto** |
+| `operacion/informes` | Los cuatro informes del §14, el estado en la URL, y que la cadena del volumen **calcule y nombre el descuadre** en vez de dejar la resta a quien mira |
+| `api/cliente` (almacén) | Que la instantánea de sesión devuelva la MISMA referencia mientras no cambie —requisito de `useSyncExternalStore`— y que un cierre en otra pestaña avise |
+| `app/entrar` | La puerta de MFA sin inscribir, la **inscripción del segundo factor**, y que un 200 no baste para entrar |
+| `componentes/PuertaDeSesion` | La puerta, sola. Vivía dentro de `ShellApp` y por eso no protegía `/tablero` |
+| `administracion/Usuarios` | Que el MFA de cada cuenta sea **visible**, y que suspender exija un motivo antes de salir del navegador (§21) |
+| `administracion/Roles` | El recuento «N de M permisos» —la cifra que habría delatado el incidente del Administrador de 11 sobre 48— y que guardar mande el conjunto ENTERO, porque es un PUT |
+| `api/cliente` (refresco) | Que un 401 refresque y **reintente** en vez de echar a la calle, con UNA sola llamada de refresco aunque caduquen cinco peticiones a la vez |
+| `app/page.tsx` | Que la raíz lleve a la aplicación y **nunca** a la maqueta |
+| `componentes/TablaDesplazable` | Que la caja con scroll sea **alcanzable por teclado** — lo visual lo mide la sonda, en un navegador de verdad |
+| `administracion/Auditoria` | Que dos JSON se lean como **qué cambió** —incluido el campo que desaparece— y que la pantalla no ofrezca nada que escriba |
+| `administracion/Dispositivos` | Que revocar exija motivo y diga **cuántas sesiones cortó**, que es la diferencia entre «lo hice» y «funcionó» |
+| `despacho/SeccionBitacora` | Que la integridad de la cadena se **pueda ver**, y que anular añada una corrección en vez de parecer que borra (§7.15) |
+| `catalogos/AvisoLicencias` | Que una licencia **vencida** no se confunda con una por vencer, que es lo único que la API no separa (§6.6) |
 | `tablero/Tablero.tsx` | Que todo el estado de la vista viva en la URL |
 | 14 componentes | Sus decisiones de accesibilidad: qué se anuncia, qué se oculta, qué se nombra |
 
@@ -43,14 +56,22 @@ cuela en una revisión visual, porque en pantalla se ve perfecto.
 
 ## El umbral
 
-| | al empezar | pantallas | componentes del panel | umbral |
-|---|---|---|---|---|
-| Sentencias | 7,24 % | 84,96 % | **92,00 %** | 91 |
-| Ramas | 6,75 % | 77,88 % | **81,17 %** | 80 |
-| Funciones | 4,65 % | 69,45 % | **82,42 %** | 81 |
-| Líneas | 7,44 % | 85,83 % | **93,33 %** | 92 |
+| | al empezar | componentes | despacho (1C) | informes (§14) | administración | §21 y bitácora | umbral |
+|---|---|---|---|---|---|---|---|
+| Sentencias | 7,24 % | 92,00 % | 93,24 % | 93,71 % | 94,48 % | **94,62 %** | 94 |
+| Ramas | 6,75 % | 81,17 % | 81,40 % | 81,51 % | 81,91 % | **82,48 %** | 82 |
+| Funciones | 4,65 % | 82,42 % | 85,34 % | 86,76 % | 88,58 % | **89,17 %** | 89 |
+| Líneas | 7,44 % | 93,33 % | 94,56 % | 95,40 % | 96,11 % | **96,12 %** | 96 |
 
 **Las cuatro pasan el 80 % que pide la disciplina.**
+
+La última columna la fija una prueba, no la buena voluntad: `umbral.spec.ts`
+compara esta tabla con `jest.config.mjs` y falla si divergen. Ya hizo su trabajo
+la primera vez que se subió el umbral después de escribirla: el commit no podía
+cerrarse sin tocar también esta tabla. Se escribió el
+2026-09-12, cuando este documento se quedó atrás por **tercera** vez —las dos
+primeras fueron `backend/test/COBERTURA.md`—. Subir el umbral y anotarlo son dos
+actos, y al segundo no lo obligaba nadie.
 
 ## Qué queda fuera de la medida, a propósito
 
@@ -66,12 +87,78 @@ Aparte, en `e2e/`. Son recorridos con Playwright contra la aplicación en marcha
 no pruebas de componente:
 
 ```bash
-node e2e/recorrido.mjs      # criterio de salida de 1A, desde la interfaz
-node e2e/recorrido-1b.mjs   # orden → plan de carga → viaje
+node e2e/recorrido.mjs        # criterio de salida de 1A, desde la interfaz
+node e2e/recorrido-1b.mjs     # orden → plan de carga → viaje
+node e2e/recorrido-1c.mjs     # carga → entrega → gasto → liquidación → informes
+node e2e/recorrido-admin.mjs  # la puerta, usuarios y roles, y el cierre de sesión
+node e2e/sonda-responsive.mjs # las 12 pantallas en los 5 anchos del spec
 ```
 
-**No están en CI** y hay que decirlo: necesitan las librerías de sistema de
-Chromium, que se instalan con `sudo npx playwright install-deps chromium`.
-Mientras eso no se resuelva en el runner, son una verificación manual — se
-corren a mano al cerrar una fase, y su resultado vive en el plan de
-construcción, no en un check verde.
+**Están en CI** desde el 2026-09-12 (trabajo `e2e`): levanta Postgres, Redis, la
+API compilada y la interfaz construida, y los corre. Para eso hubo que hacerlos
+autosuficientes —inscriben el TOTP por la API y crean sus propios datos—, porque
+en desarrollo funcionaban sólo por los datos acumulados.
+
+Localmente necesitan las librerías de sistema de Chromium:
+`sudo npx playwright install-deps chromium`.
+
+**Y necesitan un `.next` limpio.** Un build incremental sobre artefactos viejos
+deja chunks huérfanos que responden 404 sin que nada lo diga: el componente
+cliente no hidrata, la puerta de sesión no llega a correr y **la aplicación se
+sirve entera sin pedir credenciales**. Pasó el 2026-09-12 y costó media hora
+buscar el fallo en el código que acababa de cambiar. Ante cualquier síntoma raro
+en un recorrido: `rm -rf .next && npm run build`.
+
+## El estilo, que ya es una puerta (2026-09-12)
+
+`npm run lint` entra en CI y en `githooks/pre-commit`. Estuvo fuera mientras el
+frontend arrastró **13 errores** anteriores a que hubiera puerta ninguna;
+añadirlo antes habría dejado `main` en rojo por algo que ningún commit rompía, y
+de ahí sale siempre la misma salida: quitar el paso.
+
+Los 13 se cerraron **sin silenciar nada que fuera cierto**, y la distinción es
+el contenido de este apartado:
+
+| | Cuántos | Qué se hizo |
+|---|---|---|
+| `set-state-in-effect` **reales** | 4 | Se arreglaron. El `setState` era síncrono de verdad |
+| `set-state-in-effect` **falsos** | 5 | El `setState` va tras un `await`. El patrón, copiado cinco veces, vive en `useCargaInicial` |
+| `no-explicit-any` | 3 | El mismo `type Fila` copiado. Hoy en `src/api/tipos.ts`, con la excepción declarada UNA vez y explicada |
+| `require()` | 1 | Pasó a `import` en la preparación de las pruebas |
+
+**Los cuatro reales valían el arreglo por sí solos**, aparte del lint:
+
+- `if (!clienteId) { setEstaciones([]); return; }` y sus dos hermanos vaciaban
+  una lista con un render de más. Al derivarla —guardando el dato CON el
+  identificador al que pertenece— desapareció además una clase de fallo que
+  nadie había reportado: enseñar los compartimentos de la cisterna anterior, o
+  las líneas del viaje anterior, durante el rato que tarda la petición nueva.
+- `if (leerSesion()) setListo(true)` en el shell copiaba `localStorage` a un
+  estado. Ahora se lee con `useSyncExternalStore`, y con eso **cerrar sesión en
+  una pestaña echa a las demás** y un 401 devuelve a la entrada sin esperar a
+  que alguien navegue.
+
+### Lo que ese cambio enseñó sobre estas pruebas
+
+La reescritura del shell tenía un fallo: durante la hidratación React devuelve a
+propósito la instantánea DEL SERVIDOR —siempre nula—, y el efecto que redirige
+corría en ese primer commit. Resultado: todo el mundo a `/entrar`, con la sesión
+intacta en el almacén.
+
+**Las ocho pruebas del shell pasaban antes y después.** jsdom no hidrata, así
+que ninguna prueba de componente puede distinguir «la instantánea del servidor»
+de «la real». Lo cazó el recorrido de navegador en el primer intento.
+
+Es el argumento más claro que hay en este repositorio para mantener los tres
+niveles: 363 pruebas de componente no cubren una clase entera de fallo que un
+solo recorrido detecta.
+
+### Y la auditoría del 2026-09-12 lo repitió
+
+La raíz del dominio redirigía a `/tablero` —el boceto de UX-2, con seis envíos
+inventados, **sin puerta de sesión**— y se servía así en producción. Ninguna de
+las 293 pruebas lo veía: `Tablero.spec.tsx` prueba la maqueta y pasa. Ningún
+recorrido lo veía tampoco, porque los tres hacían `goto('/entrar')` directo.
+
+**La ruta que nadie prueba es la que todo el mundo escribe en la barra.** De ahí
+`recorrido-admin.mjs`, cuyo primer paso es entrar por `/`.

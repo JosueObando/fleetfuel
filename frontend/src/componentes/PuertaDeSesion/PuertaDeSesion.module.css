@@ -1,0 +1,3 @@
+/* Mismo tratamiento que tenía dentro del shell: ocupa la ventana entera para
+   que no se vea un salto de altura entre «comprobando» y la aplicación. */
+.cargando { display: grid; place-items: center; height: 100dvh; color: var(--fg-muted); }

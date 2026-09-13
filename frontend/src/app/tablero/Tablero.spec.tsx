@@ -148,3 +148,33 @@ describe('los datos del panel son coherentes', () => {
     expect(new Set(ENVIOS.map(e => e.id)).size).toBe(ENVIOS.length);
   });
 });
+
+describe('es un boceto, y tiene que decirlo', () => {
+  /*
+   * Esta pantalla es el boceto de UX-2: los seis envíos salen de `./datos`, no
+   * de la API, y no habrá datos reales hasta que cierre 2B (telemetría). Eso
+   * era invisible para quien la miraba — y hasta el 2026-09-12 era además la
+   * PRIMERA pantalla del dominio, servida sin sesión.
+   *
+   * El plan pide que lo diferido se marque como diferido y no se deje dibujado
+   * como si funcionara. Un panel de operaciones con seis camiones inventados no
+   * es una pantalla vacía: es una pantalla que MIENTE, y lo hace con el aplomo
+   * de un dato real. El aviso es la diferencia entre un boceto y un engaño.
+   */
+  it('avisa de que los datos son de muestra', () => {
+    render(<Tablero />);
+    /* `note` y no `status`: el aviso está siempre ahí, no es un mensaje que
+       aparece. Un `role="status"` es una región viva y el lector de pantalla
+       lo anunciaría en cada render, interrumpiendo lo que se estuviera
+       leyendo, para decir algo que no ha cambiado. */
+    expect(screen.getByRole('note', { name: /boceto/i })).toBeInTheDocument();
+  });
+
+  it('y dice de qué depende para traer datos de verdad', () => {
+    // Sin el porqué, el aviso se lee como un fallo temporal y alguien abre un
+    // defecto. Con él, se lee como lo que es: trabajo que todavía no toca.
+    render(<Tablero />);
+    expect(screen.getByRole('note', { name: /boceto/i }))
+      .toHaveTextContent(/UX-2/);
+  });
+});

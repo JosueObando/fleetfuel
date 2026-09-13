@@ -25,7 +25,13 @@ export default crearConfig({
   // 7 %; hoy pasa el 80 % que pide la disciplina. Se sube cada vez que la
   // cobertura sube, nunca al revés. Ver PRUEBAS.md.
   coverageThreshold: {
-    global: { statements: 91, branches: 80, functions: 81, lines: 92 },
+    // Trinquete: siempre justo por debajo de lo medido, nunca al revés.
+    // Subido CUATRO veces el 2026-09-12: despacho
+    // (93,24 / 81,40 / 85,34 / 94,56), informes (93,71 / 81,51 / 86,76 / 95,40),
+    // administración (94,48 / 81,91 / 88,58 / 96,11) y la segunda tanda —
+    // bitácora del viaje, licencias, auditoría y dispositivos —
+    // (94,62 / 82,48 / 89,17 / 96,12). Ver PRUEBAS.md.
+    global: { statements: 94, branches: 82, functions: 89, lines: 96 },
   },
   collectCoverageFrom: [
     'src/**/*.{ts,tsx}',

@@ -4,8 +4,11 @@ import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/componentes/Button/Button';
 import { Campo } from '@/componentes/Campo/Campo';
 import { api, ErrorApi } from '@/api/cliente';
+import { useCargaInicial } from '@/api/carga';
+import type { Fila } from '@/api/tipos';
 import catalogo from '@/catalogos/Catalogo.module.css';
 import estilos from './cisternas.module.css';
+import { TablaDesplazable } from '@/componentes/TablaDesplazable/TablaDesplazable';
 
 /*
  * Cisternas no usa el molde genérico: sus compartimentos son filas anidadas
@@ -17,7 +20,6 @@ import estilos from './cisternas.module.css';
 interface Compartimento {
   numero: string; capacidadNominal: string; capacidadCalibrada: string; productoPermitido: string;
 }
-type Fila = Record<string, any>;
 
 const COMP_VACIO = (n: number): Compartimento => ({
   numero: String(n), capacidadNominal: '', capacidadCalibrada: '', productoPermitido: '',
@@ -43,7 +45,7 @@ export default function Cisternas() {
     try { setFilas(await api.listar<Fila>('/cisternas')); setError(null); }
     catch (e) { setError(e instanceof ErrorApi ? e.message : 'No se pudo cargar'); setFilas([]); }
   }, []);
-  useEffect(() => { void cargar(); }, [cargar]);
+  useCargaInicial(cargar);
 
   useEffect(() => {
     if (!abierto) return;
@@ -170,6 +172,7 @@ export default function Cisternas() {
         ) : filas.length === 0 ? (
           <p className={catalogo.vacio}>Todavía no hay cisternas.</p>
         ) : (
+          <TablaDesplazable etiqueta="Cisternas">
           <table className={catalogo.tabla}>
             <thead>
               <tr>
@@ -200,6 +203,7 @@ export default function Cisternas() {
               ))}
             </tbody>
           </table>
+          </TablaDesplazable>
         )}
       </div>
     </section>

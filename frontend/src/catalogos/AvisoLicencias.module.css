@@ -1,0 +1,27 @@
+/* §6.6 · Vencimientos, encima de la tabla de conductores. */
+.aviso {
+  margin: 0 var(--esp-6) var(--esp-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card, 8px);
+  background: var(--bg-surface);
+  padding: var(--esp-3) var(--esp-4);
+}
+.barra {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--esp-3); flex-wrap: wrap;
+}
+.barra p { margin: 0; font-size: var(--texto-sm, 13px); color: var(--fg-default); }
+/* El ámbar va de borde —uso no textual— y el texto se queda en un par ya
+   auditado a 4,5:1. */
+.conVencidas {
+  border-left: 3px solid var(--color-warning-500);
+  padding-left: var(--esp-3); font-weight: 600;
+}
+.horizontes { display: flex; gap: var(--esp-2); }
+.tabla { width: 100%; border-collapse: collapse; font-size: var(--texto-sm, 13px); margin-top: var(--esp-3); }
+.tabla th {
+  text-align: left; font-size: var(--texto-xs, 12px); color: var(--fg-muted);
+  font-weight: 600; padding: var(--esp-2); border-bottom: 1px solid var(--border-subtle);
+}
+.tabla td { padding: var(--esp-2); border-bottom: 1px solid var(--border-subtle); }
+.vencida { font-weight: 600; color: var(--fg-strong); }

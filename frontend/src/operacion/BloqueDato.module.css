@@ -1,0 +1,15 @@
+.bloque {
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-card);
+  padding: var(--esp-3); background: var(--bg-surface);
+}
+.rotulo {
+  font-size: var(--texto-2xs); text-transform: uppercase; letter-spacing: .04em;
+  color: var(--fg-muted); margin: 0 0 var(--esp-1);
+}
+.dato {
+  font-family: var(--fuente-titulo); font-size: var(--texto-lg);
+  font-weight: var(--peso-semi); color: var(--fg-strong);
+  font-variant-numeric: tabular-nums; margin: 0;
+}
+.detalle { font-size: var(--texto-xs); color: var(--fg-muted); margin: 2px 0 0; }
+.resaltado .dato { color: var(--action); }

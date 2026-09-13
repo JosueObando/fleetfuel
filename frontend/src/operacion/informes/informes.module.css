@@ -1,0 +1,28 @@
+.pantalla { padding: 0 var(--esp-6) var(--esp-6); overflow-y: auto; height: 100%; }
+.aviso { margin: var(--esp-3) 0; }
+.filtros {
+  display: flex; gap: var(--esp-4); align-items: flex-end; flex-wrap: wrap;
+  margin: var(--esp-4) 0;
+}
+.bloques {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--esp-3); margin-bottom: var(--esp-4);
+}
+.veredicto {
+  font-size: var(--texto-sm); color: var(--fg-default);
+  border-left: 3px solid var(--border-subtle);
+  padding: var(--esp-2) var(--esp-3); max-width: 70ch;
+}
+.tabla { width: 100%; border-collapse: collapse; font-size: var(--texto-sm); }
+.leyenda {
+  caption-side: bottom; text-align: left; font-size: var(--texto-xs);
+  color: var(--fg-muted); padding-top: var(--esp-2); max-width: 70ch;
+}
+.tabla th {
+  text-align: left; font-size: var(--texto-2xs); text-transform: uppercase; letter-spacing: .04em;
+  color: var(--fg-muted); padding: 0 var(--esp-2) var(--esp-1);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.tabla td { padding: var(--esp-2); border-bottom: 1px solid var(--border-subtle); }
+.num { font-variant-numeric: tabular-nums; text-align: right; }
+.vacio { color: var(--fg-muted); font-size: var(--texto-sm); padding: var(--esp-6) 0; }

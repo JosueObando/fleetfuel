@@ -4,10 +4,11 @@ import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/componentes/Button/Button';
 import { Campo } from '@/componentes/Campo/Campo';
 import { api, ErrorApi } from '@/api/cliente';
+import { useCargaInicial } from '@/api/carga';
+import type { Fila } from '@/api/tipos';
 import catalogo from '@/catalogos/Catalogo.module.css';
 import estilos from './viajes.module.css';
 
-type Fila = Record<string, any>;
 
 export default function Viajes() {
   const [viajes, setViajes] = useState<Fila[] | null>(null);
@@ -20,7 +21,8 @@ export default function Viajes() {
   const [cisternas, setCisternas] = useState<Fila[]>([]);
   const [conductores, setConductores] = useState<Fila[]>([]);
   const [ordenes, setOrdenes] = useState<Fila[]>([]);
-  const [compartimentos, setCompartimentos] = useState<Fila[]>([]);
+  const [compartimentos, setCompartimentos] =
+    useState<{ cisternaId: string; filas: Fila[] }>({ cisternaId: '', filas: [] });
 
   // Alta de viaje
   const [codigo, setCodigo] = useState('');
@@ -38,7 +40,7 @@ export default function Viajes() {
     try { setViajes(await api.listar<Fila>('/viajes')); setError(null); }
     catch (e) { setError(e instanceof ErrorApi ? e.message : 'No se pudo cargar'); setViajes([]); }
   }, []);
-  useEffect(() => { void cargar(); }, [cargar]);
+  useCargaInicial(cargar);
 
   useEffect(() => {
     void api.listar<Fila>('/cisternas').then(setCisternas).catch(() => undefined);
@@ -47,12 +49,24 @@ export default function Viajes() {
   }, []);
 
   /* Los compartimentos son los de LA cisterna del viaje seleccionado: la API
-     rechaza cualquier otro, así que ofrecerlos sería ofrecer un error. */
+     rechaza cualquier otro, así que ofrecerlos sería ofrecer un error.
+
+     Se guardan CON el identificador de la cisterna a la que pertenecen, y la
+     lista que se pinta se deriva comparándolo. Eso hace dos cosas a la vez:
+     quita el `setState` síncrono dentro del efecto —el render de más que React
+     19 señala— y, sobre todo, impide enseñar los compartimentos de la cisterna
+     ANTERIOR durante el rato que tarda la petición nueva. Vaciar a mano cubría
+     lo segundo por accidente; derivar lo cubre por construcción. */
   useEffect(() => {
-    if (!sel?.cisternaId) { setCompartimentos([]); return; }
-    void api.listar<Fila>(`/cisternas/${sel.cisternaId}/compartimentos`)
-      .then(setCompartimentos).catch(() => undefined);
+    const id = sel?.cisternaId;
+    if (!id) return;
+    void api.listar<Fila>(`/cisternas/${id}/compartimentos`)
+      .then(filas => setCompartimentos({ cisternaId: String(id), filas }))
+      .catch(() => undefined);
   }, [sel?.cisternaId]);
+
+  const compartimentosDeLaCisterna =
+    compartimentos.cisternaId === String(sel?.cisternaId ?? '') ? compartimentos.filas : [];
 
   async function abrir(id: string) {
     try { setSel(await api.obtener<Fila>(`/viajes/${id}`)); setError(null); }
@@ -90,14 +104,22 @@ export default function Viajes() {
 
   /* Las líneas de las órdenes ya asignadas al viaje: son las únicas a las que
      se puede asignar carga. */
-  const [lineasDisponibles, setLineasDisponibles] = useState<Fila[]>([]);
+  const [lineas, setLineas] =
+    useState<{ viajeId: string; filas: Fila[] }>({ viajeId: '', filas: [] });
   useEffect(() => {
-    if (!sel?.ordenes?.length) { setLineasDisponibles([]); return; }
+    const viajeId = String(sel?.id ?? '');
+    if (!sel?.ordenes?.length) return;
     Promise.all(sel.ordenes.map((o: Fila) => api.obtener<Fila>(`/ordenes/${o.ordenId}`)))
-      .then(os => setLineasDisponibles(os.flatMap((o: Fila) =>
-        (o.detalles ?? []).map((d: Fila) => ({ ...d, orden: o.numeroOrdenExterna ?? `#${o.id}` })))))
-      .catch(() => setLineasDisponibles([]));
+      .then(os => setLineas({ viajeId, filas: os.flatMap((o: Fila) =>
+        (o.detalles ?? []).map((d: Fila) => ({ ...d, orden: o.numeroOrdenExterna ?? `#${o.id}` }))) }))
+      .catch(() => setLineas({ viajeId, filas: [] }));
   }, [sel]);
+
+  /* Mismo criterio que con los compartimentos: las líneas se derivan del viaje
+     al que pertenecen, así que las del viaje anterior no se cuelan mientras
+     llega la petición del nuevo. */
+  const lineasDisponibles =
+    lineas.viajeId === String(sel?.id ?? '') ? lineas.filas : [];
 
   return (
     <div className={estilos.dos}>
@@ -244,7 +266,7 @@ export default function Viajes() {
               {['borrador', 'programado'].includes(sel.estado) && (
                 <div className={estilos.formLinea}>
                   <Campo etiqueta="Compartimento" valor={compId} onCambio={setCompId}
-                         opciones={compartimentos.map(c => ({
+                         opciones={compartimentosDeLaCisterna.map(c => ({
                            valor: String(c.id),
                            etiqueta: `N.º ${c.numero} · calibrado ${c.capacidadCalibrada}`,
                          }))} />

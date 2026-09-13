@@ -1,0 +1,98 @@
+/* Mismo maestro/detalle que viajes: la lista a la izquierda, el viaje abierto
+   a la derecha. No se importa el de viajes porque un módulo CSS es del sitio
+   donde vive; compartirlo ataría dos pantallas que van a divergir. */
+.dos { display: grid; grid-template-columns: 420px 1fr; height: 100%; min-height: 0; }
+.lista { display: flex; flex-direction: column; min-height: 0;
+         border-right: 1px solid var(--border-subtle); background: var(--bg-surface); }
+.listaCuerpo { flex: 1; min-height: 0; overflow-y: auto; padding: 0 var(--esp-4) var(--esp-4); }
+.detalle { min-width: 0; min-height: 0; overflow-y: auto; }
+
+.avisoGeneral { grid-column: 1 / -1; padding: 0 var(--esp-4); }
+
+.tarjeta {
+  display: block; width: 100%; text-align: left;
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+  background: var(--bg-surface); padding: var(--esp-3); margin-bottom: var(--esp-2);
+  transition: border-color var(--transicion-rapida), box-shadow var(--transicion-rapida);
+}
+.tarjeta:hover:not(.activa) { border-color: var(--fg-muted); box-shadow: var(--sombra-card); }
+.tarjeta:focus-visible { outline: none; box-shadow: var(--anillo-foco); }
+.activa { border-color: var(--action); box-shadow: inset 0 0 0 1px rgba(6,96,255,.35), var(--sombra-card); }
+.codigo { font-family: var(--fuente-titulo); font-weight: var(--peso-semi); color: var(--fg-strong); }
+.activa .codigo { color: var(--action); }
+.meta { font-size: var(--texto-xs); color: var(--fg-muted); font-variant-numeric: tabular-nums; }
+.pastilla {
+  display: inline-block; margin-top: 4px; padding: 1px 8px;
+  border-radius: var(--radius-pill); background: var(--action-subtle);
+  font-size: var(--texto-2xs); color: var(--fg-default);
+}
+
+.seccion { padding: 0 var(--esp-6) var(--esp-5); }
+.tituloSeccion {
+  font-size: var(--texto-lg); font-weight: var(--peso-semi); color: var(--fg-strong);
+  margin: var(--esp-5) 0 var(--esp-3);
+}
+.acciones { display: flex; gap: var(--esp-2); flex-wrap: wrap; }
+.tablaMini { width: 100%; border-collapse: collapse; font-size: var(--texto-sm); }
+.tablaMini th {
+  text-align: left; font-size: var(--texto-2xs); text-transform: uppercase; letter-spacing: .04em;
+  color: var(--fg-muted); padding: 0 var(--esp-2) var(--esp-1); border-bottom: 1px solid var(--border-subtle);
+}
+.tablaMini td { padding: var(--esp-2); border-bottom: 1px solid var(--border-subtle); }
+.num { font-variant-numeric: tabular-nums; text-align: right; }
+.formLinea {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--esp-3); align-items: end; margin-top: var(--esp-3);
+  background: var(--bg-surface); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card); padding: var(--esp-4);
+}
+.vacio { color: var(--fg-muted); font-size: var(--texto-sm); padding: var(--esp-4) 0; }
+.sello { font-family: var(--fuente-mono, monospace); letter-spacing: .02em; }
+
+/* La casilla del precinto roto va sola y con su propia caja: es la única
+   afirmación de la pantalla que el sistema no puede comprobar por su cuenta,
+   y mezclarla entre los campos numéricos la volvería un campo más. */
+.casilla {
+  grid-column: 1 / -1; display: flex; gap: var(--esp-2); align-items: flex-start;
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+  padding: var(--esp-3); background: var(--bg-base);
+}
+.casilla input { margin-top: 3px; }
+.casillaTexto { font-size: var(--texto-sm); color: var(--fg-default); }
+.casillaAyuda { display: block; font-size: var(--texto-xs); color: var(--fg-muted); }
+
+/* El cálculo en vivo de la merma. Neutro mientras cuadra, de alarma cuando se
+   sale: el color NO es la única señal — el texto cambia también. */
+.conciliacion {
+  grid-column: 1 / -1; font-size: var(--texto-sm); font-variant-numeric: tabular-nums;
+  border-left: 3px solid var(--border-subtle); padding: var(--esp-2) var(--esp-3);
+}
+.fuera { border-left-color: var(--peligro, #c2551f); color: var(--fg-strong); }
+
+/* §15.5 · el panel dividido en bloques. */
+.bloques {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--esp-3); margin-top: var(--esp-3);
+}
+.bloque {
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-card);
+  padding: var(--esp-3); background: var(--bg-surface);
+}
+.bloqueRotulo {
+  font-size: var(--texto-2xs); text-transform: uppercase; letter-spacing: .04em;
+  color: var(--fg-muted); margin: 0 0 var(--esp-1);
+}
+.bloqueDato {
+  font-family: var(--fuente-titulo); font-size: var(--texto-lg);
+  font-weight: var(--peso-semi); color: var(--fg-strong); font-variant-numeric: tabular-nums;
+}
+.bloqueDetalle { font-size: var(--texto-xs); color: var(--fg-muted); }
+.total .bloqueDato { color: var(--action); }
+
+/* §7.15 · Aviso del formulario de anulación. Va dentro de la caja del
+   formulario, así que ocupa la fila entera de la rejilla. */
+.avisoTraza {
+  grid-column: 1 / -1; margin: 0; font-size: var(--texto-sm);
+  color: var(--fg-strong); border-left: 3px solid var(--peligro, #c2551f);
+  padding: var(--esp-2) var(--esp-3);
+}

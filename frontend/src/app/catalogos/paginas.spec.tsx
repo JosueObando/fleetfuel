@@ -74,3 +74,29 @@ describe('cada página monta SU catálogo', () => {
     }
   });
 });
+
+describe('conductores lleva además el aviso de licencias (§6.6)', () => {
+  /*
+   * `GET /conductores/licencias-por-vencer` existía, tenía permiso y estaba
+   * declarado antes de `:id`, y aun así respondía 400 en su uso normal durante
+   * meses: `ParseIntPipe({optional:true})` recibía el valor antes de poder
+   * descartarlo por nulo. Se arregló el 2026-09-12 y siguió sin pantalla que lo
+   * llamara — que es la segunda mitad del mismo problema: un endpoint al que
+   * nadie llama está roto aunque responda 200.
+   */
+  it('la página pide los vencimientos además del catálogo', async () => {
+    render(<Conductores />);
+    await screen.findByRole('heading', { name: 'Conductores' });
+    expect(api.listar).toHaveBeenCalledWith('/conductores');
+    expect(api.listar).toHaveBeenCalledWith('/conductores/licencias-por-vencer?dias=30');
+  });
+
+  it('y ninguna otra página de catálogo lo hace', async () => {
+    // El aviso es de conductores. Copiado en las cinco, cada pantalla haría una
+    // consulta de más que además no tiene nada que ver con lo que muestra.
+    render(<Clientes />);
+    await screen.findByRole('heading', { name: 'Clientes' });
+    expect(api.listar).not.toHaveBeenCalledWith(
+      expect.stringContaining('licencias-por-vencer'));
+  });
+});
