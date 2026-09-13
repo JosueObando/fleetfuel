@@ -25,7 +25,7 @@ export class LotePosicionesDto {
   @IsOptional() @EsId() viajeId?: string;
 
   @IsArray()
-  @ArrayMinSize(1, { message: 'Un lote vacio no es telemetria' })
+  @ArrayMinSize(1, { message: 'Un lote vacío no es telemetría' })
   /* Un vehiculo a 5 s de cadencia acumula 720 posiciones por hora. El tope de
      500 cubre de sobra una reconexion tras un tunel largo sin que una sola
      peticion tenga que insertar un dia entero. */

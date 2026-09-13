@@ -32,7 +32,7 @@ export class GpsService {
     const [vehiculo] = await gestor().query(
       `SELECT vehiculo_id FROM vehiculos WHERE vehiculo_id = $1 AND eliminado_en IS NULL`,
       [lote.vehiculoId]);
-    if (!vehiculo) throw new NotFoundException('Vehiculo no encontrado');
+    if (!vehiculo) throw new NotFoundException('Vehículo no encontrado');
 
     if (lote.viajeId) {
       const [viaje] = await gestor().query(

@@ -75,7 +75,7 @@ export class EventosService {
 
     if ((dto.latitud == null) !== (dto.longitud == null))
       throw new BadRequestException(
-        'La geolocalizacion va en pareja: media coordenada no ubica nada');
+        'La geolocalización va en pareja: media coordenada no ubica nada');
 
     return this.insertar(viajeId, {
       tipoEvento: dto.tipoEvento, origenDato: dto.origenDato,
@@ -96,7 +96,7 @@ export class EventosService {
   async anular(eventoId: string, dto: AnularEventoDto) {
     const objetivo = await this.obtener(eventoId);
     if (objetivo.tipoEvento === 'correccion')
-      throw new ConflictException('Una correccion no se anula: se corrige con otra');
+      throw new ConflictException('Una corrección no se anula: se corrige con otra');
 
     const [ya] = await gestor().query(
       `SELECT evento_id FROM eventos_viaje WHERE anula_evento_id = $1`, [eventoId]);
@@ -181,11 +181,11 @@ export class EventosService {
       const restriccion = (e as { constraint?: string })?.constraint ?? '';
       if (restriccion === 'uq_eventos_encadenado')
         throw new ConflictException(
-          'Otro evento se encadeno primero en este viaje; vuelva a intentarlo');
+          'Otro evento se encadenó primero en este viaje; vuelva a intentarlo');
       if (restriccion === 'uq_eventos_id_cliente')
-        throw new ConflictException('Ese elemento de la cola ya se sincronizo');
+        throw new ConflictException('Ese elemento de la cola ya se sincronizó');
       if (restriccion === 'uq_eventos_hash')
-        throw new ConflictException('Ese evento ya esta registrado, identico y en el mismo punto');
+        throw new ConflictException('Ese evento ya está registrado, idéntico y en el mismo punto');
       throw e;
     }
 

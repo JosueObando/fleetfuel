@@ -36,7 +36,7 @@ export class GeocercasService {
       const [est] = await gestor().query(
         `SELECT estacion_id FROM estaciones_servicio
           WHERE estacion_id = $1 AND eliminado_en IS NULL`, [dto.estacionId]);
-      if (!est) throw new NotFoundException('La estacion indicada no existe');
+      if (!est) throw new NotFoundException('La estación indicada no existe');
     }
 
     let creada;

@@ -6,6 +6,8 @@ import { join } from 'path';
 import { AlertasService, UMBRALES } from '../src/modules/alertas/alertas.service';
 import { GeocercasService } from '../src/modules/alertas/geocercas.service';
 import { ejecutarEnContexto, gestor } from '../src/common/contexto/contexto-peticion';
+import { TildesEnTitulosDeAlertas1804000000000 } from '../src/database/migrations/1804000000000-TildesEnTitulosDeAlertas';
+import type { QueryRunner } from 'typeorm';
 
 cargarEnv({ path: join(__dirname, '../../.env') });
 
@@ -165,7 +167,7 @@ describe('geocercas · el círculo que se guarda como polígono', () => {
       await expect(geocercas.crear({
         nombre: `Mala ${secuencia}`, tipo: 'estacion', estacionId: '999999999',
         ...TERMINAL, radioM: 100,
-      })).rejects.toThrow(/estacion indicada no existe/);
+      })).rejects.toThrow('La estación indicada no existe');
     });
   });
 
@@ -222,7 +224,11 @@ describe('§22 · las reglas encuentran lo que tienen que encontrar', () => {
       expect(ids).toContain(callado.viaje);
       // El que nunca mandó nada se distingue en el título.
       const delMudo = perdidas.find((a: { viajeId: string }) => String(a.viajeId) === mudo.viaje);
-      expect(delMudo.titulo).toMatch(/nunca ha enviado/);
+      // Con tildes: desde el 2026-09-13 estos títulos se LEEN en la bandeja de
+      // alertas, y antes sólo los veía quien consultaba la base.
+      expect(delMudo.titulo).toMatch(/^El viaje .+ está en marcha y nunca ha enviado posición$/);
+      const delCallado = perdidas.find((a: { viajeId: string }) => String(a.viajeId) === callado.viaje);
+      expect(delCallado.titulo).toMatch(/^Sin señal GPS en el viaje .+ desde hace \d+ min$/);
     });
   });
 
@@ -326,6 +332,7 @@ describe('§22 · las reglas que miran más allá del GPS', () => {
         (x: { tipo: string; viajeId: string }) =>
           x.tipo === 'viaje_sin_cerrar' && String(x.viajeId) === v);
       expect(suyas).toHaveLength(1);
+      expect(suyas[0].titulo).toMatch(/ lleva más de una semana sin cerrar$/);
     });
   });
 
@@ -344,6 +351,7 @@ describe('§22 · las reglas que miran más allá del GPS', () => {
         (x: { tipo: string; viajeId: string }) =>
           x.tipo === 'liquidacion_pendiente' && String(x.viajeId) === v);
       expect(suyas).toHaveLength(1);
+      expect(suyas[0].titulo).toMatch(/ está cerrado y sin liquidar$/);
     });
   });
 
@@ -434,7 +442,7 @@ describe('la deduplicación, que es lo que separa una alerta del ruido', () => {
         (x: { viajeId: string }) => String(x.viajeId) === v);
       await alertas.resolver(String(a.id), { motivo: 'Primera vez' });
       await expect(alertas.resolver(String(a.id), { motivo: 'Segunda vez' }))
-        .rejects.toThrow(/ya esta resuelta/);
+        .rejects.toThrow('Esa alerta ya está resuelta');
     });
   });
 
@@ -449,7 +457,7 @@ describe('la deduplicación, que es lo que separa una alerta del ruido', () => {
       const r = await alertas.reconocer(String(a.id));
       expect(r.estado).toBe('reconocida');
       expect(String(r.reconocidaPor)).toBe(usuario);
-      await expect(alertas.reconocer(String(a.id))).rejects.toThrow(/ya esta/);
+      await expect(alertas.reconocer(String(a.id))).rejects.toThrow('Esa alerta ya está "reconocida"');
     });
   });
 
@@ -472,6 +480,48 @@ describe('la deduplicación, que es lo que separa una alerta del ruido', () => {
   it('una alerta que no existe da 404', async () => {
     await enContexto(async () => {
       await expect(alertas.obtener('999999999')).rejects.toThrow(/no encontrada/i);
+    });
+  });
+});
+
+describe('la migración 1804: los títulos YA GUARDADOS también llevan tildes', () => {
+  /* Cambiar el texto en el servicio sólo arregla las alertas NUEVAS. La
+     deduplicación mantiene viva la que ya existe —una licencia puede estar meses
+     abierta—, así que sin migración la bandeja seguiría enseñando «esta en
+     marcha» durante semanas y con el código ya corregido. */
+  const guardar = async (titulo: string) => {
+    const [f] = await gestor().query(
+      `INSERT INTO alertas (empresa_id, tipo, severidad, titulo, entidad, clave_dedup)
+       VALUES ($1, 'perdida_gps', 'alta', $2, 'viajes', $3) RETURNING alerta_id`,
+      [empresa, titulo, `migracion:${secuencia++}:${Math.random()}`]);
+    return String(f.alerta_id);
+  };
+  const tituloDe = async (id: string) =>
+    (await gestor().query(`SELECT titulo FROM alertas WHERE alerta_id = $1`, [id]))[0].titulo;
+  const comoRunner = () => ({ query: (sql: string, p?: unknown[]) => gestor().query(sql, p) }) as unknown as QueryRunner;
+
+  it('corrige las cuatro frases, respeta lo demás, y se puede deshacer', async () => {
+    await enContexto(async () => {
+      const ids = {
+        callado: await guardar('Sin senal GPS en el viaje V-7 desde hace 12 min'),
+        mudo: await guardar('El viaje V-7 esta en marcha y nunca ha enviado posicion'),
+        semana: await guardar('El viaje V-7 lleva mas de una semana sin cerrar'),
+        liquidar: await guardar('El viaje V-7 esta cerrado y sin liquidar'),
+        // Un código de viaje puede contener cualquier cosa: sólo se toca la FRASE.
+        ajeno: await guardar('Licencia de Juan Esta por vencer'),
+      };
+      const migracion = new TildesEnTitulosDeAlertas1804000000000();
+
+      await migracion.up(comoRunner());
+      expect(await tituloDe(ids.callado)).toBe('Sin señal GPS en el viaje V-7 desde hace 12 min');
+      expect(await tituloDe(ids.mudo)).toBe('El viaje V-7 está en marcha y nunca ha enviado posición');
+      expect(await tituloDe(ids.semana)).toBe('El viaje V-7 lleva más de una semana sin cerrar');
+      expect(await tituloDe(ids.liquidar)).toBe('El viaje V-7 está cerrado y sin liquidar');
+      expect(await tituloDe(ids.ajeno)).toBe('Licencia de Juan Esta por vencer');
+
+      await migracion.down(comoRunner());
+      expect(await tituloDe(ids.mudo)).toBe('El viaje V-7 esta en marcha y nunca ha enviado posicion');
+      expect(await tituloDe(ids.callado)).toBe('Sin senal GPS en el viaje V-7 desde hace 12 min');
     });
   });
 });

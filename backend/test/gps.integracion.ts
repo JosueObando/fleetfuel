@@ -126,7 +126,7 @@ describe('ingerir · el lote de telemetría', () => {
       const { vehiculo } = await viaje();
       const p = [{ fechaHora: hace(10), latitud: 8.98, longitud: -79.53 }];
       await expect(s.ingerir({ vehiculoId: '999999999', posiciones: p }))
-        .rejects.toThrow(/Vehiculo no encontrado/);
+        .rejects.toThrow('Vehículo no encontrado');
       await expect(s.ingerir({ vehiculoId: vehiculo, viajeId: '999999999', posiciones: p }))
         .rejects.toThrow(/Viaje no encontrado/);
     });

@@ -14,12 +14,12 @@ export class ElementoColaDto extends RegistrarEventoDto {
 
 export class LoteEventosDto {
   @IsArray()
-  @ArrayMinSize(1, { message: 'Un lote vacio no es una sincronizacion' })
+  @ArrayMinSize(1, { message: 'Un lote vacío no es una sincronización' })
   /* El tope no es arbitrario: todo el lote corre dentro de UNA transaccion de
      peticion, y una transaccion larga bloquea filas y acumula savepoints. Cien
      elementos cubren de sobra una jornada sin cobertura; lo que pase de ahi son
      varias tandas, que ademas confirman antes y dejan la cola mas corta. */
-  @ArrayMaxSize(100, { message: 'El lote admite como maximo 100 elementos por tanda' })
+  @ArrayMaxSize(100, { message: 'El lote admite como máximo 100 elementos por tanda' })
   @ValidateNested({ each: true })
   @Type(() => ElementoColaDto)
   eventos: ElementoColaDto[];

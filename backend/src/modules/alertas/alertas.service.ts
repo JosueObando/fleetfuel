@@ -58,7 +58,7 @@ export class AlertasService {
     const ctx = contextoActual();
     const antes = await this.obtener(id);
     if (antes.estado !== 'abierta')
-      throw new ConflictException(`Esa alerta ya esta "${antes.estado}"`);
+      throw new ConflictException(`Esa alerta ya está "${antes.estado}"`);
     await gestor().query(
       `UPDATE alertas SET estado = 'reconocida', reconocida_por = $2, reconocida_en = now()
         WHERE alerta_id = $1`, [id, ctx.usuarioId]);
@@ -78,7 +78,7 @@ export class AlertasService {
   async resolver(id: string, dto: ResolverAlertaDto) {
     const antes = await this.obtener(id);
     if (antes.estado === 'resuelta')
-      throw new ConflictException('Esa alerta ya esta resuelta');
+      throw new ConflictException('Esa alerta ya está resuelta');
     await gestor().query(
       `UPDATE alertas SET estado = 'resuelta', resuelta_en = now(), motivo_cierre = $2
         WHERE alerta_id = $1`, [id, dto.motivo]);
@@ -173,8 +173,8 @@ export class AlertasService {
     return filas.map((f: Record<string, string>) => ({
       tipo: 'perdida_gps', severidad: 'alta' as const,
       titulo: f.ultima
-        ? `Sin senal GPS en el viaje ${f.codigo_viaje} desde hace ${Math.round(Number(f.silencio) / 60)} min`
-        : `El viaje ${f.codigo_viaje} esta en marcha y nunca ha enviado posicion`,
+        ? `Sin señal GPS en el viaje ${f.codigo_viaje} desde hace ${Math.round(Number(f.silencio) / 60)} min`
+        : `El viaje ${f.codigo_viaje} está en marcha y nunca ha enviado posición`,
       entidad: 'viajes', entidadId: String(f.viaje_id), viajeId: String(f.viaje_id),
       claveDedup: `perdida_gps:viaje:${f.viaje_id}`,
       detalle: { ultima: f.ultima, silencioSegundos: f.silencio ? Number(f.silencio) : null },
@@ -241,7 +241,7 @@ export class AlertasService {
           AND fecha_programada < now() - interval '7 days'`);
     return filas.map((f: Record<string, string>) => ({
       tipo: 'viaje_sin_cerrar', severidad: 'media' as const,
-      titulo: `El viaje ${f.codigo_viaje} lleva mas de una semana sin cerrar`,
+      titulo: `El viaje ${f.codigo_viaje} lleva más de una semana sin cerrar`,
       entidad: 'viajes', entidadId: String(f.viaje_id), viajeId: String(f.viaje_id),
       claveDedup: `viaje_sin_cerrar:viaje:${f.viaje_id}`,
       detalle: { fechaProgramada: f.fecha_programada },
@@ -257,7 +257,7 @@ export class AlertasService {
           AND v.fecha_fin < now() - interval '7 days'`);
     return filas.map((f: Record<string, string>) => ({
       tipo: 'liquidacion_pendiente', severidad: 'media' as const,
-      titulo: `El viaje ${f.codigo_viaje} esta cerrado y sin liquidar`,
+      titulo: `El viaje ${f.codigo_viaje} está cerrado y sin liquidar`,
       entidad: 'viajes', entidadId: String(f.viaje_id), viajeId: String(f.viaje_id),
       claveDedup: `liquidacion_pendiente:viaje:${f.viaje_id}`,
     }));

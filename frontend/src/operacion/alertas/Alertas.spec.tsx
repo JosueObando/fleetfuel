@@ -335,11 +335,11 @@ describe('reconocer no es resolver', () => {
 
   it('si otra persona se adelantó, el 409 se dice', async () => {
     const usuario = userEvent.setup();
-    api.crear.mockRejectedValue(new ErrorApi(409, 'Esa alerta ya esta "reconocida"'));
+    api.crear.mockRejectedValue(new ErrorApi(409, 'Esa alerta ya está "reconocida"'));
     render(<Alertas />);
     const fila = await filaDe('Sello inconsistente en V-001');
     await usuario.click(within(fila).getByRole('button', { name: /Reconocer/ }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Esa alerta ya esta "reconocida"');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Esa alerta ya está "reconocida"');
   });
 });
 
