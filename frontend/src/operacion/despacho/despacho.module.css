@@ -96,3 +96,9 @@
   color: var(--fg-strong); border-left: 3px solid var(--peligro, #c2551f);
   padding: var(--esp-2) var(--esp-3);
 }
+
+/* §2C · El historial de solicitudes de ruta del viaje: se lee, no se edita. */
+.listaSolicitudes { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--esp-3); }
+.solicitud { border-left: 3px solid var(--border-subtle); padding: var(--esp-1) var(--esp-3); min-width: 0; }
+.solicitudCabecera { margin: 0; font-size: var(--texto-sm); color: var(--fg-strong); }
+.solicitudMotivo { margin: var(--esp-1) 0; font-size: var(--texto-sm); color: var(--fg-default); overflow-wrap: anywhere; }

@@ -11,6 +11,7 @@ import { SeccionEntregas } from './SeccionEntregas';
 import { SeccionGastos } from './SeccionGastos';
 import { PanelLiquidacion } from './PanelLiquidacion';
 import { SeccionBitacora } from './SeccionBitacora';
+import { SeccionSolicitudes } from './SeccionSolicitudes';
 import type { Fila } from './tipos';
 
 /**
@@ -36,6 +37,7 @@ export function Despacho() {
   const [cargas, setCargas] = useState<Fila[]>([]);
   const [entregas, setEntregas] = useState<Fila[]>([]);
   const [gastos, setGastos] = useState<Fila[]>([]);
+  const [solicitudes, setSolicitudes] = useState<Fila[]>([]);
   const [totales, setTotales] = useState<Fila | null>(null);
   const [liquidacion, setLiquidacion] = useState<Fila | null>(null);
   const [lineas, setLineas] = useState<Fila[]>([]);
@@ -57,14 +59,14 @@ export function Despacho() {
   /**
    * Trae todo lo que cuelga de un viaje.
    *
-   * En paralelo y con `allSettled`: son siete llamadas independientes y una
+   * En paralelo y con `allSettled`: son nueve llamadas independientes y una
    * puede fallar por permisos sin que las otras dejen de tener sentido. Con un
    * `Promise.all` un 403 en gastos —que el Responsable de estación no tiene—
    * dejaría la pantalla entera sin entregas, que sí puede ver. Lo mismo vale
-   * para `eventos:leer`, que también es un permiso propio.
+   * para `eventos:leer` y `solicitudesruta:leer`, que también son permisos propios.
    */
   const cargarDetalle = useCallback(async (id: string) => {
-    const [viaje, cs, es, gs, tot, liq, evs, integ] = await Promise.allSettled([
+    const [viaje, cs, es, gs, tot, liq, evs, integ, sols] = await Promise.allSettled([
       api.obtener<Fila>(`/viajes/${id}`),
       api.listar<Fila>(`/cargas/viaje/${id}`),
       api.listar<Fila>(`/entregas/viaje/${id}`),
@@ -73,6 +75,7 @@ export function Despacho() {
       api.obtener<Fila>(`/liquidaciones/viaje/${id}`),
       api.listar<Fila>(`/eventos/viaje/${id}`),
       api.obtener<Fila>(`/eventos/viaje/${id}/integridad`),
+      api.listar<Fila>(`/solicitudes-ruta/viaje/${id}`),
     ]);
 
     if (viaje.status === 'rejected') {
@@ -91,6 +94,7 @@ export function Despacho() {
     /* `null` cuando la verificación no llegó. Poner `{integra:false}` diría que
        la cadena está rota, que es una acusación distinta de «no lo sé». */
     setIntegridad(integ.status === 'fulfilled' ? integ.value : null);
+    setSolicitudes(sols.status === 'fulfilled' ? sols.value : []);
 
     /* Las líneas de las órdenes del viaje traen la TOLERANCIA negociada, que es
        lo que permite avisar de una merma fuera de rango antes de mandarla. No
@@ -195,6 +199,7 @@ export function Despacho() {
                               cargas={cargas} totales={totales} accion={accion} />
             {/* Al final: es lo que se consulta cuando algo no cuadra, no lo que
                 se rellena al despachar. */}
+            <SeccionSolicitudes solicitudes={solicitudes} />
             <SeccionBitacora viaje={sel} eventos={eventos} integridad={integridad}
                              accion={accion} />
           </>

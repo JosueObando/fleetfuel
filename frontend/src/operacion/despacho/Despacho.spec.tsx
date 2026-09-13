@@ -84,7 +84,7 @@ const LIQUIDACION = {
 /** Respuestas por defecto: viaje cargando, una carga, sin entregas ni gastos. */
 function conApi(opciones: {
   estado?: string; cargas?: unknown[]; entregas?: unknown[];
-  gastos?: unknown[]; liquidacion?: unknown | null;
+  gastos?: unknown[]; liquidacion?: unknown | null; solicitudes?: unknown[];
 } = {}) {
   const { estado = 'cargando', cargas = [], entregas = [], gastos = [] } = opciones;
   api.listar.mockImplementation((r: string) => {
@@ -92,6 +92,7 @@ function conApi(opciones: {
     if (r.startsWith('/cargas/viaje/')) return Promise.resolve(cargas);
     if (r.startsWith('/entregas/viaje/')) return Promise.resolve(entregas);
     if (r.startsWith('/gastos/viaje/')) return Promise.resolve(gastos);
+    if (r.startsWith('/solicitudes-ruta/viaje/')) return Promise.resolve(opciones.solicitudes ?? []);
     return Promise.resolve([]);
   });
   api.obtener.mockImplementation((r: string) => {
@@ -734,6 +735,36 @@ describe('calcular la liquidación', () => {
 
     const panel = await screen.findByRole('region', { name: /Liquidación/i });
     expect(within(panel).getByText(/1 sin resolver todavía/i)).toBeInTheDocument();
+  });
+});
+
+describe('§2C · las solicitudes de cambio de ruta del viaje', () => {
+  it('se piden con el resto del viaje y se enseñan al final', async () => {
+    const usuario = userEvent.setup();
+    conApi({ estado: 'transito_estacion', solicitudes: [{
+      id: 's1', tipo: 'desvio', estado: 'pendiente', motivo: 'Calle cerrada',
+      solicitante: 'Luis', solicitadaEn: '2026-09-13T08:00:00Z' }] });
+    render(<Despacho />);
+    await abrirViaje(usuario);
+    expect(api.listar).toHaveBeenCalledWith('/solicitudes-ruta/viaje/1');
+    const region = await screen.findByRole('region', { name: 'Solicitudes de cambio de ruta' });
+    expect(within(region).getByText('Calle cerrada')).toBeInTheDocument();
+  });
+
+  it('sin `solicitudesruta:leer`, el resto del viaje se ve igual', async () => {
+    const usuario = userEvent.setup();
+    conApi({ estado: 'descargando', cargas: [CARGA] });
+    const listarBueno = api.listar.getMockImplementation()!;
+    api.listar.mockImplementation((r: string) => r.startsWith('/solicitudes-ruta/')
+      ? Promise.reject(new ErrorApi(403, 'sin permiso')) : listarBueno(r));
+    render(<Despacho />);
+    await abrirViaje(usuario);
+    // El sello sale en la tabla de cargas y en el formulario de entrega.
+    expect((await screen.findAllByText('SELLO-77')).length).toBeGreaterThan(0);
+    expect(screen.getByText('Nadie ha pedido cambiar la ruta de este viaje.')).toBeInTheDocument();
+    // Y sin aviso: para un rol sin ese permiso, un error rojo en cada viaje
+    // abierto sería falso y enseñaría a ignorar los avisos.
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 });
 

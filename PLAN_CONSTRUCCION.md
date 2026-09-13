@@ -239,7 +239,7 @@ Cerrado el mismo 2026-09-12 todo lo que era de Fase 1 o de §21:
 | `/gastos/pendientes` (§7.17) | 1 | ✅ `/operacion/gastos` (2026-09-13): la bandeja de Finanzas, de todos los viajes |
 | `GET /liquidaciones` (§7.18) | 1 | ✅ `/operacion/liquidaciones` (2026-09-13): aprobar y pagar por pestañas. Calcular sigue en despacho, que tiene el viaje delante |
 | `/geocercas` | 4 | ⬜ UX-2 / 2B — el backend sólo las CREA (no hay edición ni baja), y dibujarlas pide el mapa de UX-2 |
-| `/solicitudes-ruta` (§2C) | 5 | 🟡 `/operacion/solicitudes` (2026-09-13): la bandeja de pendientes y resolver. Pedir un cambio es de la app del conductor (2A); el historial por viaje, del panel de UX-2 |
+| `/solicitudes-ruta` (§2C) | 5 | ✅ `/operacion/solicitudes` (2026-09-13): la bandeja de pendientes y resolver; el historial de cada viaje, en despacho. Pedir sólo lo tienen el Conductor y el Administrador: su pantalla es la app del conductor (2A) |
 | `/sincronizacion`, `/gps/posiciones` | 2 | — ingesta de máquina, no pantalla (2A) |
 
 **Por qué las dos bandejas NO esperaron a UX-2** (2026-09-13): la compuerta de

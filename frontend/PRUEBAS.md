@@ -44,6 +44,7 @@ El entorno es **jsdom** y no node: lo que se prueba aquí —`localStorage`,
 | `componentes/TablaDesplazable` | Que la caja con scroll sea **alcanzable por teclado** — lo visual lo mide la sonda, en un navegador de verdad |
 | `administracion/Auditoria` | Que dos JSON se lean como **qué cambió** —incluido el campo que desaparece— y que la pantalla no ofrezca nada que escriba |
 | `administracion/Dispositivos` | Que revocar exija motivo y diga **cuántas sesiones cortó**, que es la diferencia entre «lo hice» y «funcionó» |
+| `despacho/SeccionSolicitudes` | §2C: el historial de cambios de ruta del viaje dice quién pidió, quién autorizó y POR QUÉ; se lee, no se resuelve, y un 403 no deja aviso |
 | `despacho/SeccionBitacora` | Que la integridad de la cadena se **pueda ver**, y que anular añada una corrección en vez de parecer que borra (§7.15) |
 | `catalogos/AvisoLicencias` | Que una licencia **vencida** no se confunda con una por vencer, que es lo único que la API no separa (§6.6) |
 | `operacion/alertas` | §22: que **reconocer** y **resolver** sean dos gestos —lo visto no pasa por arreglado—, que cerrar exija motivo, que «evaluar» diga cuántas encontró, y que el `detalle` JSONB se lea con nombres y unidades |

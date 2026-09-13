@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { api } from '@/api/cliente';
 import { useUsuarioActual } from '@/api/usuario-actual';
 import { mensajeDeError, useBandeja } from '../useBandeja';
+import { tipoDeSolicitud as tipoDe } from './tipos';
 import type { Fila } from '@/api/tipos';
 import { Button } from '@/componentes/Button/Button';
 import { Campo } from '@/componentes/Campo/Campo';
@@ -18,14 +19,6 @@ import estilos from '../bandeja.module.css';
  * con `useUsuarioActual`: durante la hidratación es nulo, y con nulo no se
  * ofrece resolver nada. Ofrecerlo todo sería ofrecer también lo propio.
  */
-
-const TIPOS: Record<string, { nombre: string; articulo: string; genero: 'o' | 'a' }> = {
-  desvio:       { nombre: 'Desvío',       articulo: 'el', genero: 'o' },
-  parada_extra: { nombre: 'Parada extra', articulo: 'la', genero: 'a' },
-  cancelacion:  { nombre: 'Cancelación',  articulo: 'la', genero: 'a' },
-};
-/* Sin respaldo: `ck_solicitudes_tipo` sólo admite estos tres. */
-const tipoDe = (t: unknown) => TIPOS[String(t)];
 
 /** El mismo mínimo que `ResolverCambioRutaDto`. */
 const MOTIVO_MINIMO = 5;
