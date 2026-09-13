@@ -47,9 +47,13 @@ export function Dispositivos() {
   }, []);
   useCargaInicial(cargar);
 
-  async function revocar(e: React.FormEvent) {
+  /* El dispositivo llega como argumento desde el bloque que ya comprobó que
+     existe, en vez de releerlo del estado con un `if (!revocando) return`: esa
+     guarda sólo estaba para contentar a TypeScript, no la podía alcanzar
+     ningún camino —el formulario no existe sin dispositivo— y una rama que
+     nadie puede recorrer se quita, no se cubre. */
+  async function revocar(e: React.FormEvent, dispositivo: Fila) {
     e.preventDefault();
-    if (!revocando) return;
     if (motivo.trim().length < MOTIVO_MINIMO) {
       /* Se comprueba aquí y no se deja al servidor: esta operación se hace con
          prisa, que es justo cuando nadie escribe el porqué si no se le pide, y
@@ -60,7 +64,7 @@ export function Dispositivos() {
     setGuardando(true); setError(null); setResultado(null);
     try {
       const r = await api.actualizar<Fila>(
-        `/dispositivos/${revocando.id}/revocar`, { motivo: motivo.trim() });
+        `/dispositivos/${dispositivo.id}/revocar`, { motivo: motivo.trim() });
       const cortadas = Number(r?.sesionesCortadas ?? 0);
       /* El cero se dice con todas las letras: un aparato sin sesión abierta se
          revoca igual —queda marcado y no podrá volver a entrar— y callarlo
@@ -85,7 +89,7 @@ export function Dispositivos() {
 
       <div className={catalogo.cuerpo}>
         {revocando && (
-          <form className={catalogo.formulario} onSubmit={revocar}>
+          <form className={catalogo.formulario} onSubmit={e => void revocar(e, revocando)}>
             <h2 className={estilos.subtitulo}>
               Revocar {String(revocando.nombre ?? revocando.identificador)}
             </h2>

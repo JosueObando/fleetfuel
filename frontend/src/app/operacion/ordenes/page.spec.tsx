@@ -151,6 +151,17 @@ describe('cambiar el estado de una orden', () => {
     expect(screen.getByRole('button', { name: /validada/ })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /entregada/ })).not.toBeInTheDocument();
   });
+
+  it('una orden sin salidas lo dice con una palabra, en vez de dejar la celda vacía', async () => {
+    // Una celda de acciones vacía se lee como «no ha cargado» o «no tengo
+    // permiso»; «final» dice que no hay nada más que hacer con ella.
+    api.listar.mockImplementation((r: string) => Promise.resolve(r === '/ordenes'
+      ? [{ ...ORDENES[0], estado: 'entregada', transicionesPosibles: [] }] : listarPor(r)));
+    render(<Ordenes />);
+    const fila = (await screen.findByText('EXT-1')).closest('tr')!;
+    expect(within(fila).getByText('final')).toBeInTheDocument();
+    expect(within(fila).queryAllByRole('button')).toHaveLength(0);
+  });
 });
 
 describe('crear una orden', () => {
@@ -171,6 +182,50 @@ describe('crear una orden', () => {
       clienteId: '1', estacionId: '10', prioridad: 'normal',
       detalles: [{ productoId: '9', volumenSolicitado: 4000 }],
     });
+  });
+
+  it('y lo que SÍ se escribe en los opcionales, viaja', async () => {
+    // La mitad que faltaba. «Los vacíos no viajan» sigue en verde si alguien
+    // borra la línea que manda el campo: el usuario lo escribe, la orden se
+    // crea, y el número de orden del cliente no llega nunca.
+    const usuario = userEvent.setup();
+    render(<Ordenes />);
+    await abrir(usuario);
+
+    await usuario.selectOptions(screen.getByRole('combobox', { name: /Cliente/ }), '1');
+    await waitFor(() => expect(api.listar).toHaveBeenCalledWith('/estaciones'));
+    await usuario.selectOptions(screen.getByRole('combobox', { name: /Estación/ }), '10');
+    await usuario.type(screen.getByLabelText(/orden externa/), 'OC-77');
+    await usuario.type(screen.getByLabelText(/Fecha requerida/), '2026-10-01');
+    await usuario.selectOptions(screen.getByRole('combobox', { name: /Producto/ }), '9');
+    await usuario.type(screen.getByLabelText(/^Volumen/), '4000');
+    await usuario.type(screen.getByLabelText(/Tolerancia/), '0.5');
+    await usuario.click(screen.getByRole('button', { name: /Crear orden/ }));
+
+    await waitFor(() => expect(api.crear).toHaveBeenCalled());
+    expect(api.crear.mock.calls[0][1]).toEqual({
+      clienteId: '1', estacionId: '10', prioridad: 'normal',
+      numeroOrdenExterna: 'OC-77', fechaRequerida: '2026-10-01',
+      detalles: [{ productoId: '9', volumenSolicitado: 4000, tolerancia: 0.5 }],
+    });
+  });
+
+  it('si el servidor rechaza el alta, el formulario sigue abierto con lo escrito', async () => {
+    const usuario = userEvent.setup();
+    api.crear.mockRejectedValue(new ErrorApi(400, 'La estación no pertenece al cliente'));
+    render(<Ordenes />);
+    await abrir(usuario);
+    await usuario.selectOptions(screen.getByRole('combobox', { name: /Cliente/ }), '1');
+    await waitFor(() => expect(api.listar).toHaveBeenCalledWith('/estaciones'));
+    await usuario.selectOptions(screen.getByRole('combobox', { name: /Estación/ }), '10');
+    await usuario.type(screen.getByLabelText(/orden externa/), 'OC-78');
+    await usuario.selectOptions(screen.getByRole('combobox', { name: /Producto/ }), '9');
+    await usuario.type(screen.getByLabelText(/^Volumen/), '4000');
+    await usuario.click(screen.getByRole('button', { name: /Crear orden/ }));
+
+    expect(await screen.findByText('La estación no pertenece al cliente')).toBeInTheDocument();
+    expect(screen.getByLabelText(/orden externa/)).toHaveValue('OC-78');
+    expect(screen.getByRole('button', { name: /Crear orden/ })).toBeEnabled();
   });
 
   it('el volumen total de las líneas se ve mientras se rellena', async () => {

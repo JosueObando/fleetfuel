@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Informes } from './Informes';
 import { ErrorApi } from '@/api/cliente';
@@ -278,6 +278,86 @@ describe('§14.1 · recorridos', () => {
     render(<Informes />);
     expect(await screen.findByText(/Ningún viaje cerrado/i)).toBeInTheDocument();
   });
+
+  it('un viaje SIN GPS no inventa una diferencia', async () => {
+    // `Number(null)` es 0, así que la resta ingenua daría «-250»: un odómetro
+    // que parece haber mentido 250 km cuando lo que falta es el GPS. Es justo
+    // la clase de número que acaba en una conversación con el conductor.
+    consulta = new URLSearchParams('informe=recorridos');
+    conApi({ recorridos: [{ ...RECORRIDOS[0], kilometrosGps: null, duracionSegundos: '2700' }] });
+    render(<Informes />);
+    const celdas = within((await screen.findAllByRole('row'))[1]).getAllByRole('cell');
+    expect(celdas[5]).toHaveTextContent('—');
+    expect(celdas[6]).toHaveTextContent('—');
+    // Y por debajo de una hora no se dice «0 h 45 min».
+    expect(celdas[7]).toHaveTextContent(/^45 min$/);
+  });
+
+  it('una duración que no llegó no se pinta como cero minutos', async () => {
+    consulta = new URLSearchParams('informe=recorridos');
+    conApi({ recorridos: [{ ...RECORRIDOS[0], duracionSegundos: null }] });
+    render(<Informes />);
+    const celdas = within((await screen.findAllByRole('row'))[1]).getAllByRole('cell');
+    expect(celdas[7]).toHaveTextContent(/^—$/);
+  });
+});
+
+describe('cambiar de informe mientras el anterior aún no ha contestado', () => {
+  /* La red no respeta el orden en que se pregunta. Quien cambia de pestaña
+     rápido lanza dos peticiones, y si la PRIMERA contesta la última, sus datos
+     —o su error— no pueden quedarse con la pantalla del informe que ya se
+     está mirando. */
+  function aplazado<T>() {
+    let resolver!: (v: T) => void; let rechazar!: (e: unknown) => void;
+    const promesa = new Promise<T>((res, rej) => { resolver = res; rechazar = rej; });
+    return { promesa, resolver, rechazar };
+  }
+
+  it('la respuesta tardía del anterior no pisa la del actual', async () => {
+    const operativo = aplazado<unknown>();
+    api.obtener.mockImplementation(() => operativo.promesa);
+    const { rerender } = render(<Informes />);
+
+    consulta = new URLSearchParams('informe=recorridos');
+    rerender(<Informes />);
+    expect(await screen.findByText('V-001')).toBeInTheDocument();
+
+    // Dentro de `act` y no con `waitFor`: «V-001» YA está en pantalla, así que
+    // un `waitFor` lo encontraría antes de que React aplicara la respuesta
+    // tardía, y la prueba pasaría con la protección quitada. Pasó.
+    await act(async () => { operativo.resolver(OPERATIVO); await operativo.promesa; });
+    expect(screen.getByText('V-001')).toBeInTheDocument();
+    expect(screen.queryByText(/Viajes programados/i)).not.toBeInTheDocument();
+  });
+
+  it('y su error tardío tampoco aparece bajo el informe nuevo', async () => {
+    const operativo = aplazado<unknown>();
+    api.obtener.mockImplementation(() => operativo.promesa);
+    const { rerender } = render(<Informes />);
+
+    consulta = new URLSearchParams('informe=recorridos');
+    rerender(<Informes />);
+    expect(await screen.findByText('V-001')).toBeInTheDocument();
+
+    await act(async () => {
+      operativo.rechazar(new ErrorApi(500, 'El operativo se cayó'));
+      await operativo.promesa.catch(() => undefined);
+    });
+    expect(screen.getByText('V-001')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+});
+
+describe('quitar un filtro', () => {
+  it('borrar el día lo QUITA de la URL en vez de dejar `fecha=` vacío', async () => {
+    // Un `?fecha=` vacío se comparte, se recarga y viaja a la API como filtro.
+    const usuario = userEvent.setup();
+    consulta = new URLSearchParams('fecha=2026-09-01');
+    render(<Informes />);
+    await usuario.clear(await screen.findByLabelText(/^Día/));
+    await waitFor(() => expect(reemplazar).toHaveBeenCalled());
+    expect(String(reemplazar.mock.calls.at(-1)?.[0])).not.toMatch(/fecha/);
+  });
 });
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -288,5 +368,13 @@ describe('los errores se cuentan', () => {
     api.obtener.mockRejectedValue(new ErrorApi(403, 'No tienes el permiso informes:leer'));
     render(<Informes />);
     expect(await screen.findByRole('alert')).toHaveTextContent(/informes:leer/);
+  });
+
+  it('un fallo que no es de la API (la red, un TypeError) también se dice', async () => {
+    // No trae un mensaje pensado para personas: se pone uno, en vez de pintar
+    // «Failed to fetch» o, peor, nada.
+    api.obtener.mockRejectedValue(new TypeError('Failed to fetch'));
+    render(<Informes />);
+    expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo cargar el informe');
   });
 });

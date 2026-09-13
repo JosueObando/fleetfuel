@@ -47,6 +47,20 @@ describe('RequestList · solicitudes de cambio de ruta', () => {
     expect(onAprobar).toHaveBeenCalledWith('s2');
     expect(onRechazar).toHaveBeenCalledWith('s1');
   });
+
+  it('una solicitud ya resuelta dice CÓMO, y no se puede resolver otra vez', () => {
+    // Quien pide no resuelve y lo resuelto no se reabre (§2C). Dejar los dos
+    // botones en una fila resuelta invitaría a cambiar de opinión sobre la ruta
+    // de un camión que ya salió por la otra.
+    render(<RequestList solicitudes={[
+      { ...SOLICITUDES[0], resolucion: 'aprobada' },
+      { ...SOLICITUDES[1], resolucion: 'rechazada' },
+    ]} />);
+    const [aprobada, rechazada] = screen.getAllByRole('listitem');
+    expect(within(aprobada).getByText('Aprobada')).toBeInTheDocument();
+    expect(within(rechazada).getByText('Rechazada')).toBeInTheDocument();
+    expect(screen.queryAllByRole('button')).toHaveLength(0);
+  });
 });
 
 describe('PhotoStrip y PhotoCard · los reportes del conductor', () => {
@@ -121,9 +135,21 @@ describe('MapControl y MapView', () => {
     expect(onClick).not.toHaveBeenCalled();
   });
 
-  it('el mapa se renderiza sin datos, en vez de romper el panel', () => {
-    const { container } = render(<MapView />);
-    expect(container.firstChild).toBeTruthy();
+  it('el resumen del mapa llega a quien no ve el mapa', () => {
+    // El SVG es aria-hidden: sin este párrafo, el contenido del mapa no existe
+    // para un lector de pantalla.
+    render(<MapView resumen="Ruta con 2 paradas; el vehículo va hacia la primera." />);
+    expect(screen.getByText('Ruta con 2 paradas; el vehículo va hacia la primera.')).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Zoom' })).toBeInTheDocument();
+  });
+
+  it('cargando NO anuncia una ruta que todavía no ha llegado', () => {
+    // El resumen tiene un valor por defecto. Si se pintara durante la carga,
+    // un lector de pantalla leería «Ruta con 4 paradas» de un vehículo que aún
+    // no se conoce — un dato inventado con voz de dato real.
+    render(<MapView cargando />);
+    expect(screen.queryByText(/Ruta con/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('group')).not.toBeInTheDocument();
   });
 });
 
@@ -148,6 +174,24 @@ describe('NavGroup · el menú plegable', () => {
   it('puede nacer abierto', () => {
     render(<NavGroup etiqueta="Operación" subitems={SUBITEMS} abiertoInicial />);
     expect(screen.getByRole('button', { name: /Operación/ })).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('el subitem de la sección actual lo dice con aria-current, no sólo con color', () => {
+    render(<NavGroup etiqueta="Operación" abiertoInicial
+                     subitems={[{ etiqueta: 'Órdenes' }, { etiqueta: 'Viajes', activo: true }]} />);
+    expect(screen.getByRole('button', { name: 'Viajes' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('button', { name: 'Órdenes' })).not.toHaveAttribute('aria-current');
+  });
+
+  it('cargando no se abre, y la etiqueta y el contador esperan al dato', async () => {
+    const usuario = userEvent.setup();
+    render(<NavGroup etiqueta="Operación" subitems={SUBITEMS} badge={3} cargando />);
+    const cabecera = screen.getByRole('button', { expanded: false });
+    expect(cabecera).toBeDisabled();
+    expect(screen.queryByText('Operación')).not.toBeInTheDocument();
+    expect(screen.queryByText('3')).not.toBeInTheDocument();
+    await usuario.click(cabecera);
+    expect(cabecera).toHaveAttribute('aria-expanded', 'false');
   });
 
   it('deshabilitado no se abre', async () => {

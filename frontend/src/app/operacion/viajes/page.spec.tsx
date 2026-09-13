@@ -183,6 +183,32 @@ describe('crear un viaje', () => {
       .toEqual(['codigoViaje', 'fechaProgramada']);
   });
 
+  it('y lo que SÍ se elige en los opcionales, viaja', async () => {
+    // Sin esta mitad, «los vacíos no viajan» sigue en verde si la cisterna deja
+    // de mandarse: el viaje se crea SIN cisterna, y la exclusión del §5.1 —que
+    // es lo que impide doble reserva— no tiene nada contra lo que chocar.
+    const usuario = userEvent.setup();
+    api.listar.mockImplementation((r: string) => Promise.resolve(
+      r === '/viajes' ? LISTA
+      : r === '/cisternas' ? [{ id: '3', placa: 'CT-300' }]
+      : r === '/conductores' ? [{ id: '7', nombreCompleto: 'Ana Pérez' }] : []));
+    render(<Viajes />);
+    await screen.findAllByText('V-001');
+    await usuario.click(screen.getByRole('button', { name: /Nuevo/ }));
+    await usuario.type(screen.getByLabelText(/Código del viaje/), 'V-996');
+    await usuario.type(screen.getByLabelText(/Programado para/), '2027-05-01');
+    await usuario.type(screen.getByLabelText(/Fin previsto/), '2027-05-02');
+    await usuario.selectOptions(await screen.findByRole('combobox', { name: /Cisterna/ }), '3');
+    await usuario.selectOptions(await screen.findByRole('combobox', { name: /Conductor/ }), '7');
+    await usuario.click(screen.getByRole('button', { name: /Crear viaje|Crear/ }));
+
+    await waitFor(() => expect(api.crear).toHaveBeenCalled());
+    const cuerpo = api.crear.mock.calls[0][1] as Record<string, string>;
+    expect(cuerpo).toMatchObject({ cisternaId: '3', conductorId: '7' });
+    // El fin también en ISO, por el mismo motivo que el inicio.
+    expect(cuerpo.fechaFin).toMatch(/^2027-05-02T/);
+  });
+
   it('un choque de ocupación se enseña con el mensaje del servidor', async () => {
     const usuario = userEvent.setup();
     api.crear.mockRejectedValue(
@@ -203,6 +229,15 @@ describe('la lista', () => {
     api.listar.mockResolvedValue([]);
     render(<Viajes />);
     expect(await screen.findByRole('heading', { name: 'Viajes' })).toBeInTheDocument();
+  });
+
+  it('si un viaje no se puede abrir, se dice en vez de dejar el detalle vacío', async () => {
+    const usuario = userEvent.setup();
+    api.obtener.mockRejectedValue(new ErrorApi(404, 'Ese viaje ya no existe'));
+    render(<Viajes />);
+    await screen.findAllByText('V-001');
+    await usuario.click(screen.getAllByText('V-001')[0]);
+    expect(await screen.findByText('Ese viaje ya no existe')).toBeInTheDocument();
   });
 
   it('un fallo al cargar se explica', async () => {
@@ -247,6 +282,25 @@ describe('asignar órdenes y armar el plan de carga', () => {
 
     await waitFor(() => expect(api.crear).toHaveBeenCalledWith(
       '/viajes/1/ordenes', { ordenId: '9', secuenciaEntrega: 1 }));
+  }, 30_000);
+
+  it('una orden que ya va en el viaje no se ofrece otra vez, y sin ninguna libre no hay control', async () => {
+    // La única validada es la 5, que ya está asignada. Ofrecerla invitaría a un
+    // 409; dejar el desplegable vacío con su botón, a pulsar algo que no hace
+    // nada.
+    const usuario = userEvent.setup();
+    api.obtener.mockImplementation(async (r: string) =>
+      r.startsWith('/viajes') ? conOrden()
+      : { id: '5', numeroOrdenExterna: 'EXT-1', detalles: [{ id: 'd1', producto: 'Diésel' }] });
+    api.listar.mockImplementation((r: string) =>
+      Promise.resolve(r === '/viajes' ? LISTA
+        : r === '/ordenes?estado=validada' ? [{ id: '5', numeroOrdenExterna: 'EXT-1' }] : []));
+    render(<Viajes />);
+    await abrirViaje(usuario);
+
+    await screen.findByRole('button', { name: /Quitar/ });
+    expect(screen.queryByRole('combobox', { name: /Orden validada/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Asignar orden/ })).not.toBeInTheDocument();
   }, 30_000);
 
   it('quitar una línea del plan usa su propia ruta', async () => {

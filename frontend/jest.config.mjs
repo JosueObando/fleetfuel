@@ -31,8 +31,9 @@ export default crearConfig({
     // administración (94,48 / 81,91 / 88,58 / 96,11) y la segunda tanda —
     // bitácora del viaje, licencias, auditoría y dispositivos —
     // (94,62 / 82,48 / 89,17 / 96,12). Y con Jest 30 (2026-09-13), que mide las
-    // ramas distinto: (94,65 / 83,28 / 89,19 / 96,14). Ver PRUEBAS.md.
-    global: { statements: 94, branches: 83, functions: 89, lines: 96 },
+    // ramas distinto: (94,65 / 83,28 / 89,19 / 96,14). Y tras las pruebas
+    // verificadas por mutación: (95,58 / 88,44 / 90,13 / 96,77). Ver PRUEBAS.md.
+    global: { statements: 95, branches: 88, functions: 90, lines: 96 },
   },
   collectCoverageFrom: [
     'src/**/*.{ts,tsx}',

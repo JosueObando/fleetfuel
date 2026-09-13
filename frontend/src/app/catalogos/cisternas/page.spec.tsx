@@ -170,6 +170,35 @@ describe('lo que se envía', () => {
     });
   });
 
+  it('y lo que SÍ se escribe viaja: la calibración es la prueba legal del volumen', async () => {
+    // La otra mitad de «los vacíos no viajan». Sin el certificado y sus fechas,
+    // la cisterna se crea igual, pero el aviso de calibración vencida no tiene
+    // fecha contra la que avisar, y el volumen que mide deja de ser defendible.
+    const usuario = userEvent.setup();
+    render(<Cisternas />);
+    await abrirFormulario(usuario);
+
+    await usuario.selectOptions(screen.getByRole('combobox', { name: /Vehículo/ }), '1');
+    await usuario.type(screen.getByLabelText(/Capacidad total/), '9000');
+    await usuario.type(screen.getByLabelText(/Certificado de calibración/), 'CAL-2026-14');
+    await usuario.type(screen.getByLabelText(/Fecha de calibración/), '2026-01-15');
+    await usuario.type(screen.getByLabelText(/Próxima calibración/), '2027-01-15');
+    await usuario.type(screen.getByLabelText(/^Material/), 'aluminio');
+    await usuario.type(screen.getByLabelText(/Nominal/), '4000');
+    await usuario.type(screen.getByLabelText(/Calibrada/), '3980');
+    await usuario.selectOptions(await screen.findByRole('combobox', { name: /Producto permitido/ }), '9');
+    await usuario.click(screen.getByRole('button', { name: /Crear cisterna/ }));
+
+    await waitFor(() => expect(api.crear).toHaveBeenCalled());
+    expect(api.crear.mock.calls[0][1]).toEqual({
+      vehiculoId: '1', capacidadTotal: 9000,
+      certificadoCalibracion: 'CAL-2026-14', fechaCalibracion: '2026-01-15',
+      fechaProximaCalibracion: '2027-01-15', material: 'aluminio',
+      compartimentos: [{ numero: 1, capacidadNominal: 4000, capacidadCalibrada: 3980,
+                         productoPermitido: '9' }],
+    });
+  });
+
   it('tras crear, recarga la lista y limpia el formulario', async () => {
     const usuario = userEvent.setup();
     render(<Cisternas />);
@@ -208,6 +237,39 @@ describe('la lista', () => {
     api.listar.mockImplementation((r: string) => Promise.resolve(r === '/cisternas' ? [] : listarPor(r)));
     render(<Cisternas />);
     expect(await screen.findByText(/Todavía no hay cisternas/)).toBeInTheDocument();
+  });
+
+  it('un fallo al cargar se explica, en vez de parecer una flota vacía', async () => {
+    // «Todavía no hay cisternas» tras un 403 es la peor lectura posible: invita
+    // a darlas de alta otra vez.
+    api.listar.mockImplementation((r: string) => r === '/cisternas'
+      ? Promise.reject(new ErrorApi(403, 'Permisos insuficientes. Faltan: cisternas:leer'))
+      : Promise.resolve(listarPor(r)));
+    render(<Cisternas />);
+    expect(await screen.findByText(/Faltan: cisternas:leer/)).toBeInTheDocument();
+  });
+
+  it('la próxima calibración se ve en la lista, y su ausencia se nota', async () => {
+    api.listar.mockImplementation((r: string) => Promise.resolve(r === '/cisternas'
+      ? [{ ...CISTERNAS[0], fechaProximaCalibracion: '2027-01-15T00:00:00Z' },
+         { id: '8', placa: 'IN-003', capacidadTotal: 8000, estado: 'disponible' }]
+      : listarPor(r)));
+    render(<Cisternas />);
+    await screen.findAllByText('CL-001');
+    // Por fila y no por texto: la placa sale dos veces en cada una, en su celda
+    // y en el nombre oculto del botón de baja.
+    expect(within(screen.getByRole('row', { name: /CL-001/ })).getByText('2027-01-15')).toBeInTheDocument();
+    expect(within(screen.getByRole('row', { name: /IN-003/ })).getByText('—')).toBeInTheDocument();
+  });
+
+  it('si la baja falla, el motivo del servidor se ve', async () => {
+    const usuario = userEvent.setup();
+    jest.spyOn(window, 'confirm').mockReturnValue(true);
+    api.desactivar.mockRejectedValue(new ErrorApi(409, 'La cisterna tiene un viaje en curso'));
+    render(<Cisternas />);
+    await screen.findAllByText('CL-001');
+    await usuario.click(screen.getByRole('button', { name: /Dar de baja/ }));
+    expect(await screen.findByText('La cisterna tiene un viaje en curso')).toBeInTheDocument();
   });
 
   it('dar de baja pregunta nombrando la PLACA', async () => {

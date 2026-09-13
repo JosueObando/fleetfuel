@@ -12,6 +12,7 @@ import { PanelHeader } from './PanelHeader/PanelHeader';
 import { SectionHeader } from './SectionHeader/SectionHeader';
 import { IconToolbar } from './IconToolbar/IconToolbar';
 import { ActionTile } from './ActionTile/ActionTile';
+import { Icon } from './Icon/Icon';
 
 /*
  * Los componentes de presentación del panel.
@@ -198,9 +199,27 @@ describe('los bloques de chrome', () => {
   });
 
   it('PanelHeader y SectionHeader ponen encabezados reales', () => {
+    // Por ROL y no por texto: buscando «Envíos» la prueba seguía en verde con
+    // el <h2> cambiado por un <div>, y quien navega por encabezados perdía el
+    // panel entero.
     render(<><PanelHeader titulo="Envíos" /><SectionHeader titulo="Hoy" /></>);
-    expect(screen.getByText('Envíos')).toBeInTheDocument();
-    expect(screen.getByText('Hoy')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Envíos' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Hoy' })).toBeInTheDocument();
+  });
+
+  it('PanelHeader cargando no deja buscar en lo que aún no ha llegado', () => {
+    // El título se vacía para el esqueleto, pero el botón conserva su nombre:
+    // un botón deshabilitado y SIN nombre no dice qué es ni por qué no responde.
+    render(<PanelHeader titulo="Envíos" cargando />);
+    expect(screen.queryByText('Envíos')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Buscar en Envíos' })).toBeDisabled();
+  });
+
+  it('BrandBlock cargando es sólo el esqueleto: ni icono ni textos a medias', () => {
+    const { container } = render(<BrandBlock cargando />);
+    expect(screen.queryByText(/FleetFuel/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Control de flota/)).not.toBeInTheDocument();
+    expect(container.querySelector('svg')).toBeNull();
   });
 
   it('IconToolbar da nombre accesible a cada icono', () => {
@@ -224,5 +243,30 @@ describe('los bloques de chrome', () => {
   it('ActionTile se anuncia con su etiqueta', () => {
     render(<ActionTile etiqueta="Pedir foto" />);
     expect(screen.getByRole('button', { name: /Pedir foto/ })).toBeInTheDocument();
+  });
+});
+
+describe('Icon · decorativo o con significado', () => {
+  /* La mayoría de los iconos van junto a un texto que ya dice lo mismo, y
+     anunciarlos sería ruido. Pero un icono SOLO —un estado, un aviso— es
+     información, y oculto deja a quien usa lector de pantalla sin ella. La
+     frontera la marca `titulo`, y lo que se fija aquí es que no se cruce. */
+  it('sin título se oculta y no se anuncia como imagen', () => {
+    const { container } = render(<Icon nombre="buscar" />);
+    const svg = container.querySelector('svg')!;
+    expect(svg).toHaveAttribute('aria-hidden', 'true');
+    expect(svg).not.toHaveAttribute('role');
+    expect(screen.queryByRole('img')).not.toBeInTheDocument();
+  });
+
+  it('con título es una imagen con nombre, y no está oculta', () => {
+    render(<Icon nombre="campana" titulo="Retrasado" />);
+    const img = screen.getByRole('img', { name: 'Retrasado' });
+    expect(img).not.toHaveAttribute('aria-hidden');
+  });
+
+  it('mide 20 px si nadie dice otra cosa, que es el tamaño de la navegación', () => {
+    const { container } = render(<Icon nombre="buscar" />);
+    expect(container.querySelector('svg')).toHaveAttribute('width', '20');
   });
 });

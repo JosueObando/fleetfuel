@@ -586,6 +586,46 @@ describe('registrar un gasto', () => {
     expect(screen.queryByLabelText(/reembolsa al conductor/i)).not.toBeInTheDocument();
   });
 
+  it('y el cuerpo tampoco lo lleva, aunque la casilla se quedara marcada', async () => {
+    // Esconder la casilla no borra su estado: `reembolsable` sigue a true por
+    // debajo. Si viajara con `pagadoPor: 'empresa'` chocaría con la CHECK de la
+    // base, y la prueba de arriba seguiría en verde porque sólo mira la casilla.
+    const usuario = userEvent.setup();
+    conApi({ estado: 'descargando', cargas: [CARGA] });
+    render(<Despacho />);
+    await abrirViaje(usuario);
+
+    await usuario.selectOptions(await screen.findByLabelText(/^Categoría/i), 'estacionamiento');
+    await usuario.type(screen.getByLabelText(/Descripción del gasto/i), 'Parking');
+    await usuario.type(screen.getByLabelText(/^Monto/i), '4');
+    await usuario.selectOptions(screen.getByLabelText(/Quién pagó/i), 'empresa');
+    await usuario.type(screen.getByLabelText(/^Comprobante/i), 'F-001');
+    await usuario.click(screen.getByRole('button', { name: /Registrar gasto/i }));
+
+    await waitFor(() => expect(api.crear).toHaveBeenCalledWith('/gastos/viaje/1', {
+      categoria: 'estacionamiento', descripcion: 'Parking', monto: 4,
+      pagadoPor: 'empresa', comprobante: 'F-001',
+    }));
+  });
+
+  it('un gasto ya resuelto enseña POR QUÉ, y no se puede volver a resolver', async () => {
+    // §21: lo que se guarda al resolver es el motivo. Si la tabla no lo
+    // enseñara, quien revisa la liquidación tendría que ir a la auditoría para
+    // saber por qué se le pagó —o no— un gasto al conductor.
+    const usuario = userEvent.setup();
+    conApi({ estado: 'descargando', cargas: [CARGA], gastos: [
+      { ...GASTO, id: 'x2', pagadoPor: 'empresa', reembolsable: false,
+        estado: 'rechazado', motivoResolucion: 'Factura de otro viaje' },
+    ] });
+    render(<Despacho />);
+    await abrirViaje(usuario);
+
+    const fila = (await screen.findByText('Factura de otro viaje')).closest('tr')!;
+    expect(within(fila).getByText('empresa')).toBeInTheDocument();
+    expect(within(fila).queryByText(/reembolsable/)).not.toBeInTheDocument();
+    expect(within(fila).queryByRole('button')).not.toBeInTheDocument();
+  });
+
   it('rechazar un gasto usa el mismo motivo que aprobarlo', async () => {
     const usuario = userEvent.setup();
     conApi({ estado: 'descargando', cargas: [CARGA], gastos: [GASTO] });

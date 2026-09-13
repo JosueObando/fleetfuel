@@ -56,12 +56,12 @@ cuela en una revisión visual, porque en pantalla se ve perfecto.
 
 ## El umbral
 
-| | al empezar | componentes | despacho (1C) | informes (§14) | administración | §21 y bitácora | Jest 30 | umbral |
-|---|---|---|---|---|---|---|---|---|
-| Sentencias | 7,24 % | 92,00 % | 93,24 % | 93,71 % | 94,48 % | 94,62 % | **94,65 %** | 94 |
-| Ramas | 6,75 % | 81,17 % | 81,40 % | 81,51 % | 81,91 % | 82,48 % | **83,28 %** | 83 |
-| Funciones | 4,65 % | 82,42 % | 85,34 % | 86,76 % | 88,58 % | 89,17 % | **89,19 %** | 89 |
-| Líneas | 7,44 % | 93,33 % | 94,56 % | 95,40 % | 96,11 % | 96,12 % | **96,14 %** | 96 |
+| | al empezar | componentes | despacho (1C) | informes (§14) | administración | §21 y bitácora | Jest 30 | mutaciones | umbral |
+|---|---|---|---|---|---|---|---|---|---|
+| Sentencias | 7,24 % | 92,00 % | 93,24 % | 93,71 % | 94,48 % | 94,62 % | 94,65 % | **95,58 %** | 95 |
+| Ramas | 6,75 % | 81,17 % | 81,40 % | 81,51 % | 81,91 % | 82,48 % | 83,28 % | **88,44 %** | 88 |
+| Funciones | 4,65 % | 82,42 % | 85,34 % | 86,76 % | 88,58 % | 89,17 % | 89,19 % | **90,13 %** | 90 |
+| Líneas | 7,44 % | 93,33 % | 94,56 % | 95,40 % | 96,11 % | 96,12 % | 96,14 % | **96,77 %** | 96 |
 
 **Las cuatro pasan el 80 % que pide la disciplina.**
 
@@ -72,6 +72,35 @@ cientos y tardaba 744 ms en el tablero. La suite bajó de 48,5 s a 27,5 s sin
 tocar una prueba. Las ramas suben 0,8 puntos porque el istanbul nuevo las
 cuenta distinto, no porque se cubra más; el trinquete sube igual, porque
 protege contra retrocesos medidos CON ESTE instrumento.
+
+**La columna «mutaciones»** (2026-09-13) cierra las ramas de los doce ficheros
+que quedaban por debajo del 80 %. Cada prueba nueva se dio por buena sólo
+después de ROMPER a propósito la línea que dice proteger y verla en rojo: 38
+mutaciones, todas cazadas. Dos sobrevivieron al primer intento —las de la
+carrera entre informes, ver abajo— y la prueba se rehízo.
+
+Lo que encontró, que la cobertura sola no decía:
+
+- **«Los opcionales vacíos no viajan» no protegía nada contra perderlos.** Las
+  tres pantallas con formulario (órdenes, viajes, cisternas) la tenían, y
+  ninguna la contraria. Borrar la línea que manda un campo —la cisterna de un
+  viaje, el certificado de calibración— dejaba esa prueba en verde: se
+  comprobó con ocho mutaciones, y las ocho sobrevivían. Una prueba negativa
+  necesita su positiva.
+- **Ocultar una casilla no borra su estado.** Pasar el pago a «empresa»
+  escondía «reembolsable», pero seguía a `true` por debajo; la prueba miraba
+  la casilla, no el cuerpo que se manda.
+- **Dos pruebas prometían más que su nombre**: «ponen encabezados reales»
+  buscaba texto, y seguía en verde con el `<h2>` cambiado por un `<div>`.
+- **Una guarda inalcanzable se quitó**: `if (!revocando) return` en
+  `Dispositivos` sólo contentaba a TypeScript. El dispositivo llega ahora como
+  argumento.
+
+**La trampa nueva, quinta de la familia:** para comprobar que una respuesta
+TARDÍA no cambia lo que ya se ve, `waitFor(() => getByText(...))` no sirve: lo
+encuentra al instante, antes de que React aplique la actualización, y pasa con
+la protección quitada. Hay que resolver la promesa dentro de `act` y afirmar
+después.
 
 La última columna la fija una prueba, no la buena voluntad: `umbral.spec.ts`
 compara esta tabla con `jest.config.mjs` y falla si divergen. Ya hizo su trabajo
