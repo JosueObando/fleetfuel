@@ -42,6 +42,18 @@ let secuenciaViaje = 0;
 /** El último viaje creado, para poder cerrarlo antes de abrir otro. */
 let ultimoViaje: string | null = null;
 
+/**
+ * El sello de la carga del viaje en curso.
+ *
+ * Desde el 2026-09-12 una entrega EXIGE una carga en terminal (§7.13) y
+ * contrasta su sello contra el de esa carga: es la regla 18 completa. El
+ * fixture guarda el número para que `entregaBase` lo declare, porque una
+ * entrega que no lo declara queda `inconsistente` a propósito — y eso es lo que
+ * prueba `cargas-terminal.integracion.ts`, no este fichero.
+ */
+let selloDelViaje = '';
+let secuenciaSello = 0;
+
 /** Azúcar para leer las dos aserciones de la regla 9 de un vistazo. */
 const e_pendiente = (e: { estado: string; requiereAprobacion: boolean }) =>
   e.estado === 'pendiente' && e.requiereAprobacion;
@@ -111,6 +123,20 @@ async function viajeDescargando(planificado = 3000): Promise<string> {
   await gestor().query(
     `UPDATE detalles_orden SET volumen_planificado = $2 WHERE detalle_orden_id = $1`,
     [detalleOrden, planificado]);
+
+  // La carga en terminal, sin la cual no hay entrega posible. Se carga
+  // EXACTAMENTE lo planificado para que la aritmética de merma de este fichero
+  // siga midiendo lo que medía: la diferencia entre lo que salió y lo que
+  // llegó, no la que hubiera entre el plan y la terminal.
+  selloDelViaje = `SELLO-ENT-${secuenciaSello++}`;
+  await gestor().query(
+    `INSERT INTO cargas_terminal
+       (empresa_id, viaje_id, compartimento_id, detalle_orden_id, producto_id,
+        volumen_programado, volumen_cargado, numero_sello, operador_terminal,
+        latitud, longitud)
+     VALUES ($1,$2,$3,$4,$5,$6,$6,$7,'Operador Fixture',9.3547,-79.9003)`,
+    [empresa, viaje, compartimento, detalleOrden, producto, planificado, selloDelViaje]);
+
   ultimoViaje = viaje;
   return viaje;
 }
@@ -123,6 +149,10 @@ const entregaBase = (extra: Record<string, unknown> = {}) => ({
   receptorNombre: 'Ana Receptora',
   latitud: 8.9824,
   longitud: -79.5199,
+  // Regla 18: el sello que la terminal puso. Sin declararlo, la entrega queda
+  // `inconsistente` y pasa a aprobación, que es el comportamiento correcto y
+  // enturbiaría todas las aserciones de merma de este fichero.
+  selloRecibido: selloDelViaje,
   ...extra,
 });
 
@@ -186,7 +216,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  for (const t of ['entregas', 'plan_carga', 'viaje_ordenes', 'viajes','detalles_orden', 'ordenes_abastecimiento', 'estaciones_servicio', 'clientes',
+  for (const t of ['entregas', 'cargas_terminal', 'plan_carga', 'viaje_ordenes', 'viajes','detalles_orden', 'ordenes_abastecimiento', 'estaciones_servicio', 'clientes',
                    'compartimentos_cisterna', 'productos_combustible', 'cisternas',
                    'vehiculos', 'conductores', 'auditoria', 'usuarios']) {
     await dueño.query(`DELETE FROM ${t} WHERE empresa_id = $1`, [empresa]);
@@ -205,13 +235,18 @@ describe('registrar · regla 7, toda entrega va contra una orden DE ESTE VIAJE',
     });
   });
 
-  it('un compartimento sin carga planificada de esa línea se rechaza', async () => {
+  it('un compartimento sin carga en terminal de esa línea se rechaza', async () => {
     // Regla 17: toda carga se relaciona con un compartimento. Entregar desde
     // uno que nunca llevó ese producto es combustible que no salió de ahí.
+    //
+    // Desde el 2026-09-12 quien contesta es `cargas_terminal` y no `plan_carga`:
+    // el compartimento tiene que haberse CARGADO, no sólo haberse planificado.
+    // Es una comprobación más estricta que la anterior y la contiene, porque no
+    // se puede registrar una carga de una línea que el plan no asignó.
     await enServicio(async (s) => {
       const viaje = await viajeDescargando();
       await expect(s.registrar(viaje, entregaBase({ compartimentoId: compartimentoAjeno })))
-        .rejects.toThrow(/no lleva carga de esa línea/);
+        .rejects.toThrow(/no tiene una carga registrada en terminal/);
     });
   });
 
@@ -520,13 +555,13 @@ describe('los caminos de error que sólo se ven forzándolos', () => {
       const e = await s.registrar(viaje, entregaBase({
         volumenRecibido: 2985,
         medidorInicial: 5000, medidorFinal: 7985,
-        selloRecibido: 'SELLO-778', estadoSello: 'intacto',
+        estadoSello: 'intacto',
         receptorDocumento: '8-888-8888', firmaDigital: 'base64:xxxx',
         fechaLlegada: '2029-06-01T09:30:00Z',
         documentoEntrega: 'GUIA-2029-0001',
         observaciones: 'Descarga sin incidencias',
       }));
-      expect(e.selloRecibido).toBe('SELLO-778');
+      expect(e.selloRecibido).toBe(selloDelViaje);
       expect(e.estadoSello).toBe('intacto');
       expect(e.receptorDocumento).toBe('8-888-8888');
       expect(e.documentoEntrega).toBe('GUIA-2029-0001');

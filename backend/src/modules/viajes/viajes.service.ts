@@ -163,10 +163,22 @@ export class ViajesService {
       : dto.estado === 'cerrado' ? ', fecha_cierre = now(), fecha_fin = coalesce(fecha_fin, now())'
       : '';
 
-    await gestor().query(
-      `UPDATE viajes SET estado = $2, motivo_cancelacion = coalesce($3, motivo_cancelacion),
-              actualizado_en = now()${marca}
-        WHERE viaje_id = $1`, [id, dto.estado, dto.motivo ?? null]);
+    /* Traducido como en `crear` y `actualizar`, y aquí hace MÁS falta que allí.
+       `periodo` es `tstzrange(coalesce(fecha_inicio, fecha_programada), fecha_fin)`,
+       así que estampar `fecha_inicio = now()` estira el periodo desde este
+       momento hasta el fin previsto: un viaje programado para dentro de unos
+       meses que arranca hoy pasa a ocupar todo lo que hay en medio y choca con
+       cualquier otro viaje abierto de esa cisterna. Es el único de los tres
+       caminos donde el periodo cambia sin que nadie toque una fecha, y era el
+       único sin traducir — así que la situación de negocio más corriente de
+       todas, «esa cisterna ya está ocupada», salía como un 500 con el nombre de
+       una restricción dentro. */
+    try {
+      await gestor().query(
+        `UPDATE viajes SET estado = $2, motivo_cancelacion = coalesce($3, motivo_cancelacion),
+                actualizado_en = now()${marca}
+          WHERE viaje_id = $1`, [id, dto.estado, dto.motivo ?? null]);
+    } catch (e) { traducirSolapamiento(e); }
 
     auditar({
       entidad: 'viajes', entidadId: String(id),
@@ -192,6 +204,15 @@ export class ViajesService {
       throw new ConflictException('El viaje no tiene plan de carga');
     if (!antes.cisternaId || !antes.conductorId)
       throw new ConflictException('El viaje necesita cisterna y conductor asignados');
+
+    // Regla 13 · «Los documentos vencidos bloquearán la asignación.»
+    //
+    // Se comprueba AQUÍ y no al asignar, porque §5 le da al Despachador
+    // «autoriza salida y verifica documentos» y porque una licencia puede
+    // caducar entre el día que se planifica el viaje y el día que sale: mirar
+    // sólo al asignar dejaría salir en marzo un viaje armado en enero con una
+    // licencia que venció en febrero.
+    await documentosAlDia(antes.conductorId, antes.cisternaId);
 
     await gestor().query(
       `UPDATE viajes SET estado = 'autorizado', autorizado_por = $2, actualizado_en = now()
@@ -346,4 +367,42 @@ export class ViajesService {
     auditar({ entidad: 'plan_carga', entidadId: String(planId), valorAnterior: linea });
     return this.obtener(viajeId);
   }
+}
+
+/**
+ * Regla 13 · Los documentos que tienen que estar vigentes para que un viaje
+ * salga a la calle.
+ *
+ * DOS DECISIONES QUE NO SE DEDUCEN DEL CÓDIGO
+ *
+ * **El corte es `fecha < current_date`, el mismo que usa la alerta
+ * `licencia_por_vencer`.** Un documento vence al final de su día, no al
+ * principio, así que el que caduca hoy todavía vale. Que el bloqueo y el aviso
+ * compartan el corte es lo que evita que el sistema avise de algo que no
+ * bloquea, o bloquee algo de lo que nunca avisó — y esa contradicción es
+ * exactamente la forma en que un despachador deja de creerse las alertas.
+ *
+ * **Sin fecha declarada no se bloquea.** Bloquear por un dato que nadie
+ * capturó convertiría la regla en un freno a la carga de datos, y el primer
+ * atajo de quien tenga prisa sería inventarse una fecha — con lo que el campo
+ * pasaría a contener ruido y la regla dejaría de proteger nada. Lo que falta
+ * es un hueco de catálogo, y se ve en `GET /conductores/licencias-por-vencer`.
+ */
+async function documentosAlDia(conductorId: string, cisternaId: string): Promise<void> {
+  const [doc] = await gestor().query(
+    `SELECT c.fecha_vencimiento_licencia < current_date AS "licenciaVencida",
+            c.nombre_completo AS "conductor",
+            ci.fecha_proxima_calibracion < current_date AS "calibracionVencida"
+       FROM conductores c
+       CROSS JOIN cisternas ci
+      WHERE c.conductor_id = $1 AND ci.cisterna_id = $2`, [conductorId, cisternaId]);
+  if (!doc) return;
+
+  if (doc.licenciaVencida)
+    throw new ConflictException(
+      `La licencia de ${doc.conductor} está vencida: no puede salir a ruta (regla 13)`);
+  if (doc.calibracionVencida)
+    throw new ConflictException(
+      'La calibración de la cisterna está vencida: no puede certificar el volumen que ' +
+      'transporta (regla 13)');
 }

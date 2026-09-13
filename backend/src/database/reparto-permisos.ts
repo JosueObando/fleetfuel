@@ -39,7 +39,7 @@ const CATALOGOS = ['clientes', 'estaciones', 'productos', 'vehiculos', 'cisterna
 const LEER_CATALOGOS = CATALOGOS.map(m => `${m}:leer`);
 /** Leer el flujo de la Fase 1B. */
 const LEER_OPERACION = [
-  'ordenes:leer', 'viajes:leer', 'plancarga:leer', 'entregas:leer',
+  'ordenes:leer', 'viajes:leer', 'plancarga:leer', 'cargas:leer', 'entregas:leer',
   'solicitudesruta:leer', 'gastos:leer', 'informes:leer', 'eventos:leer',
   'gps:leer', 'alertas:leer', 'geocercas:leer',
 ];
@@ -56,6 +56,7 @@ export const REPARTO: Record<string, string[]> = {
     ...TODOS('ordenes', ['leer', 'crear', 'actualizar', 'cancelar']),
     ...TODOS('viajes', ['leer', 'crear', 'actualizar', 'cancelar', 'autorizar']),
     ...TODOS('plancarga', ['leer', 'crear', 'actualizar', 'cancelar']),
+    ...TODOS('cargas', ['leer', 'registrar', 'validar']),
     ...TODOS('entregas', ['leer', 'crear', 'aprobar']),
     ...TODOS('solicitudesruta', ['leer', 'crear', 'resolver']),
     ...TODOS('gastos', ['leer', 'crear', 'aprobar']),
@@ -76,6 +77,10 @@ export const REPARTO: Record<string, string[]> = {
     // entrega no puede ser quien perdona su merma. Es la separación del §7
     // llevada al fraude de volumen, la misma que separa armar de autorizar.
     'entregas:aprobar',
+    // §5: «Monitorea rutas, retrasos, alertas y DIFERENCIAS». La diferencia
+    // entre lo programado y lo cargado es literalmente eso. Valida y no
+    // registra, por el mismo motivo que aprueba la merma sin capturarla.
+    'cargas:validar',
     // §5: «Monitorea rutas, retrasos, alertas y diferencias». Resolver un
     // cambio de ruta es exactamente eso.
     'solicitudesruta:resolver', 'gastos:aprobar',
@@ -116,9 +121,18 @@ export const REPARTO: Record<string, string[]> = {
     ...TODOS('ordenes', ['leer', 'crear', 'actualizar', 'cancelar']),
   ],
 
+  // §5, literal: «Confirma volúmenes cargados y sellos». Hasta el 2026-09-12
+  // este rol no podía hacer ninguna de las dos cosas: tenía cuatro permisos
+  // de lectura y un `plancarga:actualizar`, porque el módulo que le da
+  // trabajo —§7.13 `cargas_terminal`— no se había construido. Un rol sin
+  // trabajo es tan buena señal de un hueco como una tabla sin filas.
+  //
+  // Registra y NO valida: quien confirma lo que salió de la terminal no da
+  // por buena su propia confirmación.
   'Operador de carga': [
     'cisternas:leer', 'productos:leer', 'conductores:leer',
     ...LEER_OPERACION, 'plancarga:actualizar',
+    'cargas:registrar',
   ],
 
   'Mantenimiento': [

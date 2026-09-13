@@ -398,6 +398,172 @@ describe('autorizar · la separación entre quien planifica y quien deja salir',
   });
 });
 
+/**
+ * Regla 13 · «Los documentos vencidos bloquearán la asignación.»
+ *
+ * Hasta el 2026-09-12 esta regla NO se aplicaba en ninguna parte. Existía la
+ * alerta `licencia_por_vencer` de `alertas.service.ts`, y su propio comentario
+ * decía «la regla 13 dice que los documentos vencidos BLOQUEAN la asignación»
+ * — y a continuación implementaba sólo el aviso. Un comentario que nombra el
+ * bloqueo no es el bloqueo, y la alerta es reactiva: se entera después.
+ *
+ * El sitio es `autorizar` y no `crear`, y es una decisión: §5 le da al
+ * Despachador «autoriza salida y VERIFICA DOCUMENTOS», y una licencia puede
+ * caducar entre el día que se planifica el viaje y el día que sale. Comprobarlo
+ * al asignar dejaría salir en marzo un viaje armado en enero con una licencia
+ * que venció en febrero, que es justo el caso que la regla existe para evitar.
+ */
+/**
+ * El choque de agenda del §5.1 cuando aparece al MOVER el viaje, no al crearlo.
+ *
+ * `periodo` es `tstzrange(coalesce(fecha_inicio, fecha_programada), fecha_fin)`,
+ * así que pasar a `desplazamiento_terminal` —que estampa `fecha_inicio = now()`—
+ * ESTIRA el periodo del viaje desde este momento hasta su fin previsto. Un viaje
+ * programado para dentro de unos meses que arranca hoy pasa a ocupar todo lo que
+ * hay en medio, y choca con cualquier otro viaje abierto de la misma cisterna.
+ *
+ * Es una situación de negocio corriente —«esa cisterna ya está ocupada»— y hasta
+ * el 2026-09-12 salía como un **500 con el nombre de una restricción dentro**:
+ * `crear` y `actualizar` envolvían la consulta en `traducirSolapamiento` y
+ * `cambiarEstado` no, que es justo el único de los tres donde el periodo cambia
+ * sin que nadie toque una fecha.
+ *
+ * Lo encontró el recorrido de navegador de 1C, y no antes, porque ninguna prueba
+ * había movido un viaje más allá de `autorizado` reutilizando una cisterna: la
+ * suite de superficie estrena una en cada bloque, que es lo que una flota real
+ * no hace.
+ */
+describe('cambiarEstado · el solapamiento del §5.1 se cuenta, no revienta', () => {
+  it('arrancar un viaje que pisa a otro de la misma cisterna da un conflicto legible',
+    async () => {
+      await enServicio(async s => {
+        const { gestor } = await import('../src/common/contexto/contexto-peticion');
+
+        /* Dos viajes de la MISMA cisterna que hoy no se solapan: enero y junio
+           de un año lejano. Los dos abiertos, que es lo que la exclusión mira
+           —es parcial sobre los estados distintos de cerrado y cancelado—. */
+        const crear = async (codigo: string, desde: string, hasta: string) => {
+          const [v] = await gestor().query(
+            `INSERT INTO viajes (empresa_id, codigo_viaje, tipo_viaje, cisterna_id,
+                                 conductor_id, fecha_programada, fecha_fin, estado)
+             VALUES ($1,$2,'simple',$3,$4,$5,$6,'autorizado') RETURNING viaje_id`,
+            [empresa, codigo, cisterna, conductor, desde, hasta]);
+          return String(v.viaje_id);
+        };
+        await crear(`SRV-OCU-A-${Math.random().toString(36).slice(2, 7)}`,
+                    '2040-01-10T08:00:00Z', '2040-01-11T18:00:00Z');
+        const segundo = await crear(`SRV-OCU-B-${Math.random().toString(36).slice(2, 7)}`,
+                                    '2040-06-01T08:00:00Z', '2040-06-02T18:00:00Z');
+
+        /* Salir del patio exige plan de carga —un camión no va a la terminal
+           sin saber qué recoger—, así que el segundo lleva el suyo. */
+        await gestor().query(
+          `INSERT INTO plan_carga (empresa_id, viaje_id, compartimento_id, detalle_orden_id,
+                                   producto_id, volumen_planificado)
+           VALUES ($1,$2,$3,$4,$5,100)`,
+          [empresa, segundo, compartimento, detalleOrden, producto]);
+
+        // Arrancarlo hoy estira su periodo hasta junio de 2040 y se come al otro.
+        await expect(s.cambiarEstado(segundo, { estado: 'desplazamiento_terminal' }))
+          .rejects.toThrow(/ya tiene otro viaje que se superpone/);
+      });
+    });
+
+  it('y sin nadie a quien pisar, arranca sin ruido', async () => {
+    await enServicio(async s => {
+      const id = await viajeCompleto(s, 'programado');
+      await s.autorizar(id);
+      const v = await s.cambiarEstado(id, { estado: 'desplazamiento_terminal' });
+      expect(v.estado).toBe('desplazamiento_terminal');
+      expect(v.fechaInicio).not.toBeNull();
+    });
+  });
+});
+
+describe('autorizar · regla 13, los documentos vencidos bloquean la salida', () => {
+  const fecha = (dias: number) => {
+    const d = new Date();
+    d.setUTCDate(d.getUTCDate() + dias);
+    return d.toISOString().slice(0, 10);
+  };
+
+  async function licencia(vence: string | null) {
+    const { gestor } = await import('../src/common/contexto/contexto-peticion');
+    await gestor().query(
+      `UPDATE conductores SET fecha_vencimiento_licencia = $2 WHERE conductor_id = $1`,
+      [conductor, vence]);
+  }
+
+  async function calibracion(vence: string | null) {
+    const { gestor } = await import('../src/common/contexto/contexto-peticion');
+    await gestor().query(
+      `UPDATE cisternas SET fecha_proxima_calibracion = $2 WHERE cisterna_id = $1`,
+      [cisterna, vence]);
+  }
+
+  it('una licencia vencida impide autorizar, y el mensaje dice cuál documento', async () => {
+    await enServicio(async s => {
+      const id = await viajeCompleto(s, 'programado');
+      await licencia(fecha(-1));
+      await expect(s.autorizar(id)).rejects.toThrow(/licencia/i);
+    });
+  });
+
+  it('la licencia que vence HOY todavía vale', async () => {
+    // El límite es estricto y está donde la alerta ya lo tenía: vencida es
+    // `fecha < hoy`. Un documento vence al final de su día, no al principio, y
+    // que las dos piezas usen el mismo corte evita que el sistema avise de algo
+    // que no bloquea o bloquee algo de lo que no avisó.
+    await enServicio(async s => {
+      const id = await viajeCompleto(s, 'programado');
+      await licencia(fecha(0));
+      const v = await s.autorizar(id);
+      expect(v.estado).toBe('autorizado');
+    });
+  });
+
+  it('una licencia que vence mañana autoriza sin ruido', async () => {
+    await enServicio(async s => {
+      const id = await viajeCompleto(s, 'programado');
+      await licencia(fecha(1));
+      const v = await s.autorizar(id);
+      expect(v.estado).toBe('autorizado');
+    });
+  });
+
+  it('sin fecha declarada no se bloquea: no hay documento que esté vencido', async () => {
+    // Bloquear por un dato que nadie capturó convertiría la regla en un freno
+    // a la carga de datos, y el primer atajo sería inventarse una fecha.
+    await enServicio(async s => {
+      const id = await viajeCompleto(s, 'programado');
+      await licencia(null);
+      const v = await s.autorizar(id);
+      expect(v.estado).toBe('autorizado');
+    });
+  });
+
+  it('la calibración vencida de la cisterna también bloquea', async () => {
+    // El §7.5 la trata como un documento de la unidad, y una cisterna sin
+    // calibración vigente no puede certificar el volumen que transporta — que
+    // es el dato del que cuelga toda la conciliación del §17.
+    await enServicio(async s => {
+      const id = await viajeCompleto(s, 'programado');
+      await calibracion(fecha(-1));
+      await expect(s.autorizar(id)).rejects.toThrow(/calibraci/i);
+    });
+  });
+
+  it('con los dos documentos al día, autoriza', async () => {
+    await enServicio(async s => {
+      const id = await viajeCompleto(s, 'programado');
+      await licencia(fecha(90));
+      await calibracion(fecha(180));
+      const v = await s.autorizar(id);
+      expect(v.estado).toBe('autorizado');
+    });
+  });
+});
+
 describe('el solapamiento del §5.1 llega como error de negocio, no como 500', () => {
   it('traduce el 23P01 de Postgres a un conflicto legible', async () => {
     // Sin esta traducción, «esa cisterna ya está ocupada» —que es una respuesta

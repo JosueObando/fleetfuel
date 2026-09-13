@@ -31,6 +31,7 @@ import { ConductoresModule } from './modules/conductores/conductores.module';
 import { OrdenesModule } from './modules/ordenes/ordenes.module';
 import { ViajesModule } from './modules/viajes/viajes.module';
 import { EntregasModule } from './modules/entregas/entregas.module';
+import { CargasModule } from './modules/cargas/cargas.module';
 import { SolicitudesRutaModule } from './modules/solicitudes-ruta/solicitudes-ruta.module';
 import { GastosModule } from './modules/gastos/gastos.module';
 import { InformesModule } from './modules/informes/informes.module';
@@ -47,6 +48,7 @@ import { AlertasModule } from './modules/alertas/alertas.module';
     VehiculosModule, CisternasModule, ConductoresModule,
     // Fase 1B · órdenes, viajes y plan de carga
     OrdenesModule, ViajesModule,
+    CargasModule,
     EntregasModule,
     SolicitudesRutaModule,
     GastosModule,

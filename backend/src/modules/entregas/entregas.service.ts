@@ -11,6 +11,7 @@ const CAMPOS = `e.entrega_id AS id, e.viaje_id AS "viajeId", e.orden_id AS "orde
                 e.diferencia_volumen AS "diferenciaVolumen",
                 e.porcentaje_merma AS "porcentajeMerma",
                 e.medidor_inicial AS "medidorInicial", e.medidor_final AS "medidorFinal",
+                e.carga_id AS "cargaId",
                 e.sello_recibido AS "selloRecibido", e.estado_sello AS "estadoSello",
                 e.receptor_nombre AS "receptorNombre", e.receptor_documento AS "receptorDocumento",
                 e.latitud, e.longitud, e.fecha_llegada AS "fechaLlegada",
@@ -84,13 +85,20 @@ export class EntregasService {
     if (!detalle) throw new BadRequestException(
       'Esa línea de orden no pertenece a ninguna orden asignada a este viaje');
 
-    // 2 · Regla 17 · Sólo se entrega desde el compartimento que llevó esa carga.
+    // 2 · Regla 17 · Sólo se entrega desde el compartimento que llevó esa carga,
+    //     y la carga es la de la TERMINAL (§7.13), no la del plan.
+    //
+    //     Hasta el 2026-09-12 esto miraba `plan_carga`, y tenía dos
+    //     consecuencias que no se ven de golpe: la merma del §10.5 se calculaba
+    //     contra lo que se PENSABA cargar —así que el combustible que nunca
+    //     subió al camión se le contaba de menos al conductor— y el sello no
+    //     tenía origen, porque el plan no lleva ninguno.
     const [carga] = await gestor().query(
-      `SELECT volumen_planificado FROM plan_carga
+      `SELECT carga_id, volumen_cargado, numero_sello FROM cargas_terminal
         WHERE viaje_id = $1 AND compartimento_id = $2 AND detalle_orden_id = $3`,
       [viajeId, dto.compartimentoId, dto.detalleOrdenId]);
     if (!carga) throw new BadRequestException(
-      'Ese compartimento no lleva carga de esa línea en este viaje');
+      'Ese compartimento no tiene una carga registrada en terminal para esa línea de este viaje');
 
     // 3 · §10.4 · Si vienen medidores, el volumen descargado sale de la resta.
     const volumenDescargado = medido(dto);
@@ -99,28 +107,35 @@ export class EntregasService {
     //     alguien más la apruebe. Se compara en valor absoluto: recibir de más
     //     es tan anómalo como recibir de menos, y sólo mirar un lado dejaría
     //     pasar la mitad de los descuadres.
-    const volumenCargado = Number(carga.volumen_planificado);
+    const volumenCargado = Number(carga.volumen_cargado);
     const tolerancia = toleranciaDe(detalle);
     const merma = volumenCargado > 0
       ? ((volumenCargado - dto.volumenRecibido) / volumenCargado) * 100
       : 0;
-    const dentro = Math.abs(merma) <= tolerancia;
+
+    // 5 · Regla 18 · «Todo sello debe quedar asociado a una carga y verificarse
+    //     en la entrega». La COINCIDENCIA la decide el sistema; la integridad
+    //     física la sigue observando la persona que está delante del camión.
+    const estadoSello = verificarSello(carga.numero_sello, dto);
+
+    const dentro = Math.abs(merma) <= tolerancia && estadoSello === 'intacto';
 
     let creada;
     try {
       [creada] = await gestor().query(
         `INSERT INTO entregas
            (empresa_id, viaje_id, orden_id, detalle_orden_id, estacion_id, producto_id,
-            compartimento_id, volumen_cargado, volumen_descargado, volumen_recibido,
+            compartimento_id, carga_id, volumen_cargado, volumen_descargado, volumen_recibido,
             medidor_inicial, medidor_final, sello_recibido, estado_sello,
             receptor_nombre, receptor_documento, firma_digital, latitud, longitud,
             fecha_llegada, documento_entrega, observaciones, estado)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
          RETURNING ${CAMPOS.replace(/e\./g, '')}`,
         [ctx.empresaId, viajeId, detalle.orden_id, dto.detalleOrdenId, detalle.estacion_id,
-         detalle.producto_id, dto.compartimentoId, volumenCargado, volumenDescargado,
+         detalle.producto_id, dto.compartimentoId, carga.carga_id, volumenCargado,
+         volumenDescargado,
          dto.volumenRecibido, dto.medidorInicial ?? null, dto.medidorFinal ?? null,
-         dto.selloRecibido ?? null, dto.estadoSello ?? null, dto.receptorNombre,
+         dto.selloRecibido ?? null, estadoSello, dto.receptorNombre,
          dto.receptorDocumento ?? null, dto.firmaDigital ?? null, dto.latitud, dto.longitud,
          dto.fechaLlegada ?? null, dto.documentoEntrega ?? null, dto.observaciones ?? null,
          dentro ? 'aceptada' : 'pendiente']);
@@ -147,7 +162,14 @@ export class EntregasService {
 
     auditar({
       entidad: 'entregas', entidadId: String(creada.id),
-      valorNuevo: { ...dto, volumenCargado, porcentajeMerma: merma, estado: creada.estado },
+      // `estadoSello` va el VERIFICADO y no el que vino en el cuerpo: la
+      // auditoría tiene que guardar lo que el sistema concluyó, no lo que le
+      // propusieron. Si guardara la propuesta, reconstruir por qué una entrega
+      // quedó pendiente exigiría rehacer la comparación a mano.
+      valorNuevo: {
+        ...dto, estadoSello, cargaId: carga.carga_id,
+        volumenCargado, porcentajeMerma: merma, estado: creada.estado,
+      },
     });
     return this.obtener(String(creada.id));
   }
@@ -204,6 +226,28 @@ export class EntregasService {
     });
     return this.obtener(id);
   }
+}
+
+/**
+ * Regla 18 · El sello se verifica CONTRA EL DE LA CARGA, no contra la palabra
+ * de quien recibe.
+ *
+ * Lo que este reparto de responsabilidades protege:
+ *
+ * - **La coincidencia la decide el sistema.** Antes, `estado_sello` venía en el
+ *   cuerpo de la petición: el mismo actor aportaba el número Y su veredicto. Un
+ *   control en el que eso pasa no controla nada — la alerta `sello_inconsistente`
+ *   sólo disparaba cuando alguien ya había confesado.
+ * - **Omitirlo no es la salida barata.** Si no declarar sello dejara la entrega
+ *   limpia, el camino para que nunca hubiera un descuadre sería no escribirlo.
+ * - **Lo físico sigue siendo humano.** Un precinto reventado con el número
+ *   correcto sólo lo ve quien está delante del camión, así que una alarma
+ *   levantada a mano se respeta. Lo que se le quita a la persona es la
+ *   capacidad de RETIRAR una: puede empeorar el veredicto, nunca mejorarlo.
+ */
+function verificarSello(selloDeLaCarga: string, dto: RegistrarEntregaDto): string {
+  if (dto.selloRecibido !== selloDeLaCarga) return 'inconsistente';
+  return dto.estadoSello && dto.estadoSello !== 'intacto' ? dto.estadoSello : 'intacto';
 }
 
 /**

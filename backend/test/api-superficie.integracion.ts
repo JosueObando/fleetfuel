@@ -415,20 +415,56 @@ describe('los seis catálogos, ruta por ruta', () => {
 });
 
 /*
+ * §7.13 · La carga en terminal. Va antes que las entregas porque es su
+ * requisito: sin carga registrada no hay contra qué verificar el sello, que es
+ * la regla 18 entera.
+ */
+describe('cargas en terminal · el origen de la cadena de custodia', () => {
+  it('registrar, leer, validar — y que una validada ya no se rechace', async () => {
+    // `viajeHasta` registra la carga al pasar por `cargando`: aquí se para en
+    // `cargado`, que es donde el §9 deja el viaje después de la terminal.
+    const { viaje, carga } = await viajeHasta('cargado', sello());
+    expect(carga!.estadoValidacion).toBe('pendiente');
+
+    const lista = await ruta('GET /cargas/viaje/:viajeId',
+      api().get(`/api/cargas/viaje/${viaje.id}`).set(cab()), [200]);
+    expect(lista.body).toHaveLength(1);
+
+    const una = await ruta('GET /cargas/:id',
+      api().get(`/api/cargas/${carga!.id}`).set(cab()), [200]);
+    expect(String(una.body.id)).toBe(String(carga!.id));
+
+    const validada = await ruta('POST /cargas/:id/validar',
+      api().post(`/api/cargas/${carga!.id}/validar`).set(cabPost()).send({}), [200, 201]);
+    expect(validada.body.estadoValidacion).toBe('validada');
+
+    // Mismo idioma que las entregas: la ruta existe y contesta con su
+    // conflicto. Una carga ya resuelta no se vuelve a resolver.
+    await ruta('POST /cargas/:id/rechazar',
+      api().post(`/api/cargas/${carga!.id}/rechazar`).set(cabPost())
+        .send({ motivo: 'Ya estaba validada, esto tiene que dar conflicto' }), [409]);
+  }, 180_000);
+});
+
+/*
  * Las entregas de la Fase 1C. Van al final porque necesitan el viaje entero
  * armado: orden validada, asignada, plan de carga y el viaje descargando.
  */
 describe('entregas · el eslabón que cierra orden → carga → viaje → entrega', () => {
   it('registrar, leer, y aprobar una diferencia fuera de tolerancia', async () => {
-    const { viaje, detalle, cisterna } = await viajeHasta('descargando', sello());
+    const { viaje, detalle, cisterna, carga } = await viajeHasta('descargando', sello());
 
     // 2850 de 3000 son un 5 % de merma sobre una tolerancia del 1 %: entra
-    // pendiente, que es lo que la regla 9 pide.
+    // pendiente, que es lo que la regla 9 pide. El sello va declarado y CUADRA,
+    // para que lo que deje la entrega pendiente sea el volumen y sólo el
+    // volumen: si no se declarara, la regla 18 la marcaría inconsistente y la
+    // prueba pasaría por el motivo equivocado.
     const entrega = (await ruta('POST /entregas/viaje/:viajeId',
       api().post(`/api/entregas/viaje/${viaje.id}`).set(cabPost()).send({
         detalleOrdenId: String(detalle.id),
         compartimentoId: String(cisterna.compartimentos[0].id),
         volumenRecibido: 2850, receptorNombre: 'Ana Receptora',
+        selloRecibido: carga!.numeroSello,
         latitud: 8.9824, longitud: -79.5199,
       }), [201])).body;
     expect(entrega.estado).toBe('pendiente');
@@ -509,12 +545,28 @@ async function viajeHasta(estado: string, marca: string) {
   await api().post(`/api/viajes/${viaje.id}/autorizar`).set(cabPost()).send({}).expect(201);
   const CAMINO = ['desplazamiento_terminal', 'espera_carga', 'cargando', 'cargado',
                   'transito_estacion', 'descargando'];
+  let carga: Record<string, string> | undefined;
   for (const paso of CAMINO) {
     await api().patch(`/api/viajes/${viaje.id}/estado`).set(cab())
       .send({ estado: paso }).expect(200);
+
+    // §9 Etapa 5 · La carga en terminal se registra MIENTRAS el viaje carga, y
+    // por eso va aquí dentro y no después del bucle: el servicio la rechaza en
+    // cualquier otro estado, que es exactamente lo que se quiere de un registro
+    // de cadena de custodia. Sin ella no hay entrega posible (regla 18).
+    if (paso === 'cargando') {
+      carga = (await ruta('POST /cargas/viaje/:viajeId',
+        api().post(`/api/cargas/viaje/${viaje.id}`).set(cabPost()).send({
+          compartimentoId: String(cisterna.compartimentos[0].id),
+          detalleOrdenId: String(detalle.id),
+          volumenCargado: 3000, numeroSello: `SELLO-${marca}`,
+          operadorTerminal: 'Luis Operador',
+          latitud: 9.3547, longitud: -79.9003,
+        }), [201])).body;
+    }
     if (paso === estado) break;
   }
-  return { viaje, detalle, cisterna };
+  return { viaje, detalle, cisterna, carga };
 }
 
 /*

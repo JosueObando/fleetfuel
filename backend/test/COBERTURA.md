@@ -12,12 +12,17 @@ muere y se lleva por delante la costumbre.
 
 Así que es un **trinquete**: se puso justo por debajo de lo que ya había.
 
-| | al ponerlo | catálogos | admin. | superficie | plan carga | reserva | cierre | entregas | §2C | umbral |
-|---|---|---|---|---|---|---|---|---|---|---|
-| Sentencias | 63,47 % | 74,36 % | 89,41 % | 94,27 % | 96,30 % | 97,35 % | 97,92 % | 97,98 % | **98,05 %** | 98 |
-| Ramas | 42,52 % | 60,24 % | 71,95 % | 80,00 % | 84,50 % | 87,97 % | 89,38 % | 90,67 % | **90,85 %** | 90 |
-| Funciones | 46,48 % | 59,66 % | 79,67 % | 98,68 % | 98,71 % | 100 % | 100 % | 100 % | **100 %** | 99 |
-| Líneas | 66,18 % | 77,55 % | 92,10 % | 95,35 % | 97,43 % | 98,55 % | 98,89 % | 98,88 % | **98,92 %** | 98 |
+| | al ponerlo | catálogos | admin. | superficie | plan carga | reserva | cierre | entregas | §2C | §7.15 | 2B | §7.13 | umbral |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Sentencias | 63,47 % | 74,36 % | 89,41 % | 94,27 % | 96,30 % | 97,35 % | 97,92 % | 97,98 % | 98,05 % | 98,09 % | 98,15 % | **98,18 %** | 98 |
+| Ramas | 42,52 % | 60,24 % | 71,95 % | 80,00 % | 84,50 % | 87,97 % | 89,38 % | 90,67 % | 90,85 % | 91,00 % | 91,21 % | **91,60 %** | 91 |
+| Funciones | 46,48 % | 59,66 % | 79,67 % | 98,68 % | 98,71 % | 100 % | 100 % | 100 % | 100 % | 100 % | 100 % | **100 %** | 99 |
+| Líneas | 66,18 % | 77,55 % | 92,10 % | 95,35 % | 97,43 % | 98,55 % | 98,89 % | 98,88 % | 98,92 % | 98,87 % | 98,87 % | **98,92 %** | 98 |
+
+Entre «§2C» y «§7.15» hay dos medidas más que no tienen columna porque el
+recorrido de la tabla se haría ilegible: sincronización (566 pruebas ·
+98,07 / 91,19 / 100 / 98,83) y telemetría (583 · 98,14 / 91,15 / 100 / 98,87).
+Están en los mensajes de sus commits, que es donde se tomaron.
 
 La columna «entregas» bajó unas décimas al entrar el módulo nuevo —443 pruebas
 contra 411, con un servicio de 250 líneas recién escrito— y el umbral no se
@@ -34,13 +39,40 @@ cualquier función nueva sin prueba en un CI roto antes de que nadie pueda
 escribirla. El trinquete frena la erosión, no prohíbe escribir.
 **Las cuatro métricas pasan ya el 80 % que pide la disciplina.**
 
-> Aviso para quien lea esta tabla como registro: **una de esas seis subidas no
-> se anotó aquí.** Entre la columna «superficie de la API» y la de «plan de
-> carga», el umbral del fichero pasó de 93/79/97/94 a 95/83/98/96 y esta tabla
-> siguió diciendo lo anterior. Se detectó auditando la suite el 2026-09-06. La
-> columna que falta no se reconstruye —no hay medida guardada de ese día— y se
-> deja dicho en vez de inventarla. Si el documento que gobierna cuándo se sube
-> el umbral se queda atrás, la regla se erosiona sin que nadie la derogue.
+> Aviso para quien lea esta tabla como registro: **pasó TRES VECES que el
+> umbral subiera y la tabla no se enterara.** Desde el 2026-09-12 ya no puede
+> volver a pasar: lo impide `test/umbral.spec.ts` (ver el final de este aviso).
+>
+> 1. Entre la columna «superficie de la API» y la de «plan de carga», el umbral
+>    del fichero pasó de 93/79/97/94 a 95/83/98/96 y esta tabla siguió diciendo
+>    lo anterior. Se detectó auditando la suite el 2026-09-06. La columna que
+>    falta no se reconstruye —no hay medida guardada de ese día— y se deja dicho
+>    en vez de inventarla.
+> 2. En el commit de `eventos_viaje` (§7.15) el trinquete de RAMAS subió de 90 a
+>    91 en `jest.cobertura.json`, y la última columna de esta tabla siguió
+>    diciendo 90 durante cuatro commits. Se detectó en la auditoría TDD del
+>    2026-09-12. Esta vez sí se reconstruye: las cuatro medidas están escritas
+>    en los mensajes de sus commits, y de ahí salen las columnas «§7.15» y «2B».
+>
+> Si el documento que gobierna cuándo se sube el umbral se queda atrás, la regla
+> se erosiona sin que nadie la derogue. Que haya pasado dos veces dice que el
+> fallo no es el descuido: es que subir el umbral y anotarlo son dos actos, y el
+> segundo no lo obliga nadie.
+>
+> **Hubo una tercera vez, y ya está escrita la prueba.** El 2026-09-12
+> `frontend/PRUEBAS.md` afirmaba que los recorridos de navegador NO estaban en
+> CI cuando llevaban días en el trabajo `e2e`. Mismo fallo, otro fichero. Así
+> que existe **`test/umbral.spec.ts`**: compara la última columna de esta tabla
+> con `coverageThreshold` de `jest.cobertura.json` y falla si divergen. Su
+> gemela en el frontend es `src/umbral.spec.ts`.
+>
+> Las dos están verificadas desincronizando el umbral a propósito y viéndolas
+> fallar — una prueba que no puede fallar no protege nada. Y `umbral.spec.ts`
+> es de las poquísimas de este repositorio que corre **sin Postgres ni Redis**:
+> sólo lee dos ficheros.
+>
+> A partir de aquí, subir el umbral sin tocar esta tabla deja el commit en rojo.
+> No hay cuarta vez posible.
 
 La columna «§2C» trae las solicitudes de cambio de ruta, y su servicio entra al
 **100 % en las cuatro métricas** porque se escribió con las pruebas por delante
@@ -174,3 +206,29 @@ porcentaje sin comprobar ni una regla, que es la forma más rápida de convertir
 la cobertura en un número que no significa nada. También quedan fuera las
 migraciones y las semillas, que se verifican ejecutándolas (`migration:revert`
 en CI), no midiéndolas.
+
+## La columna «§7.13» — la carga en terminal
+
+Entra el módulo que faltaba del §7 del PRD, y con él el recorrido de 1C entero
+por HTTP. 646 pruebas contra 606, y las cuatro métricas SUBEN al entrar un
+módulo nuevo — que no es lo normal ni lo que se le pide al trinquete: `entregas`
+bajó unas décimas al entrar y estuvo bien que así fuera.
+
+Sube porque `cargas.service.ts` entra al **100 % en las cuatro**, y eso a su vez
+porque se escribió con las pruebas por delante de la primera línea, igual que
+`solicitudes-ruta`. Es la segunda vez que pasa y la coincidencia ya no lo es:
+un módulo escrito en orden TDD no deja huecos que haya que ir a tapar después,
+porque los huecos son justamente las ramas que uno no habría pensado probar.
+
+**Y una rama que se quitó en vez de cubrirse.** El traductor de errores de
+`cargas.service.ts` empezó traduciendo `ck_cargas_medidores`, copiando el patrón
+de `entregas`. Pero `parejaDeMedidores` dispara antes del INSERT, así que esa
+rama no podía ejecutarse nunca: no era defensa en profundidad, era código muerto
+que además habría obligado a escribir una prueba que fingiera alcanzarlo. Se
+quitó del traductor y la restricción sigue en la base, que es donde protege si
+algún día se inserta por otro camino.
+
+La distinción importa porque las OTRAS tres —geometría, densidad y fechas— sí
+son alcanzables: el DTO las rechaza, pero el servicio es llamable sin pasar por
+el `ValidationPipe`, y entonces quien contesta es Postgres. Ésas se cubrieron.
+El criterio no es «¿tiene prueba?» sino «¿existe un camino que llegue aquí?».
