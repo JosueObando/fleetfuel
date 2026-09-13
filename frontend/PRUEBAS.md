@@ -56,14 +56,22 @@ cuela en una revisión visual, porque en pantalla se ve perfecto.
 
 ## El umbral
 
-| | al empezar | componentes | despacho (1C) | informes (§14) | administración | §21 y bitácora | umbral |
-|---|---|---|---|---|---|---|---|
-| Sentencias | 7,24 % | 92,00 % | 93,24 % | 93,71 % | 94,48 % | **94,62 %** | 94 |
-| Ramas | 6,75 % | 81,17 % | 81,40 % | 81,51 % | 81,91 % | **82,48 %** | 82 |
-| Funciones | 4,65 % | 82,42 % | 85,34 % | 86,76 % | 88,58 % | **89,17 %** | 89 |
-| Líneas | 7,44 % | 93,33 % | 94,56 % | 95,40 % | 96,11 % | **96,12 %** | 96 |
+| | al empezar | componentes | despacho (1C) | informes (§14) | administración | §21 y bitácora | Jest 30 | umbral |
+|---|---|---|---|---|---|---|---|---|
+| Sentencias | 7,24 % | 92,00 % | 93,24 % | 93,71 % | 94,48 % | 94,62 % | **94,65 %** | 94 |
+| Ramas | 6,75 % | 81,17 % | 81,40 % | 81,51 % | 81,91 % | 82,48 % | **83,28 %** | 83 |
+| Funciones | 4,65 % | 82,42 % | 85,34 % | 86,76 % | 88,58 % | 89,17 % | **89,19 %** | 89 |
+| Líneas | 7,44 % | 93,33 % | 94,56 % | 95,40 % | 96,11 % | 96,12 % | **96,14 %** | 96 |
 
 **Las cuatro pasan el 80 % que pide la disciplina.**
+
+**La columna «Jest 30» no tiene pruebas nuevas** (2026-09-13). Se actualizó Jest
+de 29 a 30 porque trae jsdom 26, y en jsdom 20 `getComputedStyle` costaba ~2 ms
+por llamada **sin una sola hoja de estilos**: cada `getByRole` con `name` pedía
+cientos y tardaba 744 ms en el tablero. La suite bajó de 48,5 s a 27,5 s sin
+tocar una prueba. Las ramas suben 0,8 puntos porque el istanbul nuevo las
+cuenta distinto, no porque se cubra más; el trinquete sube igual, porque
+protege contra retrocesos medidos CON ESTE instrumento.
 
 La última columna la fija una prueba, no la buena voluntad: `umbral.spec.ts`
 compara esta tabla con `jest.config.mjs` y falla si divergen. Ya hizo su trabajo
