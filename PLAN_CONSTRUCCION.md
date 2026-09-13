@@ -108,22 +108,217 @@ uso enseña más sobre lo que falta que tres módulos a medio terminar.»*
 
 ---
 
-## Estado al 2026-09-06
+## Estado al 2026-09-12
 
 | Fase | Duración §19 | Estado | Comentario |
 |---|---|---|---|
 | 0 · Cimientos | 30 d | ✅ **cerrada** | 2026-09-06. Los tres entornos en pie, observabilidad recogiendo y respaldos verificándose solos |
 | UX-0 · Sistema de diseño | ~15 d | 🟢 **código completo** | 24/24 componentes, contraste AA en CI. Falta Noka y la revisión humana |
 | 1A · Catálogos | 25 d | ✅ **cerrada** | Criterio de salida verificado DESDE LA UI: alta de cliente, conductor, vehículo y cisterna con compartimentos, las cuatro en auditoría |
-| UX-1 · Shell y catálogos | — | 🟢 **código completo** | 3 columnas, 5 breakpoints, estado en la URL, CRUD de los 6 catálogos |
+| UX-1 · Shell y catálogos | — | 🟢 **código completo** | 3 columnas, 5 breakpoints, estado en la URL, CRUD de los 6 catálogos. Los **5 breakpoints ya se verifican solos** en CI (`sonda-responsive.mjs`, 2026-09-12). Falta la revisión humana y los objetivos táctiles de 44 px |
 | 1B · Órdenes → viaje | 35 d | 🟢 **código verificado** | 5 tablas, exclusiones del §5.1, 14 rutas, 16 pruebas y el flujo completo recorrido desde la UI. Falta solo la compuerta de producción |
-| 1C · Entregas, liquidación | 30 d | ✅ **cerrada en código** | Entregas, conciliación, gastos, informes y liquidaciones (2026-09-07). Falta el criterio de salida: un viaje REAL recorrido de punta a punta |
-| 2A · App del conductor | 45 d | ⬜ | |
-| 2B · GPS, geocercas, alertas | 30 d | ⬜ | |
-| UX-2 · Panel de tracking | ~35 d | ⬜ | Compuerta dura: 2B |
-| 3 · Costos y mantenimiento | 55 d | ⬜ | |
+| 1C · Entregas, liquidación | 30 d | 🟢 **código completo** | Entregas, conciliación, gastos, informes y liquidaciones (2026-09-07), más `cargas_terminal`, la pantalla `/operacion/despacho`, la **bitácora del viaje (§7.15)** y el recorrido de navegador (2026-09-12). El criterio de salida se recorre entero DESDE LA UI. Falta el viaje real |
+| 2A · App del conductor | 45 d | 🟡 **lado servidor hecho** | `eventos_viaje` y `POST /sincronizacion/eventos` (2026-09-07). Falta la app: React Native, SQLite, cola de salida, checklists, fotografías y firma |
+| 2B · GPS, geocercas, alertas | 30 d | 🟡 **casi cerrada** | `posiciones_gps` particionada, ingesta por lotes, `stale`, km PostGIS, geocercas y 8 de 10 alertas (2026-09-07). Faltan desvío de ruta y parada no autorizada, el WebSocket y el **cálculo de ETA** |
+| 2C · Solicitudes de ruta | — | ✅ **cerrada** | 5 rutas, permisos y la regla de que quien pide no resuelve. Chat descartado (opción 3) |
+| **ADM · Administración (§5 y §21)** | — | 🟢 **código completo** | Fase NUEVA, creada el 2026-09-12: no estaba en el §19 ni en este plan. Usuarios, roles y permisos, inscripción del segundo factor, refresco de sesión, cierre con revocación, **auditoría y dispositivos**. Recorrido de navegador propio en CI |
+| UX-2 · Panel de tracking | ~35 d | ⬜ | Compuerta dura: 2B. Le falta además el ETA, que hoy no existe en ningún sitio |
+| 3 · Costos y mantenimiento | 55 d | ⬜ | Aquí viven `consumo_combustible_vehiculo` (§7.16) y `mantenimientos` (§7.19), y con ellas las reglas 3 y 11 del §11 |
 | 4 · Integraciones | 45 d | ⬜ | |
 | 5 · Analítica | 40 d | ⬜ | |
+
+**Auditoría TDD del 2026-09-12.** Se midió el backend contra el §7 y el §11 del
+PRD ejecutando la suite, no leyendo el plan. Resultado: **16 de las 19 tablas
+del §7** existían y **16 de las 20 reglas del §11** se aplicaban. De los cuatro
+huecos, tres eran Fase 3 y uno no estaba en ninguna fase — ver abajo. Cerrados
+ese mismo día el hueco sin fase (§7.13) y la regla 13.
+
+**Auditoría TDD del FRONTEND, el mismo día.** Mismo método —medir contra el PRD
+y contra la superficie de API viva, ejecutando la suite— aplicado a la interfaz.
+Resultado: de las **115 rutas** del backend, unas **40 no tenían pantalla**, y
+nueve módulos enteros estaban a cero. Ver abajo.
+
+### El hueco que no estaba en ninguna fase — la ADMINISTRACIÓN (§5 y §21)
+
+La Fase 0.3 construyó auth, RBAC y MFA en el backend. **La interfaz nunca los
+recibió**, y el plan no tenía una sola casilla para ellos: UX-1 entrega «CRUD de
+catálogos», UX-2 entrega el panel, y la administración no era de nadie. Es
+exactamente la forma del hueco de `cargas_terminal`: lo que no está escrito en
+ninguna fase no lo echa de menos nadie.
+
+`grep` de cada módulo del backend contra `frontend/src`, fuera de las pruebas:
+`/usuarios` (3 rutas), `/roles` y `/permisos` (4), `/dispositivos` (2),
+`/auditoria` (1) — **cero referencias**. Y de las 6 rutas de `/auth`, la
+interfaz llamaba **sólo a `/auth/login`**.
+
+Lo que eso significaba en la práctica, y por qué bloqueaba la compuerta 🏁:
+
+1. **Un usuario nuevo no podía entrar.** La pantalla detectaba
+   `debeInscribirMfa` y sólo mostraba un aviso: no había nada que llamara a
+   `mfa/iniciar`. Los recorridos e2e lo inscribían **por la API**, que es por lo
+   que nadie lo echaba de menos. La compuerta pendiente es «producción con
+   usuarios reales» y no se podía dar de alta a uno sin curl.
+2. **La sesión duraba 15 minutos y no se refrescaba.** El `refreshToken` se
+   guardaba y no se usaba nunca; el primer 401 echaba a la persona a `/entrar`,
+   a media pantalla de despacho.
+3. **Cerrar sesión era sólo local.** El refresco seguía vivo en Redis hasta
+   vencer, así que quien tuviera una copia podía seguir pidiendo tokens de
+   acceso después del «cierre».
+
+**Cerrado el 2026-09-12**, en orden TDD y con recorrido de navegador propio
+(`e2e/recorrido-admin.mjs`, primero en CI). Entregado: pantalla de inscripción
+del segundo factor dentro de `/entrar` —con el token de inscripción EN MEMORIA,
+nunca en `localStorage`, porque no es una sesión—, `/administracion/usuarios`
+con el MFA de cada cuenta visible y la suspensión motivada del §21,
+`/administracion/roles` con el editor de permisos por módulo, refresco
+automático con una sola llamada en vuelo, y cierre de sesión que revoca en el
+servidor.
+
+**El recuento «N de M permisos» de la pantalla de roles no es adorno**: es la
+cifra que habría delatado el primer día el Administrador de 11 permisos sobre 48
+que estuvo días en producción. Nadie lo vio porque no había dónde verlo.
+
+### Los 5 breakpoints, que nadie había vuelto a mirar
+
+El criterio de salida de UX-1 dice «el shell aguanta los 5 breakpoints con datos
+reales». Se verificó a mano al escribir el shell — y desde entonces entraron
+**nueve pantallas** sin que nadie volviera a abrirlas en un móvil. Ninguna
+prueba de componente puede verlo: jsdom no tiene ancho ni calcula layout.
+
+`e2e/sonda-responsive.mjs` recorre las **12 pantallas en los 5 anchos** (60
+combinaciones) y encontró **seis layouts rotos**, uno de ellos a 1100 px —un
+portátil corriente— en la pantalla de usuarios recién escrita.
+
+**La causa de fondo era una sola, y no era la que parecía.** Las tablas anchas
+no caben, eso se sabía; se envolvieron en `TablaDesplazable` para que se
+desplace la tabla y no la página. Pero la ventana **seguía** desplazándose con
+las tablas ya contenidas. El culpable era un `<span class="solo-lectores">` —
+texto invisible, de un píxel, para lectores de pantalla— dentro de cada botón de
+la tabla: al ser `position: absolute` sin ningún ancestro posicionado, **escapaba
+de la caja con scroll** y arrastraba el ancho del documento. Nueve píxeles que
+nadie ve moviendo el layout de todos. Se cerró con un `position: relative` en la
+caja.
+
+Queda **un aviso abierto, y es de diseño**: hay objetivos táctiles por debajo de
+los 44 px que pide el spec en TODAS las pantallas, incluidas las de UX-0/UX-1
+(botones de 32 y 36 px, 81 de ellos sólo en órdenes). Es un cambio de altura en
+el sistema de diseño, no un arreglo puntual, así que **se reporta y no se
+cambia**: entra en la revisión humana pendiente de UX-0.
+
+### El otro hallazgo: la raíz del dominio servía una maqueta
+
+`src/app/page.tsx` redirigía a `/tablero`, el boceto de UX-2: seis envíos
+inventados, sin `ShellApp` —**sin puerta de sesión**— y con un menú de botones
+sin `href`. Verificado con Playwright contra producción: `/` → `/tablero`, no
+pedía sesión, enseñaba los datos falsos y ofrecía **0 enlaces** a la aplicación
+real. Mientras tanto el login mandaba a `/operacion/ordenes`: el tablero estaba
+huérfano por los dos lados.
+
+Ninguna de las 293 pruebas lo veía —`Tablero.spec.tsx` prueba la maqueta, y
+pasa— y ningún recorrido tampoco, porque los tres hacían `goto('/entrar')`
+directo. **La ruta que nadie prueba es la que todo el mundo escribe en la
+barra.**
+
+Arreglado: la raíz lleva a `/operacion/ordenes`, el tablero va detrás de la
+puerta y se declara boceto en pantalla. La puerta se extrajo de `ShellApp` a
+`PuertaDeSesion` porque vivía acoplada a la navegación y por eso sólo protegía
+lo que llevaba menú.
+
+### Lo que queda sin pantalla, y a qué fase pertenece
+
+Cerrado el mismo 2026-09-12 todo lo que era de Fase 1 o de §21:
+
+| API viva | Rutas | Estado |
+|---|---|---|
+| `/eventos` (bitácora del viaje, §7.15) | 5 | ✅ `SeccionBitacora` en `/operacion/despacho` |
+| `/conductores/licencias-por-vencer` | 1 | ✅ `AvisoLicencias` sobre la tabla de conductores |
+| `/auditoria` (§21) | 1 | ✅ `/administracion/auditoria` |
+| `/dispositivos` (§21) | 2 | ✅ `/administracion/dispositivos` |
+| `/gps` (flota, recorrido, kilómetros) | 4 | ⬜ UX-2 / 2B |
+| `/alertas` y `/geocercas` | 9 | ⬜ UX-2 / 2B |
+| `/solicitudes-ruta` | 5 | ⬜ UX-2 (2C ya decidida) |
+| `/sincronizacion`, `/gps/posiciones` | 2 | — ingesta de máquina, no pantalla (2A) |
+
+**Lo que aportó cada pantalla sobre su API**, que es el criterio con el que se
+decidió qué construir y no sólo «pintar el endpoint»:
+
+- **Bitácora**: que la verificación de integridad se pueda VER. El backend
+  expuso `/integridad` como ruta propia porque «un hash que nadie puede
+  comprobar desde fuera no prueba nada a nadie» — y sin pantalla seguía sin
+  comprobarlo nadie. Y que anular no parezca borrar: el evento original se
+  queda, marcado, con su corrección al lado.
+- **Licencias**: la consulta es `fecha <= hoy + N días`, así que en la misma
+  lista vienen las que van a vencer y **las que ya vencieron**. No son lo mismo:
+  una vencida no es un aviso con margen, es un conductor que hoy no puede
+  conducir. La API no las separa; la pantalla sí.
+- **Auditoría**: traducir dos JSON a QUÉ CAMBIÓ, incluido el campo que
+  desaparece. Un volcado de JSON enseña el dato sin responder la pregunta que
+  trae quien abre una auditoría.
+- **Dispositivos**: enseñar `sesionesCortadas`. Revocar toca dos mundos —la
+  marca en Postgres impide futuros logins, el borrado en Redis corta las
+  sesiones ya abiertas— y ese número es la diferencia entre «lo hice» y
+  «funcionó».
+
+### El hueco que no estaba en ninguna fase — §7.13 `cargas_terminal`
+
+El flujo `orden → plan de carga → viaje → entrega` se dio por cerrado sin la
+tabla que registra **qué pasó en la terminal**. No se ve desde dentro porque la
+máquina de estados sí tiene `cargando → cargado`: el viaje pasaba por la
+terminal y no dejaba constancia.
+
+Lo que eso rompía, y que ninguna prueba podía ver porque todas medían módulos
+por separado:
+
+- **La regla 18 estaba a medias.** «Todo sello debe quedar asociado a una carga
+  y verificarse en la entrega»: sólo existía la verificación, contra nada.
+  `entregas.sello_recibido` lo escribía quien registraba la entrega y
+  `estado_sello` lo elegía esa misma persona entre tres valores. Un control en
+  el que el mismo actor aporta el dato y su veredicto no controla nada, y la
+  alerta `sello_inconsistente` sólo disparaba cuando alguien ya había confesado.
+- **La merma del §10.5 se medía contra el plan.** `entregas.volumen_cargado` se
+  copiaba de `plan_carga.volumen_planificado`, así que el combustible que nunca
+  llegó a subir al camión se le contaba de menos al conductor. En un sistema
+  cuyo riesgo declarado es el fraude de volumen, era la resta importante con el
+  sustraendo equivocado.
+- **El rol «Operador de carga» llevaba semanas sin trabajo.** El §5 le da
+  literalmente «confirma volúmenes cargados y sellos», y tenía cuatro permisos
+  de lectura. Un rol vacío es tan buena señal de un hueco como una tabla sin
+  filas.
+
+Cerrado el 2026-09-12: migración 1803, 5 rutas, 32 pruebas y el servicio al
+100 % en las cuatro métricas. Ahora la coincidencia del sello **la decide el
+sistema**; lo que sigue siendo humano es la integridad física —un precinto
+reventado sólo lo ve quien está delante del camión—, así que se puede empeorar
+el veredicto a mano y nunca mejorarlo.
+
+### El 500 que el recorrido de navegador destapó
+
+`PATCH /viajes/:id/estado` devolvía un **500 con el nombre de una restricción
+dentro** cada vez que arrancar un viaje pisaba a otro de la misma cisterna.
+
+`periodo` es `tstzrange(coalesce(fecha_inicio, fecha_programada), fecha_fin)`, y
+pasar a `desplazamiento_terminal` estampa `fecha_inicio = now()`: el periodo se
+estira desde este momento hasta el fin previsto. `crear` y `actualizar`
+envolvían su consulta en `traducirSolapamiento`; `cambiarEstado` no — y era el
+único de los tres donde el periodo cambia sin que nadie toque una fecha.
+
+No lo había visto ninguna prueba porque **ninguna había movido un viaje más allá
+de `autorizado` reutilizando una cisterna**: la suite de superficie estrena una
+en cada bloque, que es justo lo que una flota real no hace. Lo encontró el
+recorrido de navegador el primer día que existió.
+
+### Y la regla 13, que era un comentario y no un bloqueo
+
+«Los documentos vencidos bloquearán la asignación» no se aplicaba en ninguna
+parte. Existía la alerta `licencia_por_vencer`, y su propio comentario decía
+que la regla 13 BLOQUEA — y a continuación implementaba sólo el aviso.
+
+Cerrada en `autorizar` y no en `crear`, porque §5 le da al Despachador
+«autoriza salida y verifica documentos» y porque una licencia puede caducar
+entre el día que se planifica el viaje y el día que sale: comprobarlo sólo al
+asignar dejaría salir en marzo un viaje armado en enero. Cubre la licencia del
+conductor y la calibración de la cisterna, con el mismo corte que usa la alerta
+(`fecha < current_date`) para que el aviso y el bloqueo no se contradigan.
 
 Repositorio: `main` en `67acab8`, respaldado en
 `git@github.com:JosueObando/fleetfuel.git` (privado).
@@ -393,6 +588,14 @@ empezar 1C.
 
 # FASE UX-0 · Sistema de diseño
 
+> **Casillas revisadas el 2026-09-13** contra el CÓDIGO, no contra la tabla de
+> estado: se marcaron las que tienen evidencia (24 directorios en
+> `src/componentes`, tokens y anchos en `tokens.css`, `auditar:contraste` en CI,
+> `sonda-responsive.mjs`, el kit con sus estados). Siguen abiertas las que no se
+> pueden demostrar: Noka no está en el repositorio, los iconos son trazos propios
+> «al estilo» UIcons y no UIcons, los skeletons del panel son de UX-2, y no hay
+> revisión humana ni recorrido de teclado grabado.
+
 > **Objetivo.** Convertir el spec en código que compila, **antes** de que existan
 > datos que pintar. Todo lo aquí listado se puede construir con datos falsos.
 
@@ -400,22 +603,22 @@ empezar 1C.
 
 ### Entregables
 
-- [ ] Proyecto Next.js 16 + React 19 + TypeScript 5.6 (§8 «Stack recomendado»)
-- [ ] **Tokens como variables CSS** (`#/spec/ux-tokens-color`), en la columna
+- [x] Proyecto Next.js 16 + React 19 + TypeScript 5.6 (§8 «Stack recomendado»)
+- [x] **Tokens como variables CSS** (`#/spec/ux-tokens-color`), en la columna
       del spec, no en la del original oscuro:
       `--action #0660FF` · `--bg-base #F4F6F7` · `--bg-surface #FCFDFD` ·
       `--fg-strong #21252B` · `--fg-default #363B43` · `--fg-muted #627485` ·
       `--border-subtle #D9D9D9` · éxito `#2ECC71` · aviso `#F59E0B` · error `#E53935`
-- [ ] Escala tipográfica, radios y transiciones (`#/spec/ux-tokens-forma`).
+- [x] Escala tipográfica, radios y transiciones (`#/spec/ux-tokens-forma`).
       Radios del spec: `--radius-sm 8` inputs y chips · `--radius-card 16` tarjetas ·
       `--radius-pill` botones — **los botones del spec son pastilla, no radio 8**
 - [ ] Tipografía a dos voces: **Noka** sólo en títulos e ID de envío,
       **Montserrat** en todo lo demás. **Nunca Prometo en UI**
-- [ ] Los **24 componentes** de las fichas, cada uno con sus 6 estados
+- [x] Los **24 componentes** de las fichas, cada uno con sus 6 estados
       (reposo, hover, foco, activo, deshabilitado, cargando):
-  - [ ] Chrome y navegación (5): `BrandBlock` `NavItem` `NavGroup` `IconToolbar` `DashedCTA`
-  - [ ] Panel de tracking (8): `PanelHeader` `FilterChip` `SegmentedControl` `ShipmentCard` `StatusBadge` `MetricStack` `RouteTimeline` `VehicleThumb`
-  - [ ] Panel de detalle (11): `DetailHeader` `Button` `Tabs` `CapacityGauge` `SectionHeader` `MapView` `MapControl` `PhotoStrip` `PhotoCard` `ActionTile` `RequestList`
+  - [x] Chrome y navegación (5): `BrandBlock` `NavItem` `NavGroup` `IconToolbar` `DashedCTA`
+  - [x] Panel de tracking (8): `PanelHeader` `FilterChip` `SegmentedControl` `ShipmentCard` `StatusBadge` `MetricStack` `RouteTimeline` `VehicleThumb`
+  - [x] Panel de detalle (11): `DetailHeader` `Button` `Tabs` `CapacityGauge` `SectionHeader` `MapView` `MapControl` `PhotoStrip` `PhotoCard` `ActionTile` `RequestList`
 - [ ] Iconos UIcons Rounded vía componente `Icon`: 20 px en nav, 16 px en botones
 - [ ] **Skeletons por panel, no globales** (`#/spec/ux-estados-pantalla`):
       6 tarjetas con bloques de 12/60/72 px y shimmer de 1.2 s. Sin spinner de
@@ -425,13 +628,13 @@ empezar 1C.
 - [ ] Accesibilidad (`#/spec/ux-accesibilidad`): contraste verificado —
       **incluida la corrección de `fg-tertiary`**—, recorrido de teclado completo
       sin trampas de foco, regiones vivas, `prefers-reduced-motion`
-- [ ] Storybook (o equivalente) con los 24 × 6 estados navegables
+- [x] Storybook (o equivalente) con los 24 × 6 estados navegables
 
 **Criterio de salida**
 
 - [ ] Un revisor abre el kit junto a `#/spec/ux-tablero` y recorre los 23 globos:
       cada uno tiene su componente construido y sus 6 estados visibles
-- [ ] Auditoría de contraste automatizada en CI, 0 fallos AA
+- [x] Auditoría de contraste automatizada en CI, 0 fallos AA
 - [ ] Recorrido de teclado grabado de extremo a extremo, sin trampas
 
 **El riesgo de esta fase:** construir los componentes con el tema **oscuro** del
@@ -468,14 +671,14 @@ las tres altas con autor, fecha y valores.
 
 **Puerta de entrada:** UX-0 terminada · 1A con endpoints vivos.
 
-- [ ] Layout de tres columnas (`#/spec/ux-layout`): sidebar 228 px fijo ·
+- [x] Layout de tres columnas (`#/spec/ux-layout`): sidebar 228 px fijo ·
       Tracking 540 px · Detalle 672 px flexible (`flex:1`, mínimo 560).
       **La ventana no scrollea**; scrollean sólo los dos paneles
-- [ ] Sidebar colapsado a 72 px por debajo de 1280
-- [ ] Los 5 breakpoints (`#/spec/ux-responsive`): ≥1600 · 1280–1599 ·
+- [x] Sidebar colapsado a 72 px por debajo de 1280
+- [x] Los 5 breakpoints (`#/spec/ux-responsive`): ≥1600 · 1280–1599 ·
       1024–1279 · 768–1023 maestro/detalle conmutado · <768 tab bar de 5 destinos
-- [ ] CRUD de catálogos sobre los componentes de UX-0
-- [ ] **Estado de la vista reflejado en la URL** —
+- [x] CRUD de catálogos sobre los componentes de UX-0
+- [x] **Estado de la vista reflejado en la URL** —
       `?partners=a,b&show=active&selected=SD-…` — para que sea compartible y
       recargable sin pérdida de estado
 
@@ -486,10 +689,10 @@ catálogo y la URL restaura la vista exacta tras recargar.
 
 **Puerta de entrada:** 1A cerrada.
 
-- [ ] Órdenes
-- [ ] Plan de carga, con asignación por compartimento
-- [ ] Viajes, con la máquina de estados del §8 del PRD
-- [ ] Restricción de exclusión: una cisterna o un conductor **no pueden estar en
+- [x] Órdenes
+- [x] Plan de carga, con asignación por compartimento
+- [x] Viajes, con la máquina de estados del §8 del PRD
+- [x] Restricción de exclusión: una cisterna o un conductor **no pueden estar en
       dos viajes que se superpongan** (§5.1)
 - [ ] Motor de cálculo y control de concurrencia (§16 de arquitectura)
 
@@ -521,6 +724,9 @@ catálogo y la URL restaura la vista exacta tras recargar.
 
 **Puerta de entrada:** la compuerta 🏁 superada.
 
+- [x] **Carga en terminal** — §7.13 completa (2026-09-12), 5 rutas, 32 pruebas.
+      La Etapa 5 del §9, que faltaba entera. Es el origen del sello y del
+      volumen real contra el que la entrega concilia
 - [x] **Entregas** — §7.14 completa, 5 rutas, 25 pruebas (2026-09-07)
 - [ ] Evidencia fotográfica y documentos de la entrega — llega con 2A, que es
       donde el conductor captura evidencias (§5)
@@ -534,6 +740,11 @@ catálogo y la URL restaura la vista exacta tras recargar.
 - [x] **Reportes básicos (§14)** — operativo, cadena del volumen, mermas por
       conductor/cisterna/producto y recorridos. Los del §14.3 (costo por km,
       rentabilidad) NO: dependen del motor de costos de la Fase 3
+- [x] **Su pantalla** — `/operacion/informes` (2026-09-12), 22 pruebas, con el
+      estado en la URL para que un informe filtrado se pueda mandar por
+      mensaje. Lo que la pantalla añade sobre la API son **las restas**: la
+      cadena del §14.2 existe para hacer visible el descuadre, y cuatro sumas
+      en fila dejan esa resta a cargo de quien mira
 
 ### Por qué esta parte se adelantó a la compuerta, y el resto no
 
@@ -559,6 +770,48 @@ rol. El único tope duro es el de la regla 20, y vive en la base.
 **Criterio de salida:** un viaje real recorre orden → carga → entrega →
 liquidación y cuadra contra la conciliación de volúmenes, con la merma dentro de
 tolerancia y la diferencia justificada en auditoría.
+
+- [x] **El recorrido existe y pasa** — `test/recorrido-1c.integracion.ts`
+      (2026-09-12): un solo viaje de punta a punta por HTTP, con dos usuarios
+      para que las separaciones de responsabilidad se ejerciten de verdad. Una
+      orden de 6 000 en dos compartimentos, carga en terminal con medidores que
+      no dan redondo (2 990 y 3 010), entregas dentro de tolerancia con sus
+      sellos verificados, gasto aprobado por otra mano, y liquidación calculada,
+      firmada y pagada por manos distintas. Comprueba que los números se
+      ENCADENAN —planificado sale de pedido, cargado de planificado, entregado
+      de cargado— y que las cinco entidades dejaron rastro en `auditoria`.
+      Hasta ahora `api-superficie` armaba un viaje nuevo por bloque: cada módulo
+      podía estar bien y la cadena estar rota, que es exactamente lo que pasaba
+      con el sello.
+- [ ] **Un viaje REAL**, con datos de verdad y no de una suite. Sigue pendiente,
+      y es lo que la compuerta 🏁 protege.
+- [x] **La interfaz de 1C** — `/operacion/despacho` (2026-09-12), 40 pruebas.
+      Al empezar el día no existía: el frontend tenía pantallas para los seis
+      catálogos, órdenes y viajes, y NINGUNA para cargas, entregas, gastos ni
+      liquidaciones. 1C estaba cerrada en el backend y sin empezar en el
+      frontend, y esa asimetría no estaba escrita en ningún sitio.
+
+      **Una pantalla y no cuatro**, porque una carga, una entrega, un gasto y
+      una liquidación son siempre de UN viaje: cuatro listas obligarían a elegir
+      el mismo viaje cuatro veces y, peor, dejarían mirar las entregas sin ver
+      contra qué carga concilian — que es la relación que 1C existe para
+      vigilar. Qué momento está abierto lo dice la máquina de estados del §8.2 y
+      no una pestaña.
+
+      Lo que la pantalla NO ofrece es tan deliberado como lo que ofrece: **no
+      hay forma de declarar un precinto «intacto»**. La coincidencia la decide
+      el servidor contra `cargas_terminal.numero_sello`; lo que se le pregunta a
+      la persona es lo único que sólo ella ve —si llegó físicamente roto—, así
+      que puede empeorar el veredicto y nunca retirarlo. Un desplegable con las
+      tres opciones habría contado la historia contraria.
+- [x] **El recorrido de navegador** — `frontend/e2e/recorrido-1c.mjs`, once
+      pasos, en CI. Es lo que el §26 pide para cerrar una fase: *desde la
+      interfaz*, no por API. Termina comprobando que lo entregado es exactamente
+      lo que salió de la terminal y que el panel del §15.5 muestra sus bloques.
+- [ ] **Los cuatro bloques del §15.5 que faltan** — consumo, ingreso, costo y
+      utilidad. Dependen del motor de costos y de `consumo_combustible_vehiculo`
+      (§7.16), que son Fase 3. El panel los nombra en vez de omitirlos: uno al
+      que le faltan cuatro sin explicación se lee como terminado y olvidadizo.
 
 **El riesgo de la Fase 1:** construir 1C en paralelo con 1B «para ganar tiempo».
 Es exactamente lo que el §19 desaconseja, y el coste no se ve hasta que hay que
@@ -772,8 +1025,23 @@ justo el día que el proveedor de tiles se cae.
 Con el arco cerrado, el resto es el §26 del PRD sin reordenar.
 
 ## Fase 3 · Costos y mantenimiento — 55 d
+
+Aquí viven las **dos últimas tablas del §7 que faltan**. La auditoría del
+2026-09-12 las nombró porque el plan las daba por implícitas y no las escribía
+en ninguna parte, y una tabla del modelo de datos que no aparece en ninguna fase
+es exactamente como se perdió `cargas_terminal`.
+
+- [ ] **§7.16 `consumo_combustible_vehiculo`** — el combustible del CABEZAL, que
+      no es el producto transportado. De ella cuelgan el §10.2 y el §10.3, y la
+      **regla 11**: «no se puede cerrar un viaje sin registrar el combustible
+      consumido o justificar su ausencia». Hoy cerrar un viaje no comprueba nada
+- [ ] **§7.19 `mantenimientos`** — y con ella la **regla 3**: «no se puede
+      despachar una unidad con mantenimiento crítico vencido». El gancho ya está
+      puesto: `documentosAlDia` en `viajes.service.ts` es donde entra, junto a
+      la licencia y la calibración que ya bloquean
 - [ ] Motor de costos y rentabilidad · costo por kilómetro · depreciación
 - [ ] Mantenimiento preventivo y reparaciones
+- [ ] Los informes del §14.3 y §14.5, que dependen de las dos tablas de arriba
 - [ ] Indicadores ejecutivos (§24)
 
 ## Fase 4 · Integraciones — 45 d
