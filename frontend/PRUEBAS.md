@@ -46,6 +46,8 @@ El entorno es **jsdom** y no node: lo que se prueba aquí —`localStorage`,
 | `administracion/Dispositivos` | Que revocar exija motivo y diga **cuántas sesiones cortó**, que es la diferencia entre «lo hice» y «funcionó» |
 | `despacho/SeccionBitacora` | Que la integridad de la cadena se **pueda ver**, y que anular añada una corrección en vez de parecer que borra (§7.15) |
 | `catalogos/AvisoLicencias` | Que una licencia **vencida** no se confunda con una por vencer, que es lo único que la API no separa (§6.6) |
+| `operacion/alertas` | §22: que **reconocer** y **resolver** sean dos gestos —lo visto no pasa por arreglado—, que cerrar exija motivo, que «evaluar» diga cuántas encontró, y que el `detalle` JSONB se lea con nombres y unidades |
+| `operacion/solicitudes` | §2C: que **quien pide no resuelve** ni siquiera vea el gesto, que aprobar y rechazar exijan motivo, y que una bandeja vieja que contesta tarde no resucite lo ya resuelto |
 | `tablero/Tablero.tsx` | Que todo el estado de la vista viva en la URL |
 | 14 componentes | Sus decisiones de accesibilidad: qué se anuncia, qué se oculta, qué se nombra |
 
@@ -56,12 +58,12 @@ cuela en una revisión visual, porque en pantalla se ve perfecto.
 
 ## El umbral
 
-| | al empezar | componentes | despacho (1C) | informes (§14) | administración | §21 y bitácora | Jest 30 | mutaciones | umbral |
-|---|---|---|---|---|---|---|---|---|---|
-| Sentencias | 7,24 % | 92,00 % | 93,24 % | 93,71 % | 94,48 % | 94,62 % | 94,65 % | **95,58 %** | 95 |
-| Ramas | 6,75 % | 81,17 % | 81,40 % | 81,51 % | 81,91 % | 82,48 % | 83,28 % | **88,44 %** | 88 |
-| Funciones | 4,65 % | 82,42 % | 85,34 % | 86,76 % | 88,58 % | 89,17 % | 89,19 % | **90,13 %** | 90 |
-| Líneas | 7,44 % | 93,33 % | 94,56 % | 95,40 % | 96,11 % | 96,12 % | 96,14 % | **96,77 %** | 96 |
+| | al empezar | componentes | despacho (1C) | informes (§14) | administración | §21 y bitácora | Jest 30 | mutaciones | bandejas | umbral |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Sentencias | 7,24 % | 92,00 % | 93,24 % | 93,71 % | 94,48 % | 94,62 % | 94,65 % | 95,58 % | **95,58 %** | 95 |
+| Ramas | 6,75 % | 81,17 % | 81,40 % | 81,51 % | 81,91 % | 82,48 % | 83,28 % | 88,44 % | **89,33 %** | 89 |
+| Funciones | 4,65 % | 82,42 % | 85,34 % | 86,76 % | 88,58 % | 89,17 % | 89,19 % | 90,13 % | **90,66 %** | 90 |
+| Líneas | 7,44 % | 93,33 % | 94,56 % | 95,40 % | 96,11 % | 96,12 % | 96,14 % | 96,77 % | **96,56 %** | 96 |
 
 **Las cuatro pasan el 80 % que pide la disciplina.**
 
@@ -102,6 +104,18 @@ encuentra al instante, antes de que React aplique la actualización, y pasa con
 la protección quitada. Hay que resolver la promesa dentro de `act` y afirmar
 después.
 
+**La columna «bandejas»** (2026-09-13) son las pantallas de alertas y de
+solicitudes de ruta, escritas en orden TDD y verificadas con 38 mutaciones más.
+Las líneas bajan dos décimas y el trinquete de líneas sigue en 96: son más
+sentencias nuevas, no menos cubiertas.
+
+**El fallo que la cobertura no podía ver:** `alertas.detalle` es JSONB, y la
+primera versión de las pruebas lo simulaba como TEXTO —una suposición sobre el
+contrato, no el contrato—. Pantalla y pruebas estaban de acuerdo entre sí y en
+verde, y en producción habría salido «[object Object]» en cada alerta. Lo
+encontró leer la migración para decidir qué ramas eran alcanzables. **Los datos
+de una prueba de pantalla se copian de la API o del esquema, no se imaginan.**
+
 La última columna la fija una prueba, no la buena voluntad: `umbral.spec.ts`
 compara esta tabla con `jest.config.mjs` y falla si divergen. Ya hizo su trabajo
 la primera vez que se subió el umbral después de escribirla: el commit no podía
@@ -128,7 +142,7 @@ node e2e/recorrido.mjs        # criterio de salida de 1A, desde la interfaz
 node e2e/recorrido-1b.mjs     # orden → plan de carga → viaje
 node e2e/recorrido-1c.mjs     # carga → entrega → gasto → liquidación → informes
 node e2e/recorrido-admin.mjs  # la puerta, usuarios y roles, y el cierre de sesión
-node e2e/sonda-responsive.mjs # las 12 pantallas en los 5 anchos del spec
+node e2e/sonda-responsive.mjs # las 14 pantallas en los 5 anchos del spec
 ```
 
 **Están en CI** desde el 2026-09-12 (trabajo `e2e`): levanta Postgres, Redis, la

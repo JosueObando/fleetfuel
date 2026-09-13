@@ -15,3 +15,31 @@ import { webcrypto } from 'node:crypto';
 if (!globalThis.crypto?.randomUUID) {
   Object.defineProperty(globalThis, 'crypto', { value: webcrypto, configurable: true });
 }
+
+/*
+ * user-event sin pausas entre teclas ni hover previo al clic.
+ *
+ * La suite pasó de 29 a 32 s al entrar las bandejas de alertas y solicitudes,
+ * por encima de los 30 que pide la disciplina. Medido: lo que queda caro no es
+ * jsdom (eso lo arregló Jest 30) sino ESCRIBIR — unos 16 ms por carácter entre
+ * user-event y el re-render — y las dos suites que más escriben marcan el
+ * tiempo de pared. Con estos dos valores la suite vuelve a 28,6 s.
+ *
+ * No se pierde nada que se esté comprobando:
+ *   · `delay: null` quita el `setTimeout` entre tecla y tecla; los eventos de
+ *     cada tecla siguen disparándose todos y en orden.
+ *   · `skipHover` no dispara `pointerover`/`mouseenter` antes del clic, y ni
+ *     el código ni las pruebas escuchan un solo evento de hover (comprobado con
+ *     grep el 2026-09-13). Si alguno llega a hacerlo, esa prueba pasa
+ *     `userEvent.setup({ skipHover: false })` y aquí no hay que tocar nada.
+ *
+ * Vive aquí y no en cada fichero para que una prueba nueva lo herede sin
+ * saberlo: veinte `userEvent.setup()` copiados son veinte sitios donde olvidarlo.
+ */
+jest.mock('@testing-library/user-event', () => {
+  const real = jest.requireActual('@testing-library/user-event');
+  const base = real.default ?? real;
+  const setup = (opciones: Record<string, unknown> = {}) =>
+    base.setup({ delay: null, skipHover: true, ...opciones });
+  return { __esModule: true, ...real, default: { ...base, setup } };
+});

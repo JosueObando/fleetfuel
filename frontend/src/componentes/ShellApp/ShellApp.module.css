@@ -12,7 +12,12 @@
   color: var(--nav-fg-tenue);
   padding: var(--esp-4) var(--esp-3) var(--esp-2);
 }
-.navegacion { flex: 1; min-height: 0; }
+/* `flex: 1 0 auto` y no `flex: 1; min-height: 0`: con aquello la lista se
+   ENCOGÍA por debajo de su contenido y lo dejaba desbordar por encima de la barra
+   de utilidades y de «Cerrar sesión» (2026-09-13, visto en una captura a 900 px de
+   alto). Así la lista ocupa lo que mide, empuja el pie hacia abajo, y quien
+   desplaza es el `.sidebar` entero, que ya tiene `overflow-y: auto`. */
+.navegacion { flex: 1 0 auto; }
 .contenido { min-width: 0; min-height: 0; overflow: hidden; background: var(--bg-base); }
 .cargando { display: grid; place-items: center; height: 100dvh; color: var(--fg-muted); }
 

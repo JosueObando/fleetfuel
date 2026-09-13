@@ -8,7 +8,7 @@ Los cuatro necesitan el frontend en el 3100 y la API en el 4100.
 | `recorrido.mjs` | Alta de cliente, conductor, vehículo y cisterna con dos compartimentos | **1A** |
 | `recorrido-1b.mjs` | Orden → validación → viaje → plan de carga → autorización | **1B** |
 | `recorrido-1c.mjs` | Carga en terminal → entrega con precinto verificado → gasto → liquidación → informes del §14 | **1C** |
-| `sonda-responsive.mjs` | Las 12 pantallas en los 5 anchos del spec | **UX-1** |
+| `sonda-responsive.mjs` | Las 14 pantallas en los 5 anchos del spec | **UX-1** |
 
 ## La sonda de breakpoints, y el error que cometió primero
 
@@ -34,6 +34,16 @@ distintas, que son dos fallos distintos:
 2. **Contenido recortado e inalcanzable** — un `overflow:hidden` evita el scroll
    cortando lo que sobra: la página se ve perfecta y las columnas de la derecha
    de una tabla no existen para nadie. Es peor que el scroll.
+
+3. **La navegación pisándose a sí misma** (2026-09-13). El menú lateral es lo
+   único que crece en VERTICAL con cada sección, y las dos medidas anteriores
+   sólo miran el ancho. Al pasar de 14 a 16 destinos, «Cerrar sesión» se pintó
+   encima de «Auditoría» a 900 px de alto —y a 1600×1000 ya pisaba a
+   «Dispositivos» desde antes—. Lo vio una CAPTURA del recorrido de las bandejas,
+   no una prueba. La medida se escribió antes que el arreglo y falló en 52 de
+   las 70 combinaciones —todas menos el tablero, que no lleva este menú, y el
+   ancho de 820 px, donde va plegado—; con `.navegacion { flex: 1 0 auto }`, en
+   ninguna.
 
 No mide «se ve bien»: eso no es automatizable, y para eso sigue pendiente la
 revisión humana que pide el plan.

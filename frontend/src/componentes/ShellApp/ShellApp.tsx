@@ -24,6 +24,9 @@ const GRUPOS: Array<{ rotulo: string; items: Array<{ ruta: string; etiqueta: str
       // en la pantalla de arriba y se despacha, entrega y liquida en ésta.
       { ruta: '/operacion/despacho', etiqueta: 'Despacho y cierre', icono: 'flota' },
       { ruta: '/operacion/informes', etiqueta: 'Informes', icono: 'informes' },
+      // Las dos bandejas: lo que espera una decisión de quien opera.
+      { ruta: '/operacion/alertas',     etiqueta: 'Alertas',             icono: 'campana' },
+      { ruta: '/operacion/solicitudes', etiqueta: 'Solicitudes de ruta', icono: 'seguimiento' },
     ],
   },
   {

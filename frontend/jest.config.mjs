@@ -32,8 +32,9 @@ export default crearConfig({
     // bitácora del viaje, licencias, auditoría y dispositivos —
     // (94,62 / 82,48 / 89,17 / 96,12). Y con Jest 30 (2026-09-13), que mide las
     // ramas distinto: (94,65 / 83,28 / 89,19 / 96,14). Y tras las pruebas
-    // verificadas por mutación: (95,58 / 88,44 / 90,13 / 96,77). Ver PRUEBAS.md.
-    global: { statements: 95, branches: 88, functions: 90, lines: 96 },
+    // verificadas por mutación: (95,58 / 88,44 / 90,13 / 96,77). Con las bandejas
+    // de alertas y solicitudes: (95,58 / 89,33 / 90,66 / 96,56). Ver PRUEBAS.md.
+    global: { statements: 95, branches: 89, functions: 90, lines: 96 },
   },
   collectCoverageFrom: [
     'src/**/*.{ts,tsx}',

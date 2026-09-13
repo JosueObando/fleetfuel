@@ -53,7 +53,7 @@ const ANCHOS = [
 
 const PANTALLAS = [
   '/operacion/ordenes', '/operacion/viajes', '/operacion/despacho',
-  '/operacion/informes',
+  '/operacion/informes', '/operacion/alertas', '/operacion/solicitudes',
   '/catalogos/clientes', '/catalogos/cisternas', '/catalogos/conductores',
   '/administracion/usuarios', '/administracion/roles',
   '/administracion/auditoria', '/administracion/dispositivos',
@@ -148,6 +148,38 @@ for (const ruta of PANTALLAS) {
       fallos.push(`${ruta} @ ${bp.nombre} · contenido inalcanzable`);
     }
 
+    /* 3. **La navegación se pisa a sí misma.** El menú lateral es lo único que
+       crece en VERTICAL con cada sección nueva, y las dos medidas de arriba
+       sólo miran el ancho. El 2026-09-13, al pasar de 14 a 16 destinos, el
+       pie con «Cerrar sesión» se pintó ENCIMA de «Auditoría» a 900 px de alto:
+       `.navegacion` tenía `flex: 1` y `min-height: 0`, se encogía por debajo
+       de su contenido y lo dejaba desbordar sobre lo que venía después. Se ve
+       en una captura y no en ninguna prueba: jsdom no calcula layout. */
+    const pisados = await pag.evaluate(() => {
+      const nav = document.querySelector('nav[aria-label="Navegación principal"]');
+      if (!nav) return [];
+      const piezas = [...nav.querySelectorAll('button, h2, [role="toolbar"]')]
+        .filter(el => !el.closest('[role="toolbar"]') || el.getAttribute('role') === 'toolbar')
+        .map(el => ({ el, r: el.getBoundingClientRect() }))
+        .filter(({ r }) => r.width > 0 && r.height > 0);
+      const nombre = el => (el.getAttribute('aria-label') || el.textContent || el.tagName).trim().slice(0, 24);
+      const choques = [];
+      for (let i = 0; i < piezas.length; i++) {
+        for (let j = i + 1; j < piezas.length; j++) {
+          const a = piezas[i].r, b = piezas[j].r;
+          const alto = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+          const ancho = Math.min(a.right, b.right) - Math.max(a.left, b.left);
+          // Más de 2 px en las dos direcciones: un borde compartido no es un choque.
+          if (alto > 2 && ancho > 2) choques.push(`«${nombre(piezas[i].el)}» pisa «${nombre(piezas[j].el)}»`);
+        }
+      }
+      return choques;
+    });
+    if (pisados.length) {
+      marcas.push(`❌ ${bp.nombre}: la navegación se solapa · ${pisados.slice(0, 3).join(', ')}`);
+      fallos.push(`${ruta} @ ${bp.nombre} · navegación solapada`);
+    }
+
     if (bp.w < 768) {
       const pequenos = await pag.evaluate(() => {
         const malos = [];
@@ -175,4 +207,4 @@ if (fallos.length) {
   for (const f of fallos) console.log(`   · ${f}`);
   process.exit(1);
 }
-console.log('✅ ninguna pantalla desplaza la ventana ni recorta contenido, en los 5 anchos');
+console.log('✅ ninguna pantalla desplaza la ventana, recorta contenido ni solapa la navegación, en los 5 anchos');

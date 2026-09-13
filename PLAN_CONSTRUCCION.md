@@ -185,7 +185,7 @@ reales». Se verificó a mano al escribir el shell — y desde entonces entraron
 **nueve pantallas** sin que nadie volviera a abrirlas en un móvil. Ninguna
 prueba de componente puede verlo: jsdom no tiene ancho ni calcula layout.
 
-`e2e/sonda-responsive.mjs` recorre las **12 pantallas en los 5 anchos** (60
+`e2e/sonda-responsive.mjs` recorre las **14 pantallas en los 5 anchos** (70
 combinaciones) y encontró **seis layouts rotos**, uno de ellos a 1100 px —un
 portátil corriente— en la pantalla de usuarios recién escrita.
 
@@ -235,9 +235,17 @@ Cerrado el mismo 2026-09-12 todo lo que era de Fase 1 o de §21:
 | `/auditoria` (§21) | 1 | ✅ `/administracion/auditoria` |
 | `/dispositivos` (§21) | 2 | ✅ `/administracion/dispositivos` |
 | `/gps` (flota, recorrido, kilómetros) | 4 | ⬜ UX-2 / 2B |
-| `/alertas` y `/geocercas` | 9 | ⬜ UX-2 / 2B |
-| `/solicitudes-ruta` | 5 | ⬜ UX-2 (2C ya decidida) |
+| `/alertas` (§22) | 5 | ✅ `/operacion/alertas` (2026-09-13): listar, evaluar, reconocer y resolver. `GET /alertas/:id` no hace falta: la lista trae cada alerta entera |
+| `/geocercas` | 4 | ⬜ UX-2 / 2B — el backend sólo las CREA (no hay edición ni baja), y dibujarlas pide el mapa de UX-2 |
+| `/solicitudes-ruta` (§2C) | 5 | 🟡 `/operacion/solicitudes` (2026-09-13): la bandeja de pendientes y resolver. Pedir un cambio es de la app del conductor (2A); el historial por viaje, del panel de UX-2 |
 | `/sincronizacion`, `/gps/posiciones` | 2 | — ingesta de máquina, no pantalla (2A) |
+
+**Por qué las dos bandejas NO esperaron a UX-2** (2026-09-13): la compuerta de
+UX-2 es 2B, y lo que 2B no tiene —el ETA, el WebSocket, las alertas de desvío—
+lo necesita el PANEL, no una lista de alertas ni una cola de permisos. Esperar
+dejaba al Despachador sin forma de resolver una solicitud y a nadie leyendo las
+alertas que el backend genera desde el 07-09. Un sistema de alertas que nadie
+lee no alerta de nada.
 
 **Lo que aportó cada pantalla sobre su API**, que es el criterio con el que se
 decidió qué construir y no sólo «pintar el endpoint»:

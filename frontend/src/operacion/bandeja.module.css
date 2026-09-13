@@ -1,0 +1,54 @@
+/* Las bandejas de Operación: alertas (§22) y solicitudes de ruta (§2C). Las dos
+   son listas de cosas que esperan una decisión con motivo, y comparten forma.
+
+   La gravedad de una alerta va en PALABRAS y además en un borde: el borde es un
+   uso no textual, así que no necesita 4,5:1, y el texto sigue en los pares
+   auditados. */
+
+.casilla {
+  display: flex; align-items: center; gap: var(--esp-2);
+  min-height: 44px; margin-bottom: var(--esp-3);
+  font-size: 13px; color: var(--fg-default);
+}
+
+.resultado {
+  margin: 0 0 var(--esp-3);
+  border-left: 3px solid var(--color-success-500);
+  padding: var(--esp-2) var(--esp-3);
+  font-size: 13px; color: var(--fg-default);
+}
+
+.lista { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--esp-3); }
+
+.elemento {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: inset 4px 0 0 var(--border-strong);
+  padding: var(--esp-3) var(--esp-4);
+  min-width: 0;
+}
+.critica { box-shadow: inset 4px 0 0 var(--color-error-500); }
+.alta    { box-shadow: inset 4px 0 0 var(--color-warning-500); }
+/* Con regla propia y no vacías: un módulo CSS no exporta una clase sin
+   declaraciones, y `estilos.media` saldría `undefined` en el atributo. */
+.media   { box-shadow: inset 4px 0 0 var(--border-strong); }
+.baja    { box-shadow: inset 4px 0 0 var(--border-subtle); }
+
+.datos { display: flex; flex-wrap: wrap; gap: var(--esp-1) var(--esp-4); margin: var(--esp-2) 0 0; }
+.dato  { display: flex; gap: var(--esp-1); font-size: 13px; min-width: 0; }
+.dato dt { color: var(--fg-muted); }
+.dato dt::after { content: ':'; }
+.dato dd { margin: 0; color: var(--fg-default); overflow-wrap: anywhere; }
+
+.cabecera { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--esp-2); }
+.gravedad { font-size: 12px; font-weight: 700; color: var(--fg-strong); text-transform: uppercase; }
+.titulo   { margin: 0; font-size: 15px; font-weight: 600; color: var(--fg-strong); overflow-wrap: anywhere; }
+.estado   { margin-left: auto; font-size: 12px; color: var(--fg-muted); }
+
+.detalle { margin: var(--esp-1) 0 0; font-size: 13px; color: var(--fg-default); overflow-wrap: anywhere; }
+.meta    { margin: var(--esp-1) 0 0; font-size: 12px; color: var(--fg-muted); }
+.cierre  { margin: var(--esp-2) 0 0; font-size: 13px; color: var(--fg-default); }
+
+.acciones { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--esp-2); margin-top: var(--esp-3); }
+.resolver { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--esp-2); min-width: 0; }
