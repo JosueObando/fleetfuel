@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { api, ErrorApi } from '@/api/cliente';
+import { useState } from 'react';
+import { api } from '@/api/cliente';
 import { useUsuarioActual } from '@/api/usuario-actual';
+import { mensajeDeError, useBandeja } from '../useBandeja';
 import type { Fila } from '@/api/tipos';
 import { Button } from '@/componentes/Button/Button';
 import { Campo } from '@/componentes/Campo/Campo';
@@ -29,9 +30,6 @@ const tipoDe = (t: unknown) => TIPOS[String(t)];
 /** El mismo mínimo que `ResolverCambioRutaDto`. */
 const MOTIVO_MINIMO = 5;
 
-const mensaje = (e: unknown, porDefecto: string) =>
-  e instanceof ErrorApi ? e.message : porDefecto;
-
 const cuando = (v: unknown) => new Date(String(v)).toLocaleString('es-PA', {
   dateStyle: 'short', timeStyle: 'short', timeZone: 'America/Panama',
 });
@@ -39,22 +37,9 @@ const cuando = (v: unknown) => new Date(String(v)).toLocaleString('es-PA', {
 export function Solicitudes() {
   const yo = useUsuarioActual();
 
-  const [filas, setFilas] = useState<Fila[] | null>(null);
-  const [version, setVersion] = useState(0);
-  const [error, setError] = useState<string | null>(null);
+  const { filas, error, setError, recargar } =
+    useBandeja('/solicitudes-ruta/pendientes', 'No se pudieron cargar las solicitudes');
   const [resultado, setResultado] = useState<string | null>(null);
-
-  useEffect(() => {
-    let vigente = true;
-    api.listar<Fila>('/solicitudes-ruta/pendientes')
-      .then(f => { if (vigente) { setFilas(f); setError(null); } })
-      .catch(e => {
-        if (!vigente) return;
-        setError(mensaje(e, 'No se pudieron cargar las solicitudes'));
-        setFilas([]);
-      });
-    return () => { vigente = false; };
-  }, [version]);
 
   async function resolver(s: Fila, estado: 'aprobada' | 'rechazada', motivo: string) {
     setError(null); setResultado(null);
@@ -63,9 +48,9 @@ export function Solicitudes() {
       const t = tipoDe(s.tipo);
       const verbo = estado === 'aprobada' ? 'Aprobad' : 'Rechazad';
       setResultado(`${verbo}${t.genero} ${t.articulo} ${t.nombre.toLowerCase()} de ${String(s.codigoViaje)}.`);
-      setVersion(v => v + 1);
+      recargar();
     } catch (e) {
-      setError(mensaje(e, 'No se pudo resolver la solicitud'));
+      setError(mensajeDeError(e, 'No se pudo resolver la solicitud'));
     }
   }
 

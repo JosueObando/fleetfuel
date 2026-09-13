@@ -91,7 +91,7 @@ describe('la navegación', () => {
     expect(await screen.findByRole('navigation', { name: /Navegación principal/ })).toBeInTheDocument();
   });
 
-  it('están las tres secciones y sus dieciséis destinos, y NINGUNO más', async () => {
+  it('están las cuatro secciones y sus dieciocho destinos, y NINGUNO más', async () => {
     /* La lista se comprueba ENTERA y con su tamaño, no destino a destino.
        Enumerando sólo los que se esperan, añadir una sección al menú no rompía
        nada —pasó dos veces el 2026-09-12, con «Despacho y cierre» e
@@ -103,6 +103,9 @@ describe('la navegación', () => {
       // Las dos bandejas del 2026-09-13. El backend servía alertas (§22) y
       // solicitudes de ruta (§2C) desde el 07-09 sin forma de llegar a ellas.
       'Alertas', 'Solicitudes de ruta',
+      // Finanzas, también del 13: `GET /gastos/pendientes` y `GET /liquidaciones`
+      // existían desde 1C, y aprobar exigía abrir los viajes uno por uno.
+      'Gastos por aprobar', 'Liquidaciones',
       'Clientes', 'Estaciones', 'Productos', 'Vehículos', 'Cisternas', 'Conductores',
       // Administración, desde el 2026-09-12. La API de usuarios y roles existía
       // desde la Fase 0.3 y no había forma de llegar a ella por la interfaz:
@@ -120,6 +123,9 @@ describe('la navegación', () => {
     }
     // Los destinos, más «Cerrar sesión» y las dos utilidades de la barra.
     expect(within(nav).getAllByRole('button')).toHaveLength(DESTINOS.length + 3);
+    // Y las secciones, que el nombre de esta prueba prometía y no comprobaba.
+    expect(within(nav).getAllByRole('heading').map(h => h.textContent))
+      .toEqual(['Operación', 'Finanzas', 'Catálogos', 'Administración']);
   });
 
   it('marca como actual SOLO la sección en la que se está', async () => {

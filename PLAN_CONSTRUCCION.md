@@ -185,7 +185,7 @@ reales». Se verificó a mano al escribir el shell — y desde entonces entraron
 **nueve pantallas** sin que nadie volviera a abrirlas en un móvil. Ninguna
 prueba de componente puede verlo: jsdom no tiene ancho ni calcula layout.
 
-`e2e/sonda-responsive.mjs` recorre las **14 pantallas en los 5 anchos** (70
+`e2e/sonda-responsive.mjs` recorre las **16 pantallas en los 5 anchos** (80
 combinaciones) y encontró **seis layouts rotos**, uno de ellos a 1100 px —un
 portátil corriente— en la pantalla de usuarios recién escrita.
 
@@ -236,6 +236,8 @@ Cerrado el mismo 2026-09-12 todo lo que era de Fase 1 o de §21:
 | `/dispositivos` (§21) | 2 | ✅ `/administracion/dispositivos` |
 | `/gps` (flota, recorrido, kilómetros) | 4 | ⬜ UX-2 / 2B |
 | `/alertas` (§22) | 5 | ✅ `/operacion/alertas` (2026-09-13): listar, evaluar, reconocer y resolver. `GET /alertas/:id` no hace falta: la lista trae cada alerta entera |
+| `/gastos/pendientes` (§7.17) | 1 | ✅ `/operacion/gastos` (2026-09-13): la bandeja de Finanzas, de todos los viajes |
+| `GET /liquidaciones` (§7.18) | 1 | ✅ `/operacion/liquidaciones` (2026-09-13): aprobar y pagar por pestañas. Calcular sigue en despacho, que tiene el viaje delante |
 | `/geocercas` | 4 | ⬜ UX-2 / 2B — el backend sólo las CREA (no hay edición ni baja), y dibujarlas pide el mapa de UX-2 |
 | `/solicitudes-ruta` (§2C) | 5 | 🟡 `/operacion/solicitudes` (2026-09-13): la bandeja de pendientes y resolver. Pedir un cambio es de la app del conductor (2A); el historial por viaje, del panel de UX-2 |
 | `/sincronizacion`, `/gps/posiciones` | 2 | — ingesta de máquina, no pantalla (2A) |

@@ -8,7 +8,7 @@ Los cuatro necesitan el frontend en el 3100 y la API en el 4100.
 | `recorrido.mjs` | Alta de cliente, conductor, vehículo y cisterna con dos compartimentos | **1A** |
 | `recorrido-1b.mjs` | Orden → validación → viaje → plan de carga → autorización | **1B** |
 | `recorrido-1c.mjs` | Carga en terminal → entrega con precinto verificado → gasto → liquidación → informes del §14 | **1C** |
-| `sonda-responsive.mjs` | Las 14 pantallas en los 5 anchos del spec | **UX-1** |
+| `sonda-responsive.mjs` | Las 16 pantallas en los 5 anchos del spec | **UX-1** |
 
 ## La sonda de breakpoints, y el error que cometió primero
 

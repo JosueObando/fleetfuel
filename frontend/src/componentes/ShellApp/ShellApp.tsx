@@ -30,6 +30,16 @@ const GRUPOS: Array<{ rotulo: string; items: Array<{ ruta: string; etiqueta: str
     ],
   },
   {
+    // El trabajo del rol Finanzas (§5): aprobar gastos y liquidaciones de TODOS
+    // los viajes de una sentada. Calcular la liquidación sigue en despacho,
+    // porque necesita el viaje delante.
+    rotulo: 'Finanzas',
+    items: [
+      { ruta: '/operacion/gastos',        etiqueta: 'Gastos por aprobar', icono: 'ordenes' },
+      { ruta: '/operacion/liquidaciones', etiqueta: 'Liquidaciones',      icono: 'informes' },
+    ],
+  },
+  {
     rotulo: 'Catálogos',
     items: [
       { ruta: '/catalogos/clientes',    etiqueta: 'Clientes',    icono: 'conductores' },

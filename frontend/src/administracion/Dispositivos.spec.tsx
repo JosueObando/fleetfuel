@@ -11,6 +11,16 @@ const { api } = jest.requireMock('@/api/cliente') as {
   api: { listar: jest.Mock; actualizar: jest.Mock };
 };
 
+/* Rellenar un campo PEGANDO y no tecleando. Estas pruebas comprueban lo que se
+   ENVÍA y lo que se valida, no cómo se escribe: teclear cuesta ~16 ms por
+   carácter y esta suite tecleaba cientos, lo que sacó la de todo el frontend
+   de los 30 s. Que cada tecla llegue al formulario ya lo fija `Campo.spec.tsx`
+   («avisa de cada tecla»), y ningún campo de formulario escucha teclas sueltas. */
+const escribir = async (usuario: ReturnType<typeof userEvent.setup>, campo: HTMLElement, texto: string) => {
+  await usuario.click(campo);
+  await usuario.paste(texto);
+};
+
 /*
  * §21 · Los dispositivos con sesión abierta.
  *
@@ -82,7 +92,7 @@ describe('revocar', () => {
     await screen.findByText('Tablet cabina 1');
 
     await usuario.click(within(filaDe('Tablet cabina 1')).getByRole('button', { name: /Revocar/ }));
-    await usuario.type(screen.getByLabelText(/Motivo/), 'robo');
+    await escribir(usuario, screen.getByLabelText(/Motivo/), 'robo');
     await usuario.click(screen.getByRole('button', { name: /Confirmar revocación/ }));
 
     expect(api.actualizar).not.toHaveBeenCalled();
@@ -95,7 +105,7 @@ describe('revocar', () => {
     await screen.findByText('Tablet cabina 1');
 
     await usuario.click(within(filaDe('Tablet cabina 1')).getByRole('button', { name: /Revocar/ }));
-    await usuario.type(screen.getByLabelText(/Motivo/), 'Robo del vehículo el 2026-09-12');
+    await escribir(usuario, screen.getByLabelText(/Motivo/), 'Robo del vehículo el 2026-09-12');
     await usuario.click(screen.getByRole('button', { name: /Confirmar revocación/ }));
 
     await waitFor(() => expect(api.actualizar).toHaveBeenCalledWith(
@@ -111,7 +121,7 @@ describe('revocar', () => {
     await screen.findByText('Tablet cabina 1');
 
     await usuario.click(within(filaDe('Tablet cabina 1')).getByRole('button', { name: /Revocar/ }));
-    await usuario.type(screen.getByLabelText(/Motivo/), 'Robo del vehículo el 2026-09-12');
+    await escribir(usuario, screen.getByLabelText(/Motivo/), 'Robo del vehículo el 2026-09-12');
     await usuario.click(screen.getByRole('button', { name: /Confirmar revocación/ }));
 
     expect(await screen.findByText(/2 sesion/i)).toBeInTheDocument();
@@ -126,7 +136,7 @@ describe('revocar', () => {
     await screen.findByText('Tablet cabina 1');
 
     await usuario.click(within(filaDe('Tablet cabina 1')).getByRole('button', { name: /Revocar/ }));
-    await usuario.type(screen.getByLabelText(/Motivo/), 'Empleado que deja la empresa');
+    await escribir(usuario, screen.getByLabelText(/Motivo/), 'Empleado que deja la empresa');
     await usuario.click(screen.getByRole('button', { name: /Confirmar revocación/ }));
 
     expect(await screen.findByText(/no tenía ninguna sesión abierta/i)).toBeInTheDocument();
@@ -146,7 +156,7 @@ describe('revocar', () => {
     await screen.findByText('Tablet cabina 1');
 
     await usuario.click(within(filaDe('Tablet cabina 1')).getByRole('button', { name: /Revocar/ }));
-    await usuario.type(screen.getByLabelText(/Motivo/), 'Robo del vehículo el 2026-09-12');
+    await escribir(usuario, screen.getByLabelText(/Motivo/), 'Robo del vehículo el 2026-09-12');
     await usuario.click(screen.getByRole('button', { name: /Confirmar revocación/ }));
 
     expect(await screen.findByText(/Redis no responde/)).toBeInTheDocument();
@@ -167,7 +177,7 @@ describe('revocar', () => {
     const antes = api.listar.mock.calls.length;
 
     await usuario.click(within(filaDe('Tablet cabina 1')).getByRole('button', { name: /Revocar/ }));
-    await usuario.type(screen.getByLabelText(/Motivo/), 'Robo del vehículo el 2026-09-12');
+    await escribir(usuario, screen.getByLabelText(/Motivo/), 'Robo del vehículo el 2026-09-12');
     await usuario.click(screen.getByRole('button', { name: /Confirmar revocación/ }));
 
     await waitFor(() => expect(api.listar.mock.calls.length).toBeGreaterThan(antes));
@@ -183,7 +193,7 @@ describe('arrepentirse', () => {
     await screen.findByText('Tablet cabina 1');
 
     await usuario.click(within(filaDe('Tablet cabina 1')).getByRole('button', { name: /Revocar/ }));
-    await usuario.type(screen.getByLabelText(/Motivo/), 'Me equivoqué de aparato');
+    await escribir(usuario, screen.getByLabelText(/Motivo/), 'Me equivoqué de aparato');
     await usuario.click(screen.getByRole('button', { name: /^Cancelar$/ }));
 
     expect(api.actualizar).not.toHaveBeenCalled();

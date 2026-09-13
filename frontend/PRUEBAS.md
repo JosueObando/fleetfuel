@@ -48,6 +48,9 @@ El entorno es **jsdom** y no node: lo que se prueba aquí —`localStorage`,
 | `catalogos/AvisoLicencias` | Que una licencia **vencida** no se confunda con una por vencer, que es lo único que la API no separa (§6.6) |
 | `operacion/alertas` | §22: que **reconocer** y **resolver** sean dos gestos —lo visto no pasa por arreglado—, que cerrar exija motivo, que «evaluar» diga cuántas encontró, y que el `detalle` JSONB se lea con nombres y unidades |
 | `operacion/solicitudes` | §2C: que **quien pide no resuelve** ni siquiera vea el gesto, que aprobar y rechazar exijan motivo, y que una bandeja vieja que contesta tarde no resucite lo ya resuelto |
+| `operacion/gastos` | §7.17: los pendientes de TODOS los viajes con cuántos y por cuánto, un gasto **sin comprobante** señalado antes de aprobarlo, y que quien lo registró no pueda aprobárselo |
+| `operacion/liquidaciones` | §7.18: tres pestañas en la URL que son los tres actos —cada una ofrece sólo el que toca—, quien calculó no aprueba, y la referencia del pago con el mínimo del DTO |
+| `api/usuario-actual` | Quién mira, para las tres reglas de separación (solicitudes, gastos, liquidaciones): nulo durante la hidratación, y nulo es «no ofrecer» |
 | `tablero/Tablero.tsx` | Que todo el estado de la vista viva en la URL |
 | 14 componentes | Sus decisiones de accesibilidad: qué se anuncia, qué se oculta, qué se nombra |
 
@@ -142,7 +145,7 @@ node e2e/recorrido.mjs        # criterio de salida de 1A, desde la interfaz
 node e2e/recorrido-1b.mjs     # orden → plan de carga → viaje
 node e2e/recorrido-1c.mjs     # carga → entrega → gasto → liquidación → informes
 node e2e/recorrido-admin.mjs  # la puerta, usuarios y roles, y el cierre de sesión
-node e2e/sonda-responsive.mjs # las 14 pantallas en los 5 anchos del spec
+node e2e/sonda-responsive.mjs # las 16 pantallas en los 5 anchos del spec
 ```
 
 **Están en CI** desde el 2026-09-12 (trabajo `e2e`): levanta Postgres, Redis, la

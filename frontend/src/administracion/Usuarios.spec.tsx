@@ -14,6 +14,16 @@ const { api } = jest.requireMock('@/api/cliente') as {
   api: { listar: jest.Mock; crear: jest.Mock; actualizar: jest.Mock };
 };
 
+/* Rellenar un campo PEGANDO y no tecleando. Estas pruebas comprueban lo que se
+   ENVÍA y lo que se valida, no cómo se escribe: teclear cuesta ~16 ms por
+   carácter y esta suite tecleaba cientos, lo que sacó la de todo el frontend
+   de los 30 s. Que cada tecla llegue al formulario ya lo fija `Campo.spec.tsx`
+   («avisa de cada tecla»), y ningún campo de formulario escucha teclas sueltas. */
+const escribir = async (usuario: ReturnType<typeof userEvent.setup>, campo: HTMLElement, texto: string) => {
+  await usuario.click(campo);
+  await usuario.paste(texto);
+};
+
 /*
  * §5 del PRD · Usuarios y roles.
  *
@@ -91,9 +101,9 @@ describe('dar de alta', () => {
     await screen.findByText('Ana Pérez');
 
     await usuario.click(screen.getByRole('button', { name: /Nuevo usuario/ }));
-    await usuario.type(screen.getByLabelText(/Nombre/), 'Carlos Díaz');
-    await usuario.type(screen.getByLabelText(/Correo/), 'carlos@fleetfuel.jop.lat');
-    await usuario.type(screen.getByLabelText(/Clave/), 'ClaveLarga123');
+    await escribir(usuario, screen.getByLabelText(/Nombre/), 'Carlos Díaz');
+    await escribir(usuario, screen.getByLabelText(/Correo/), 'carlos@fleetfuel.jop.lat');
+    await escribir(usuario, screen.getByLabelText(/Clave/), 'ClaveLarga123');
     await usuario.click(screen.getByRole('checkbox', { name: 'Despachador' }));
     await usuario.click(screen.getByRole('button', { name: /Crear usuario/ }));
 
@@ -123,9 +133,9 @@ describe('dar de alta', () => {
     await screen.findByText('Ana Pérez');
 
     await usuario.click(screen.getByRole('button', { name: /Nuevo usuario/ }));
-    await usuario.type(screen.getByLabelText(/Nombre/), 'Ana Bis');
-    await usuario.type(screen.getByLabelText(/Correo/), 'ana@fleetfuel.jop.lat');
-    await usuario.type(screen.getByLabelText(/Clave/), 'ClaveLarga123');
+    await escribir(usuario, screen.getByLabelText(/Nombre/), 'Ana Bis');
+    await escribir(usuario, screen.getByLabelText(/Correo/), 'ana@fleetfuel.jop.lat');
+    await escribir(usuario, screen.getByLabelText(/Clave/), 'ClaveLarga123');
     await usuario.click(screen.getByRole('button', { name: /Crear usuario/ }));
 
     expect(await screen.findByText(/Ya existe un usuario con ese correo/)).toBeInTheDocument();
@@ -140,9 +150,9 @@ describe('dar de alta', () => {
     await screen.findByText('Ana Pérez');
 
     await usuario.click(screen.getByRole('button', { name: /Nuevo usuario/ }));
-    await usuario.type(screen.getByLabelText(/Nombre/), 'Sin Rol');
-    await usuario.type(screen.getByLabelText(/Correo/), 'sinrol@fleetfuel.jop.lat');
-    await usuario.type(screen.getByLabelText(/Clave/), 'ClaveLarga123');
+    await escribir(usuario, screen.getByLabelText(/Nombre/), 'Sin Rol');
+    await escribir(usuario, screen.getByLabelText(/Correo/), 'sinrol@fleetfuel.jop.lat');
+    await escribir(usuario, screen.getByLabelText(/Clave/), 'ClaveLarga123');
     await usuario.click(screen.getByRole('button', { name: /Crear usuario/ }));
 
     await waitFor(() => expect(api.crear).toHaveBeenCalled());
@@ -182,7 +192,7 @@ describe('suspender', () => {
     await screen.findByText('Ana Pérez');
 
     await usuario.click(within(filaDe('Luis Gómez')).getByRole('button', { name: /Suspender/ }));
-    await usuario.type(screen.getByLabelText(/Motivo/), 'Se fue');
+    await escribir(usuario, screen.getByLabelText(/Motivo/), 'Se fue');
     await usuario.click(screen.getByRole('button', { name: /Confirmar suspensión/ }));
 
     expect(await screen.findByText(/mínimo 10 caracteres/i)).toBeInTheDocument();
@@ -197,7 +207,7 @@ describe('suspender', () => {
     await screen.findByText('Ana Pérez');
 
     await usuario.click(within(filaDe('Luis Gómez')).getByRole('button', { name: /Suspender/ }));
-    await usuario.type(screen.getByLabelText(/Motivo/), 'Dejó la empresa el 2026-09-10');
+    await escribir(usuario, screen.getByLabelText(/Motivo/), 'Dejó la empresa el 2026-09-10');
     await usuario.click(screen.getByRole('button', { name: /Confirmar suspensión/ }));
 
     await waitFor(() => expect(api.actualizar).toHaveBeenCalledWith(
@@ -220,7 +230,7 @@ describe('suspender', () => {
     const antes = api.listar.mock.calls.filter(c => c[0] === '/usuarios').length;
 
     await usuario.click(within(filaDe('Luis Gómez')).getByRole('button', { name: /Suspender/ }));
-    await usuario.type(screen.getByLabelText(/Motivo/), 'Dejó la empresa el 2026-09-10');
+    await escribir(usuario, screen.getByLabelText(/Motivo/), 'Dejó la empresa el 2026-09-10');
     await usuario.click(screen.getByRole('button', { name: /Confirmar suspensión/ }));
 
     await waitFor(() => expect(
@@ -237,7 +247,7 @@ describe('los caminos que no salen bien', () => {
     await screen.findByText('Ana Pérez');
 
     await usuario.click(within(filaDe('Luis Gómez')).getByRole('button', { name: /Suspender/ }));
-    await usuario.type(screen.getByLabelText(/Motivo/), 'Dejó la empresa el 2026-09-10');
+    await escribir(usuario, screen.getByLabelText(/Motivo/), 'Dejó la empresa el 2026-09-10');
     await usuario.click(screen.getByRole('button', { name: /Confirmar suspensión/ }));
 
     expect(await screen.findByText(/El usuario ya estaba suspendido/)).toBeInTheDocument();
@@ -262,7 +272,7 @@ describe('los caminos que no salen bien', () => {
     await screen.findByText('Ana Pérez');
 
     await usuario.click(screen.getByRole('button', { name: /Nuevo usuario/ }));
-    await usuario.type(screen.getByLabelText(/Nombre/), 'Arrepentido');
+    await escribir(usuario, screen.getByLabelText(/Nombre/), 'Arrepentido');
     await usuario.click(screen.getByRole('button', { name: /^Cancelar$/ }));
 
     expect(api.crear).not.toHaveBeenCalled();
@@ -278,9 +288,9 @@ describe('los caminos que no salen bien', () => {
     await screen.findByText('Ana Pérez');
 
     await usuario.click(screen.getByRole('button', { name: /Nuevo usuario/ }));
-    await usuario.type(screen.getByLabelText(/Nombre/), 'Carlos Díaz');
-    await usuario.type(screen.getByLabelText(/Correo/), 'carlos@fleetfuel.jop.lat');
-    await usuario.type(screen.getByLabelText(/Clave/), 'ClaveSinDigito');
+    await escribir(usuario, screen.getByLabelText(/Nombre/), 'Carlos Díaz');
+    await escribir(usuario, screen.getByLabelText(/Correo/), 'carlos@fleetfuel.jop.lat');
+    await escribir(usuario, screen.getByLabelText(/Clave/), 'ClaveSinDigito');
     await usuario.click(screen.getByRole('button', { name: /Crear usuario/ }));
 
     expect(await screen.findByText(/La clave debe incluir un dígito/)).toBeInTheDocument();
@@ -296,9 +306,9 @@ describe('los caminos que no salen bien', () => {
     await screen.findByText('Ana Pérez');
 
     await usuario.click(screen.getByRole('button', { name: /Nuevo usuario/ }));
-    await usuario.type(screen.getByLabelText(/Nombre/), 'Sin Teléfono');
-    await usuario.type(screen.getByLabelText(/Correo/), 'st@fleetfuel.jop.lat');
-    await usuario.type(screen.getByLabelText(/Clave/), 'ClaveLarga123');
+    await escribir(usuario, screen.getByLabelText(/Nombre/), 'Sin Teléfono');
+    await escribir(usuario, screen.getByLabelText(/Correo/), 'st@fleetfuel.jop.lat');
+    await escribir(usuario, screen.getByLabelText(/Clave/), 'ClaveLarga123');
     await usuario.click(screen.getByRole('button', { name: /Crear usuario/ }));
 
     await waitFor(() => expect(api.crear).toHaveBeenCalled());
@@ -312,10 +322,10 @@ describe('los caminos que no salen bien', () => {
     await screen.findByText('Ana Pérez');
 
     await usuario.click(screen.getByRole('button', { name: /Nuevo usuario/ }));
-    await usuario.type(screen.getByLabelText(/Nombre/), 'Con Teléfono');
-    await usuario.type(screen.getByLabelText(/Correo/), 'ct@fleetfuel.jop.lat');
-    await usuario.type(screen.getByLabelText(/Clave/), 'ClaveLarga123');
-    await usuario.type(screen.getByLabelText(/Teléfono/), '+507 6000-0000');
+    await escribir(usuario, screen.getByLabelText(/Nombre/), 'Con Teléfono');
+    await escribir(usuario, screen.getByLabelText(/Correo/), 'ct@fleetfuel.jop.lat');
+    await escribir(usuario, screen.getByLabelText(/Clave/), 'ClaveLarga123');
+    await escribir(usuario, screen.getByLabelText(/Teléfono/), '+507 6000-0000');
     await usuario.click(screen.getByRole('button', { name: /Crear usuario/ }));
 
     await waitFor(() => expect(api.crear).toHaveBeenCalled());

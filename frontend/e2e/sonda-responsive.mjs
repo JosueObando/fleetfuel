@@ -54,6 +54,7 @@ const ANCHOS = [
 const PANTALLAS = [
   '/operacion/ordenes', '/operacion/viajes', '/operacion/despacho',
   '/operacion/informes', '/operacion/alertas', '/operacion/solicitudes',
+  '/operacion/gastos', '/operacion/liquidaciones',
   '/catalogos/clientes', '/catalogos/cisternas', '/catalogos/conductores',
   '/administracion/usuarios', '/administracion/roles',
   '/administracion/auditoria', '/administracion/dispositivos',
