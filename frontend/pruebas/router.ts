@@ -24,6 +24,8 @@ const avisar = () => oyentes.forEach(f => f());
 
 /** Cada `router.replace` que hizo la pantalla, con sus argumentos. */
 export const reemplazos = jest.fn();
+/** Cada `router.push`: navegar a OTRA pantalla, que apila historial. */
+export const navegaciones = jest.fn();
 
 /** Deja la URL como si se hubiera abierto `url` en la barra. */
 export function irA(url: string) {
@@ -35,12 +37,13 @@ export function irA(url: string) {
 
 export function reiniciarUrl(url = '/') {
   reemplazos.mockClear();
+  navegaciones.mockClear();
   irA(url);
 }
 
 export const useRouter = () => ({
   replace: (url: string, opciones?: unknown) => { reemplazos(url, opciones); irA(url); },
-  push: (url: string) => irA(url),
+  push: (url: string) => { navegaciones(url); irA(url); },
 });
 
 export const usePathname = () => useSyncExternalStore(suscribir, () => ruta);

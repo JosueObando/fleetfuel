@@ -52,7 +52,7 @@ const ANCHOS = [
 ];
 
 const PANTALLAS = [
-  '/operacion/ordenes', '/operacion/viajes', '/operacion/despacho',
+  '/operacion/ordenes', '/operacion/viajes', '/operacion/planificador', '/operacion/despacho',
   '/operacion/informes', '/operacion/alertas', '/operacion/solicitudes',
   '/operacion/gastos', '/operacion/liquidaciones',
   '/catalogos/clientes', '/catalogos/cisternas', '/catalogos/conductores',

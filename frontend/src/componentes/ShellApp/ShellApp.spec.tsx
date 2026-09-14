@@ -91,7 +91,7 @@ describe('la navegación', () => {
     expect(await screen.findByRole('navigation', { name: /Navegación principal/ })).toBeInTheDocument();
   });
 
-  it('están las cuatro secciones y sus dieciocho destinos, y NINGUNO más', async () => {
+  it('están las cuatro secciones y sus diecinueve destinos, y NINGUNO más', async () => {
     /* La lista se comprueba ENTERA y con su tamaño, no destino a destino.
        Enumerando sólo los que se esperan, añadir una sección al menú no rompía
        nada —pasó dos veces el 2026-09-12, con «Despacho y cierre» e
@@ -99,7 +99,10 @@ describe('la navegación', () => {
        navegación no divergió. Un test cuyo nombre dice «ocho» y no cuenta
        ocho documenta lo que había, no lo que hay. */
     const DESTINOS = [
-      'Órdenes', 'Viajes', 'Despacho y cierre', 'Informes',
+      'Órdenes', 'Viajes',
+      // §15.3, del 2026-09-14: la semana por cisterna, antes de autorizar.
+      'Planificador',
+      'Despacho y cierre', 'Informes',
       // Las dos bandejas del 2026-09-13. El backend servía alertas (§22) y
       // solicitudes de ruta (§2C) desde el 07-09 sin forma de llegar a ellas.
       'Alertas', 'Solicitudes de ruta',

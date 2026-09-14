@@ -31,3 +31,13 @@ export const EN_MARCHA = new Set([
 
 /** Estados en los que el plan de carga todavía se puede tocar. */
 export const PLANIFICABLE = new Set(['borrador', 'programado']);
+
+/**
+ * Estados de un viaje que todavía no ha salido. Con la fecha programada ya
+ * pasada, es un viaje RETRASADO. Lo usan el informe operativo (§14.1) y la
+ * lista de viajes: dos definiciones de «retrasado» acabarían contando distinto.
+ */
+export const SIN_SALIR = ['borrador', 'programado', 'autorizado'];
+
+/** La lista de arriba escrita para un `IN (...)` de SQL. Son constantes, no datos. */
+export const SIN_SALIR_SQL = SIN_SALIR.map(e => `'${e}'`).join(', ');

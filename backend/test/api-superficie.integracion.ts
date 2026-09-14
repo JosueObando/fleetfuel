@@ -224,6 +224,17 @@ describe('órdenes y viajes, ruta por ruta', () => {
     }), [201])).body;
 
     await ruta('GET /viajes', api().get('/api/viajes').set(cab()), [200]);
+    /* La ventana del planificador llega por la cadena de consulta: sin estas dos
+       peticiones, un controlador que no pasara `desde`/`hasta` al servicio
+       devolvería el histórico entero y ninguna prueba de servicio lo vería. */
+    const enVentana = await api().get('/api/viajes?desde=2028-01-15T00:00:00Z&hasta=2028-01-16T00:00:00Z')
+      .set(cab()).expect(200);
+    expect(enVentana.body.map((v: { id: unknown }) => String(v.id))).toContain(String(viaje.id));
+    // Antes de su salida: sin fecha de fin, DESPUÉS lo ocupa todo.
+    const fuera = await api().get('/api/viajes?desde=2027-01-01T00:00:00Z&hasta=2027-01-02T00:00:00Z')
+      .set(cab()).expect(200);
+    expect(fuera.body.map((v: { id: unknown }) => String(v.id))).not.toContain(String(viaje.id));
+    await api().get('/api/viajes?desde=manana&hasta=2028-01-16').set(cab()).expect(400);
     await ruta('GET /viajes/:id', api().get(`/api/viajes/${viaje.id}`).set(cab()), [200]);
     await ruta('PATCH /viajes/:id',
       api().patch(`/api/viajes/${viaje.id}`).set(cab()).send({ rutaPlanificada: 'Vía Centenario' }), [200]);

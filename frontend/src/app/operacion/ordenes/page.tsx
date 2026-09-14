@@ -10,6 +10,7 @@ import type { Fila } from '@/api/tipos';
 import catalogo from '@/catalogos/Catalogo.module.css';
 import estilos from './ordenes.module.css';
 import { EditarOrden } from './EditarOrden';
+import { TablaDesplazable } from '@/componentes/TablaDesplazable/TablaDesplazable';
 
 interface Linea { productoId: string; volumenSolicitado: string; tolerancia: string }
 
@@ -207,6 +208,7 @@ export default function Ordenes() {
         ) : filas.length === 0 ? (
           <p className={catalogo.vacio}>Todavía no hay órdenes.</p>
         ) : (
+          <TablaDesplazable etiqueta="Órdenes">
           <table className={catalogo.tabla}>
             <thead>
               <tr>
@@ -246,6 +248,7 @@ export default function Ordenes() {
               ))}
             </tbody>
           </table>
+          </TablaDesplazable>
         )}
       </div>
     </section>

@@ -10,7 +10,9 @@ export class ViajesController {
   constructor(private readonly viajes: ViajesService) {}
 
   @Get() @RequierePermisos('viajes:leer')
-  listar(@Query('estado') estado?: string) { return this.viajes.listar(estado); }
+  listar(@Query('estado') estado?: string, @Query('desde') desde?: string, @Query('hasta') hasta?: string) {
+    return this.viajes.listar(estado, { desde, hasta });
+  }
 
   @Get(':id') @RequierePermisos('viajes:leer')
   obtener(@Param('id') id: string) { return this.viajes.obtener(id); }

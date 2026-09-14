@@ -305,6 +305,33 @@ extremo ya está guardado—: calibración invertida, ventana invertida, odómet
 final menor, fin anterior al inicio y código de viaje repetido. El periodo vacío
 no daba un 500: se aceptaba en silencio, que es peor.
 
+### §15.3 · Planificador de viajes — ✅ (2026-09-14)
+
+`/operacion/planificador`: una semana en `?desde=`, una fila por cisterna
+—también las libres— y un bloque por viaje, con la lista de conflictos como
+versión en texto. Lo pide el backend acotado a la ventana (`GET
+/viajes?desde=&hasta=`), con `destinos` en orden de ruta y `retrasado` con la
+MISMA definición que el informe operativo (`SIN_SALIR` en `viajes/estados.ts`).
+
+**Qué es un conflicto, y qué no.** Dos viajes activos de la misma cisterna o
+del mismo conductor no pueden pisarse: lo impide la exclusión del §5.1. Marcar
+«solapes» sólo encontraría viajes CERRADOS, que ya no ocupan nada: una alarma
+siempre falsa. Los conflictos son lo que la exclusión NO ve: sin cisterna, sin
+conductor, sin fin previsto y retrasado.
+
+Queda de §15.3: la **terminal de carga** en el bloque (el viaje no la trae en
+la lista) y las **horas**, que llegarán con el arreglo de los días en UTC.
+
+**Encontrado de paso, y ABIERTO: el shell no cumple el breakpoint <768.** A 360
+px el menú lateral asoma recortado y los botones de las barras se cortan por la
+derecha en TODAS las pantallas (visto en cisternas y planificador), cuando UX-1
+da por hecho «<768 tab bar de 5 destinos». La sonda responsive no lo detecta:
+mide que la ventana no se desplace, y aquí no se desplaza — el contenido se
+corta dentro de un ancestro. **Lo vio una captura, otra vez**, como el menú que
+se pisaba. La sonda también destapó una regresión real de este mismo día —la
+tabla de órdenes, fuera de `TablaDesplazable`, desbordaba a 360 px por el
+`span.solo-lectores` del botón «Editar»— y ésa sí está arreglada.
+
 ### El hueco que no estaba en ninguna fase — §7.13 `cargas_terminal`
 
 El flujo `orden → plan de carga → viaje → entrega` se dio por cerrado sin la

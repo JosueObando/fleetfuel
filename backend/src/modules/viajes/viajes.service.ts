@@ -3,7 +3,7 @@ import { auditar, contextoActual, gestor } from '../../common/contexto/contexto-
 import {
   CrearViajeDto, ActualizarViajeDto, CambiarEstadoViajeDto, AsignarOrdenDto, LineaPlanDto,
 } from './dto/viajes.dto';
-import { FLUJO_VIAJE, EN_MARCHA, PLANIFICABLE } from './estados';
+import { FLUJO_VIAJE, EN_MARCHA, PLANIFICABLE, SIN_SALIR_SQL } from './estados';
 
 const CAMPOS = `v.viaje_id AS id, v.codigo_viaje AS "codigoViaje", v.tipo_viaje AS "tipoViaje",
                 v.cabezal_id AS "cabezalId", v.cisterna_id AS "cisternaId",
@@ -13,7 +13,26 @@ const CAMPOS = `v.viaje_id AS id, v.codigo_viaje AS "codigoViaje", v.tipo_viaje 
                 v.fecha_fin AS "fechaFin", v.estado, v.motivo_cancelacion AS "motivoCancelacion",
                 v.autorizado_por AS "autorizadoPor", v.odometro_inicial AS "odometroInicial",
                 v.odometro_final AS "odometroFinal", v.kilometros_gps AS "kilometrosGps",
-                v.ruta_planificada AS "rutaPlanificada"`;
+                v.ruta_planificada AS "rutaPlanificada",
+                ARRAY(SELECT e.nombre FROM viaje_ordenes vo
+                        JOIN ordenes_abastecimiento o ON o.orden_id = vo.orden_id
+                        JOIN estaciones_servicio e ON e.estacion_id = o.estacion_id
+                       WHERE vo.viaje_id = v.viaje_id ORDER BY vo.secuencia_entrega) AS destinos,
+                (v.fecha_programada < now() AND v.estado IN (${SIN_SALIR_SQL})) AS retrasado`;
+
+/** La ventana de tiempo que pide el planificador: los dos extremos o ninguno. */
+export interface Ventana { desde?: string; hasta?: string }
+
+function ventanaValida(v?: Ventana): { desde: string; hasta: string } | null {
+  if (!v || (v.desde === undefined && v.hasta === undefined)) return null;
+  const desde = Date.parse(v.desde ?? ''), hasta = Date.parse(v.hasta ?? '');
+  /* Se normaliza a ISO aquí: lo que llega al `::timestamptz` ya es una fecha
+     que Postgres entiende, y un texto raro es un 400 y no un 500 del cast. */
+  if (Number.isNaN(desde) || Number.isNaN(hasta))
+    throw new BadRequestException('La ventana necesita fechas válidas');
+  if (hasta <= desde) throw new BadRequestException('La ventana termina antes de empezar');
+  return { desde: new Date(desde).toISOString(), hasta: new Date(hasta).toISOString() };
+}
 
 const DESDE = `FROM viajes v LEFT JOIN conductores cd ON cd.conductor_id = v.conductor_id`;
 
@@ -51,11 +70,17 @@ function traducirRestricciones(e: unknown, codigoViaje?: string): never {
 
 @Injectable()
 export class ViajesService {
-  async listar(estado?: string) {
+  async listar(estado?: string, ventana?: Ventana) {
+    const v = ventanaValida(ventana);
+    /* «Ocupa algo de la ventana» con la misma cuenta que `periodo`: desde la
+       salida real o la programada, hasta el fin EXCLUIDO; sin fin, sin límite. */
     const filas = await gestor().query(
       `SELECT ${CAMPOS} ${DESDE}
         WHERE ($1::text IS NULL OR v.estado = $1)
-        ORDER BY v.fecha_programada DESC`, [estado ?? null]);
+          AND ($2::timestamptz IS NULL
+               OR (coalesce(v.fecha_inicio, v.fecha_programada) < $3::timestamptz
+                   AND coalesce(v.fecha_fin, 'infinity') > $2::timestamptz))
+        ORDER BY v.fecha_programada DESC`, [estado ?? null, v?.desde ?? null, v?.hasta ?? null]);
     return filas.map((f: { estado: string }) => ({
       ...f, transicionesPosibles: FLUJO_VIAJE[f.estado] ?? [],
     }));

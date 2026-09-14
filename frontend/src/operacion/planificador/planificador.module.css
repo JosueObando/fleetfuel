@@ -1,0 +1,62 @@
+/* Tres botones no caben junto al título en un teléfono: la barra pasa a dos
+   líneas en vez de empujarlos fuera de la pantalla. */
+.barra { flex-wrap: wrap; }
+.navegacion { display: flex; flex-wrap: wrap; gap: var(--esp-2); min-width: 0; }
+.rango {
+  margin: 0 0 var(--esp-4); color: var(--fg-muted); font-size: var(--texto-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Ancho mínimo para que un día quepa legible; por debajo, desplaza la tabla
+   (TablaDesplazable) y no la página. */
+.tabla { width: 100%; min-width: 760px; border-collapse: collapse; table-layout: fixed; }
+.cabeceraFila {
+  width: 120px; text-align: left; padding: var(--esp-2) var(--esp-3);
+  font-size: var(--texto-sm); font-weight: var(--peso-semi); color: var(--fg-strong);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.dia {
+  text-align: left; padding: var(--esp-2) var(--esp-2);
+  font-size: var(--texto-xs); font-weight: var(--peso-medio); color: var(--fg-muted);
+  border-bottom: 1px solid var(--border-subtle); border-left: 1px solid var(--border-subtle);
+}
+
+/* La pista de una cisterna: siete franjas pintadas con un degradado repetido,
+   y los bloques encima en posición absoluta (`position: relative` aquí, o se
+   escapan de la caja con scroll — ver la sonda responsive). */
+.pista {
+  position: relative; height: 56px; padding: 0;
+  border-bottom: 1px solid var(--border-subtle);
+  background-image: linear-gradient(to right, var(--border-subtle) 1px, transparent 1px);
+  background-size: calc(100% / 7) 100%;
+}
+
+.bloque {
+  position: absolute; top: 8px; bottom: 8px;
+  display: flex; flex-direction: column; justify-content: center; gap: 2px;
+  min-width: 0; overflow: hidden; padding: 0 var(--esp-2);
+  border-radius: var(--radius-sm); border: 1px solid var(--border-strong);
+  text-decoration: none; font-size: var(--texto-xs); line-height: 1.2;
+  transition: box-shadow var(--transicion-rapida);
+}
+.bloque:hover { box-shadow: var(--sombra-sutil); }
+.bloque:focus-visible { outline: none; box-shadow: var(--anillo-foco); z-index: 1; }
+.codigo { font-weight: var(--peso-semi); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.detalle { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Cuatro momentos, no trece estados: pares de color que ya usa el sistema. */
+.planificacion { background: var(--action-subtle); color: var(--fg-default); }
+.autorizado { background: var(--bg-surface); color: var(--fg-strong); border-left: 4px solid var(--color-warning-500); }
+.enMarcha { background: var(--action); color: var(--fg-on-action); border-color: var(--action); }
+.cerrado { background: var(--bg-base); color: var(--fg-muted); border-style: dashed; }
+
+/* Recortado por la semana: el borde que sigue fuera no se redondea. */
+.cortaInicio { border-top-left-radius: 0; border-bottom-left-radius: 0; border-left-style: dotted; }
+.cortaFin { border-top-right-radius: 0; border-bottom-right-radius: 0; border-right-style: dotted; }
+
+.conflictos { margin-top: var(--esp-6); }
+.tituloConflictos {
+  margin: 0 0 var(--esp-2); font-size: var(--texto-md); font-weight: var(--peso-semi); color: var(--fg-strong);
+}
+.listaConflictos { margin: 0; padding-left: var(--esp-5); display: grid; gap: var(--esp-1); font-size: var(--texto-sm); }
+.listaConflictos a { color: var(--fg-default); }

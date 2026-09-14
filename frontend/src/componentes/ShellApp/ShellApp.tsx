@@ -20,6 +20,9 @@ const GRUPOS: Array<{ rotulo: string; items: Array<{ ruta: string; etiqueta: str
     items: [
       { ruta: '/operacion/ordenes', etiqueta: 'Órdenes', icono: 'ordenes' },
       { ruta: '/operacion/viajes',  etiqueta: 'Viajes',  icono: 'seguimiento' },
+      // §15.3: la semana por cisterna. Junto a viajes, porque es donde se
+      // decide a qué cisterna y conductor va cada uno antes de autorizar.
+      { ruta: '/operacion/planificador', etiqueta: 'Planificador', icono: 'calendario' },
       // Va DESPUÉS de viajes porque es lo que pasa después: un viaje se arma
       // en la pantalla de arriba y se despacha, entrega y liquida en ésta.
       { ruta: '/operacion/despacho', etiqueta: 'Despacho y cierre', icono: 'flota' },

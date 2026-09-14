@@ -12,7 +12,7 @@
 export type NombreIcono =
   | 'seguimiento' | 'flota' | 'conductores' | 'ordenes' | 'informes'
   | 'ajustes' | 'ayuda' | 'campana' | 'buscar' | 'salir'
-  | 'chevron' | 'mas' | 'camara' | 'telefono';
+  | 'chevron' | 'mas' | 'camara' | 'telefono' | 'calendario';
 
 // Trazo redondeado, grosor 1.5, lienzo 24: el lenguaje de UIcons Rounded.
 const TRAZOS: Record<NombreIcono, string> = {
@@ -30,6 +30,7 @@ const TRAZOS: Record<NombreIcono, string> = {
   mas:         'M12 6v12M6 12h12',
   camara:      'M4 8h3.5L9 6h6l1.5 2H20v11H4zM12 16.5a3 3 0 100-6 3 3 0 000 6z',
   telefono:    'M6 4h3l1.5 4-2 1.5a11 11 0 006 6l1.5-2 4 1.5v3a1 1 0 01-1 1A15 15 0 015 5a1 1 0 011-1z',
+  calendario:  'M5 6h14v14H5zM5 10h14M9 3v4M15 3v4',
 };
 
 interface Props {

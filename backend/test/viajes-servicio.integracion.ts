@@ -424,6 +424,146 @@ describe('actualizar · lo que la base rechaza llega como error de negocio, no c
   });
 });
 
+describe('listar · la ventana del planificador (§15.3)', () => {
+  /* El planificador enseña una semana. Sin ventana tendría que pedir TODO el
+     histórico y recortarlo en el navegador, que es lo que deja de funcionar el
+     primer año de operación. «Ocupa algo de la ventana» usa la misma cuenta que
+     `periodo`: desde la salida real o la programada, hasta el fin EXCLUIDO; sin
+     fin, hacia adelante sin límite. */
+  const creado = (s: ViajesService, fechaProgramada: string, fechaFin?: string) =>
+    s.crear({ codigoViaje: `VEN-${Math.random().toString(36).slice(2, 9)}`, fechaProgramada,
+              ...(fechaFin ? { fechaFin } : {}) }).then(v => String(v.id));
+  const ids = (filas: Array<{ id: unknown }>) => filas.map(f => String(f.id));
+  const ventana = { desde: '2031-01-02T00:00:00Z', hasta: '2031-01-05T00:00:00Z' };
+
+  it('sólo los viajes que ocupan algo de la ventana', async () => {
+    await enServicio(async s => {
+      const dentro = await creado(s, '2031-01-01T08:00:00Z', '2031-01-03T08:00:00Z');
+      const sinFin = await creado(s, '2030-12-01T08:00:00Z');
+      const despues = await creado(s, '2031-01-10T08:00:00Z', '2031-01-11T08:00:00Z');
+      const antes = await creado(s, '2030-11-01T08:00:00Z', '2030-11-02T08:00:00Z');
+
+      const vistos = ids(await s.listar(undefined, ventana));
+      expect(vistos).toEqual(expect.arrayContaining([dentro, sinFin]));
+      expect(vistos).not.toContain(despues);
+      expect(vistos).not.toContain(antes);
+    });
+  });
+
+  it('los bordes: el fin es EXCLUIDO y la ventana también', async () => {
+    await enServicio(async s => {
+      const terminaAlEmpezar = await creado(s, '2031-01-01T00:00:00Z', ventana.desde);
+      const empiezaAlTerminar = await creado(s, ventana.hasta, '2031-01-06T00:00:00Z');
+      const vistos = ids(await s.listar(undefined, ventana));
+      expect(vistos).not.toContain(terminaAlEmpezar);
+      expect(vistos).not.toContain(empiezaAlTerminar);
+    });
+  });
+
+  it('un viaje YA ARRANCADO cuenta desde su salida real, no desde la programada', async () => {
+    // Programado para diciembre, salió el 3 de enero: ocupa la ventana.
+    await enServicio(async s => {
+      const id = await creado(s, '2030-12-01T08:00:00Z', '2031-01-04T00:00:00Z');
+      const { gestor } = await import('../src/common/contexto/contexto-peticion');
+      await gestor().query(`UPDATE viajes SET fecha_programada = '2030-12-01T08:00:00Z', fecha_inicio = '2031-01-03T08:00:00Z',
+                                            fecha_fin = '2031-01-04T00:00:00Z' WHERE viaje_id = $1`, [id]);
+      expect(ids(await s.listar(undefined, { desde: '2031-01-03T00:00:00Z', hasta: '2031-01-05T00:00:00Z' })))
+        .toContain(id);
+      expect(ids(await s.listar(undefined, { desde: '2030-12-01T00:00:00Z', hasta: '2030-12-02T00:00:00Z' })))
+        .not.toContain(id);
+    });
+  });
+
+  it('una fecha que no es fecha es un 400, no un 500 del cast', async () => {
+    await enServicio(async s => {
+      const intento = s.listar(undefined, { desde: 'mañana', hasta: ventana.hasta });
+      await expect(intento).rejects.toBeInstanceOf(BadRequestException);
+      await expect(intento).rejects.toThrow('La ventana necesita fechas válidas');
+    });
+  });
+
+  it('una ventana que termina antes de empezar es un 400', async () => {
+    await enServicio(async s => {
+      await expect(s.listar(undefined, { desde: ventana.hasta, hasta: ventana.desde }))
+        .rejects.toThrow('La ventana termina antes de empezar');
+    });
+  });
+
+  it('una ventana de duración cero tampoco es una ventana', async () => {
+    await enServicio(async s => {
+      await expect(s.listar(undefined, { desde: ventana.desde, hasta: ventana.desde }))
+        .rejects.toThrow('La ventana termina antes de empezar');
+    });
+  });
+
+  it('sólo uno de los dos extremos también se rechaza', async () => {
+    // Una ventana a medias no es una ventana: devolver «todo desde X» con
+    // `hasta` olvidado es la consulta cara que esto existe para evitar.
+    await enServicio(async s => {
+      await expect(s.listar(undefined, { desde: ventana.desde }))
+        .rejects.toThrow('La ventana necesita fechas válidas');
+    });
+  });
+});
+
+describe('listar y obtener · lo que el planificador enseña de cada viaje', () => {
+  it('los destinos, en el orden de entrega', async () => {
+    await enServicio(async s => {
+      const id = await viajeConOrden(s);
+      expect((await s.obtener(id)).destinos).toEqual(['Estación Srv']);
+      const fila = (await s.listar()).find((v: { id: unknown }) => String(v.id) === id);
+      expect(fila.destinos).toEqual(['Estación Srv']);
+    });
+  });
+
+  it('con dos paradas, en el orden de la RUTA y no en el de alta', async () => {
+    // La segunda orden se asigna primero pero se entrega después: el conductor
+    // lee los destinos en el orden en que va a parar.
+    await enServicio(async s => {
+      const { gestor } = await import('../src/common/contexto/contexto-peticion');
+      const [cli] = await gestor().query(
+        `INSERT INTO clientes (empresa_id, nombre) VALUES ($1,'Cliente Ruta') RETURNING cliente_id`, [empresa]);
+      const [est] = await gestor().query(
+        `INSERT INTO estaciones_servicio (empresa_id, cliente_id, nombre)
+         VALUES ($1,$2,'Estación Primera') RETURNING estacion_id`, [empresa, cli.cliente_id]);
+      const [o] = await gestor().query(
+        `INSERT INTO ordenes_abastecimiento (empresa_id, cliente_id, estacion_id, estado)
+         VALUES ($1,$2,$3,'validada') RETURNING orden_id`, [empresa, cli.cliente_id, est.estacion_id]);
+      const v = await s.crear({ codigoViaje: `RUT-${Math.random().toString(36).slice(2, 9)}`,
+                                fechaProgramada: '2031-03-01T08:00:00Z' });
+      await s.asignarOrden(String(v.id), { ordenId: orden, secuenciaEntrega: 2 });
+      await s.asignarOrden(String(v.id), { ordenId: String(o.orden_id), secuenciaEntrega: 1 });
+      expect((await s.obtener(String(v.id))).destinos).toEqual(['Estación Primera', 'Estación Srv']);
+    });
+  });
+
+  it('sin órdenes, la lista de destinos está vacía, no es null', async () => {
+    await enServicio(async s => {
+      const v = await s.crear({ codigoViaje: `DST-${Math.random().toString(36).slice(2, 9)}`,
+                                fechaProgramada: '2031-02-01T08:00:00Z' });
+      expect((await s.obtener(String(v.id))).destinos).toEqual([]);
+    });
+  });
+
+  it('retrasado: debió salir y sigue sin salir — la MISMA cuenta que el informe operativo', async () => {
+    await enServicio(async s => {
+      const pasado = await s.crear({ codigoViaje: `RET-${Math.random().toString(36).slice(2, 9)}`,
+                                     fechaProgramada: '2020-01-01T08:00:00Z' });
+      const futuro = await s.crear({ codigoViaje: `RET-${Math.random().toString(36).slice(2, 9)}`,
+                                     fechaProgramada: '2040-01-01T08:00:00Z' });
+      expect((await s.obtener(String(pasado.id))).retrasado).toBe(true);
+      expect((await s.obtener(String(futuro.id))).retrasado).toBe(false);
+
+      await forzarEstado(String(pasado.id), 'autorizado');
+      expect((await s.obtener(String(pasado.id))).retrasado).toBe(true);
+      // Ya salió: con fecha pasada, pero no está retrasado.
+      await forzarEstado(String(pasado.id), 'transito_estacion');
+      const fila = (await s.listar()).find((v: { id: unknown }) => String(v.id) === String(pasado.id));
+      expect(fila.retrasado).toBe(false);
+    });
+  });
+});
+
 describe('crear · un código repetido también se dice con el código', () => {
   it('nombra el código que choca', async () => {
     await enServicio(async s => {

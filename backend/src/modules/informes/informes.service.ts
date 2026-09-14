@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { SIN_SALIR_SQL } from '../viajes/estados';
 import { gestor } from '../../common/contexto/contexto-peticion';
 
 /**
@@ -59,7 +60,7 @@ export class InformesService {
          -- la orden y puede ser otra cosa.
          (SELECT count(*) FROM viajes
            WHERE fecha_programada < now()
-             AND estado IN ('borrador','programado','autorizado'))
+             AND estado IN (${SIN_SALIR_SQL}))
            AS "viajesRetrasados"
        FROM dia`, [fecha ?? null]);
     return fila;

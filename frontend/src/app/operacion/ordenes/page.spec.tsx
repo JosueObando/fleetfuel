@@ -249,6 +249,17 @@ describe('crear una orden', () => {
 });
 
 describe('la lista', () => {
+  it('la tabla desplaza dentro de su propia caja, no la página', async () => {
+    /* La sonda responsive la marcó rota a 360 px el 2026-09-14: el botón
+       «Editar» lleva un `span.solo-lectores` absoluto que, sin una caja
+       posicionada que lo contenga, ensancha el documento entero. Las demás
+       tablas ya vivían en `TablaDesplazable`; ésta no. Lo visual lo mide la
+       sonda en un navegador; esto fija que el envoltorio no se pierda. */
+    render(<Ordenes />);
+    await screen.findAllByText('EXT-1');
+    expect(within(screen.getByRole('region', { name: 'Órdenes' })).getByRole('table')).toBeInTheDocument();
+  });
+
   it('sin órdenes lo dice', async () => {
     api.listar.mockImplementation((r: string) => Promise.resolve(r === '/ordenes' ? [] : listarPor(r)));
     render(<Ordenes />);
