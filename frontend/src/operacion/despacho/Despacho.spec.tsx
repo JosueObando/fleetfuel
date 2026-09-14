@@ -2,7 +2,11 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Despacho } from './Despacho';
 import { ErrorApi } from '@/api/cliente';
+import { reiniciarUrl } from '../../../pruebas/router';
 
+/* Un router que navega de verdad: elegir un viaje escribe `?viaje=ID` y la
+   pantalla lo abre LEYENDO la URL. Ver `Despacho.url.spec.tsx`. */
+jest.mock('next/navigation', () => jest.requireActual('../../../pruebas/router'));
 jest.mock('@/api/cliente', () => {
   const real = jest.requireActual('@/api/cliente');
   return { ...real, api: {
@@ -115,6 +119,7 @@ function conApi(opciones: {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  reiniciarUrl('/operacion/despacho');
   window.localStorage.setItem('fleetfuel.sesion', JSON.stringify({
     accessToken: 't', usuario: { id: YO, nombre: 'Quien mira', correo: 'yo@x', roles: [] },
   }));

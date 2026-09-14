@@ -1,6 +1,9 @@
 import { render, screen } from '@testing-library/react';
 import Pagina from './page';
 
+// La pantalla lee el viaje abierto de la URL: sin router no monta.
+jest.mock('next/navigation', () => jest.requireActual('../../../../pruebas/router'));
+
 jest.mock('@/api/cliente', () => {
   const real = jest.requireActual('@/api/cliente');
   return { ...real, api: {

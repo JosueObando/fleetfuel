@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { auditar, contextoActual, gestor } from '../../common/contexto/contexto-peticion';
 import { CrearOrdenDto, ActualizarOrdenDto, CambiarEstadoOrdenDto } from './dto/ordenes.dto';
 import { ADMITEN_EDICION, FLUJO_ORDEN, EXIGEN_MOTIVO } from './estados';
+import { PLANIFICABLE } from '../viajes/estados';
 
 const CAMPOS = `o.orden_id AS id, o.numero_orden_externa AS "numeroOrdenExterna",
                 o.cliente_id AS "clienteId", c.nombre AS cliente,
@@ -9,7 +10,18 @@ const CAMPOS = `o.orden_id AS id, o.numero_orden_externa AS "numeroOrdenExterna"
                 o.fecha_orden AS "fechaOrden", o.fecha_requerida AS "fechaRequerida",
                 o.ventana_inicio AS "ventanaInicio", o.ventana_fin AS "ventanaFin",
                 o.prioridad, o.estado, o.volumen_total AS "volumenTotal",
-                o.observaciones, o.fuente`;
+                o.observaciones, o.fuente,
+                EXISTS (SELECT 1 FROM viaje_ordenes vo JOIN viajes v ON v.viaje_id = vo.viaje_id
+                         WHERE vo.orden_id = o.orden_id
+                           AND v.estado NOT IN (${[...PLANIFICABLE, 'cancelado'].map(e => `'${e}'`).join(', ')})
+                       ) AS "enViajeQueSalio"`;
+
+/* El estado de la orden NO avanza solo cuando avanza su viaje (§8.1 y §8.2 no
+   están sincronizadas todavía): hay órdenes «validada» dentro de viajes
+   cerrados. Por eso admitir edición mira las dos cosas. `enViajeQueSalio` se
+   calcula en la consulta y no viaja en la respuesta: es un paso intermedio. */
+const admiteEdicion = (f: { estado: string; enViajeQueSalio: boolean }) =>
+  ADMITEN_EDICION.has(f.estado) && !f.enViajeQueSalio;
 
 const DESDE = `FROM ordenes_abastecimiento o
                  JOIN clientes c ON c.cliente_id = o.cliente_id
@@ -36,9 +48,9 @@ export class OrdenesService {
       `SELECT ${CAMPOS} ${DESDE}
         WHERE o.eliminado_en IS NULL AND ($1::text IS NULL OR o.estado = $1)
         ORDER BY o.fecha_requerida NULLS LAST, o.orden_id DESC`, [estado ?? null]);
-    return filas.map((f: { estado: string }) => ({
+    return filas.map(({ enViajeQueSalio, ...f }: { estado: string; enViajeQueSalio: boolean }) => ({
       ...f, transicionesPosibles: FLUJO_ORDEN[f.estado] ?? [],
-      admiteEdicion: ADMITEN_EDICION.has(f.estado),
+      admiteEdicion: admiteEdicion({ ...f, enViajeQueSalio }),
     }));
   }
 
@@ -53,9 +65,11 @@ export class OrdenesService {
               d.tolerancia, d.estado
          FROM detalles_orden d JOIN productos_combustible p ON p.producto_id = d.producto_id
         WHERE d.orden_id = $1 ORDER BY d.detalle_orden_id`, [id]);
-    /** Transiciones legales desde aquí: la interfaz no tiene que replicarlas. */
+    /* Transiciones legales y si admite edición: la interfaz no tiene que
+       replicar ninguna de las dos reglas. */
     orden.transicionesPosibles = FLUJO_ORDEN[orden.estado] ?? [];
-    orden.admiteEdicion = ADMITEN_EDICION.has(orden.estado);
+    orden.admiteEdicion = admiteEdicion(orden);
+    delete orden.enViajeQueSalio;
     return orden;
   }
 
@@ -94,8 +108,9 @@ export class OrdenesService {
   async actualizar(id: string, dto: ActualizarOrdenDto) {
     const antes = await this.obtener(id);
     if (!antes.admiteEdicion)
-      throw new ConflictException(
-        `Una orden en estado "${antes.estado}" ya no admite cambios de programación`);
+      throw new ConflictException(ADMITEN_EDICION.has(antes.estado)
+        ? 'La orden va en un viaje que ya salió: no admite cambios de programación'
+        : `Una orden en estado "${antes.estado}" ya no admite cambios de programación`);
 
     const columnas: Record<string, unknown> = {
       fecha_requerida: dto.fechaRequerida, ventana_inicio: dto.ventanaInicio,

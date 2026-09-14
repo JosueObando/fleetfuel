@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/componentes/Button/Button';
 import { api, ErrorApi } from '@/api/cliente';
 import { useCargaInicial } from '@/api/carga';
@@ -30,8 +31,17 @@ import type { Fila } from './tipos';
  * que sí.
  */
 export function Despacho() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const params = useSearchParams();
+  /* El viaje abierto vive en la URL: esta pantalla se deja abierta horas, se
+     recarga y se comparte («mira el V-001»). El estado de React sólo guarda lo
+     que se TRAJO, y se enseña únicamente si es del viaje que la URL pide. */
+  const idEnUrl = params.get('viaje');
+
   const [viajes, setViajes] = useState<Fila[] | null>(null);
-  const [sel, setSel] = useState<Fila | null>(null);
+  const [cargado, setSel] = useState<Fila | null>(null);
+  const sel = cargado && String(cargado.id) === idEnUrl ? cargado : null;
   const [error, setError] = useState<string | null>(null);
 
   const [cargas, setCargas] = useState<Fila[]>([]);
@@ -65,7 +75,7 @@ export function Despacho() {
    * dejaría la pantalla entera sin entregas, que sí puede ver. Lo mismo vale
    * para `eventos:leer` y `solicitudesruta:leer`, que también son permisos propios.
    */
-  const cargarDetalle = useCallback(async (id: string) => {
+  const cargarDetalle = useCallback(async (id: string, vigente: () => boolean = () => true) => {
     const [viaje, cs, es, gs, tot, liq, evs, integ, sols] = await Promise.allSettled([
       api.obtener<Fila>(`/viajes/${id}`),
       api.listar<Fila>(`/cargas/viaje/${id}`),
@@ -78,10 +88,24 @@ export function Despacho() {
       api.listar<Fila>(`/solicitudes-ruta/viaje/${id}`),
     ]);
 
+    /* Las líneas de las órdenes del viaje traen la TOLERANCIA negociada, que es
+       lo que permite avisar de una merma fuera de rango antes de mandarla. No
+       viene en el viaje, y calcularla del producto sería otra fuente distinta.
+       Se piden ANTES de pintar nada, para que haya una sola comprobación de
+       vigencia y no dos que se puedan desincronizar. */
+    const ordenes = viaje.status === 'fulfilled'
+      ? await Promise.allSettled((viaje.value.ordenes ?? [])
+          .map((o: Fila) => api.obtener<Fila>(`/ordenes/${o.ordenId}`)))
+      : [];
+
+    /* Si la URL ya pide otro viaje, esta respuesta llegó tarde: pintarla
+       mezclaría las cargas de uno con la cabecera del otro. */
+    if (!vigente()) return;
     if (viaje.status === 'rejected') {
       setError(mensaje(viaje.reason, 'No se pudo abrir el viaje'));
       return;
     }
+    setError(null);
     setSel(viaje.value);
     setCargas(cs.status === 'fulfilled' ? cs.value : []);
     setEntregas(es.status === 'fulfilled' ? es.value : []);
@@ -95,19 +119,19 @@ export function Despacho() {
        la cadena está rota, que es una acusación distinta de «no lo sé». */
     setIntegridad(integ.status === 'fulfilled' ? integ.value : null);
     setSolicitudes(sols.status === 'fulfilled' ? sols.value : []);
-
-    /* Las líneas de las órdenes del viaje traen la TOLERANCIA negociada, que es
-       lo que permite avisar de una merma fuera de rango antes de mandarla. No
-       viene en el viaje, y calcularla del producto sería otra fuente distinta. */
-    const ordenes = await Promise.allSettled(
-      (viaje.value.ordenes ?? []).map((o: Fila) => api.obtener<Fila>(`/ordenes/${o.ordenId}`)));
     setLineas(ordenes.flatMap(r =>
       r.status === 'fulfilled' ? ((r.value.detalles ?? []) as Fila[]) : []));
   }, []);
 
-  async function abrir(id: string) {
-    setError(null);
-    await cargarDetalle(id);
+  const cargarSeleccion = useCallback(async (vigente: () => boolean) => {
+    if (idEnUrl) await cargarDetalle(idEnUrl, vigente);
+  }, [idEnUrl, cargarDetalle]);
+  useCargaInicial(cargarSeleccion);
+
+  function abrir(id: string) {
+    const p = new URLSearchParams(params.toString());
+    p.set('viaje', id);
+    router.replace(`${pathname}?${p.toString()}`, { scroll: false });
   }
 
   /** Ejecuta una acción, refresca lo que haya cambiado y cuenta el error. */
@@ -146,7 +170,7 @@ export function Despacho() {
             <button key={String(v.id)} type="button"
                     className={`${estilos.tarjeta} ${sel?.id === v.id ? estilos.activa : ''}`}
                     aria-pressed={sel?.id === v.id}
-                    onClick={() => void abrir(String(v.id))}>
+                    onClick={() => abrir(String(v.id))}>
               <div className={estilos.codigo}>{v.codigoViaje}</div>
               <div className={estilos.meta}>
                 {String(v.fechaProgramada ?? '').slice(0, 10)} · {v.conductor ?? 'sin conductor'}

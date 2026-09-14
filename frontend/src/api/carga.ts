@@ -31,7 +31,18 @@ import { useEffect } from 'react';
  * que empiece poniendo `setCargando(true)` de forma síncrona vuelve a ser
  * exactamente lo que la regla persigue, y este envoltorio lo taparía. Si hace
  * falta ese estado, se pone antes de llamar aquí o dentro del propio `await`.
+ *
+ * RESPUESTAS TARDÍAS
+ *
+ * `cargar` recibe `vigente()`, que pasa a falso en cuanto la función cambia o
+ * la pantalla se desmonta. Una carga que dependa de algo que cambia —el viaje
+ * que pide la URL— lo consulta antes de pintar, y la respuesta de la petición
+ * anterior no pisa la nueva. Las cargas que no dependen de nada lo ignoran.
  */
-export function useCargaInicial(cargar: () => Promise<unknown>): void {
-  useEffect(() => { void cargar(); }, [cargar]);
+export function useCargaInicial(cargar: (vigente: () => boolean) => Promise<unknown>): void {
+  useEffect(() => {
+    let vigente = true;
+    void cargar(() => vigente);
+    return () => { vigente = false; };
+  }, [cargar]);
 }

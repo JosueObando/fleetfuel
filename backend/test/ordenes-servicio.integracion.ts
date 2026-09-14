@@ -5,7 +5,7 @@ import { BadRequestException } from '@nestjs/common';
 import { join } from 'path';
 
 import { OrdenesService } from '../src/modules/ordenes/ordenes.service';
-import { ejecutarEnContexto } from '../src/common/contexto/contexto-peticion';
+import { ejecutarEnContexto, gestor } from '../src/common/contexto/contexto-peticion';
 
 cargarEnv({ path: join(__dirname, '../../.env') });
 
@@ -248,6 +248,53 @@ describe('actualizar · una orden que ya salió no se reprograma editando', () =
       await s.cambiarEstado(String(o.id), { estado: 'planificada' });
       expect((await deLaLista()).admiteEdicion).toBe(false);
       expect((await s.obtener(String(o.id))).admiteEdicion).toBe(false);
+    });
+  });
+
+  /* El estado de la orden NO avanza solo cuando su viaje avanza: en desarrollo
+     había diez órdenes «validada» dentro de viajes CERRADOS. Mirar sólo el
+     estado dejaba reprogramar una entrega que ya ocurrió. Lo que la regla
+     protege —«sus viajes ya están armados sobre esos datos»— se mira en el
+     viaje: una vez autorizado, ya no se planifica. */
+  const enViaje = async (ordenId: string, estadoViaje: string) => {
+    const [v] = await gestor().query(
+      `INSERT INTO viajes (empresa_id, codigo_viaje, fecha_programada, estado, motivo_cancelacion)
+       VALUES ($1, $2, '2027-01-01T08:00:00Z', $3, $4) RETURNING viaje_id`,
+      [empresa, `ORD-V-${Math.random().toString(36).slice(2, 9)}`, estadoViaje,
+       estadoViaje === 'cancelado' ? 'prueba' : null]);
+    await gestor().query(
+      `INSERT INTO viaje_ordenes (empresa_id, viaje_id, orden_id, secuencia_entrega) VALUES ($1,$2,$3,1)`,
+      [empresa, v.viaje_id, ordenId]);
+  };
+
+  it.each(['autorizado', 'cerrado'])('en un viaje %s ya no admite edición, aunque siga «validada»', async estadoViaje => {
+    await enServicio(async s => {
+      const o = await s.crear(ordenBase());
+      await s.cambiarEstado(String(o.id), { estado: 'validada' });
+      await enViaje(String(o.id), estadoViaje);
+
+      const detalle = await s.obtener(String(o.id));
+      expect(detalle.admiteEdicion).toBe(false);
+      const deLaLista = (await s.listar()).find((f: { id: unknown }) => String(f.id) === String(o.id));
+      expect(deLaLista.admiteEdicion).toBe(false);
+      // El paso intermedio de la consulta no forma parte de la respuesta.
+      expect(detalle).not.toHaveProperty('enViajeQueSalio');
+      expect(deLaLista).not.toHaveProperty('enViajeQueSalio');
+      await expect(s.actualizar(String(o.id), { prioridad: 'alta' }))
+        .rejects.toThrow('La orden va en un viaje que ya salió: no admite cambios de programación');
+    });
+  });
+
+  it.each(['borrador', 'programado', 'cancelado'])('en un viaje %s todavía se corrige', async estadoViaje => {
+    // Mientras el viaje se planifica, ajustar la orden es justo lo que se hace;
+    // un viaje cancelado ya no la lleva a ningún sitio.
+    await enServicio(async s => {
+      const o = await s.crear(ordenBase());
+      await s.cambiarEstado(String(o.id), { estado: 'validada' });
+      await enViaje(String(o.id), estadoViaje);
+
+      expect((await s.obtener(String(o.id))).admiteEdicion).toBe(true);
+      expect((await s.actualizar(String(o.id), { prioridad: 'alta' })).prioridad).toBe('alta');
     });
   });
 

@@ -32,6 +32,8 @@ El entorno es **jsdom** y no node: lo que se prueba aquí —`localStorage`,
 | `catalogos/cisternas` | La suma de compartimentos en vivo, el tope de doce y el filtro de vehículos; al **editar**, que la capacidad no baje de lo que suman y que «cargada» o «en viaje» no se declaren desde el catálogo |
 | `operacion/ordenes` | Que la estación dependa del cliente, y los motivos obligatorios; editar la programación sólo donde la API dice `admiteEdicion`, con la ventana en **hora local** |
 | `operacion/viajes` | Que **autorizar** sea una acción aparte del §7, no una transición más; y que un viaje en marcha deje anotar el **odómetro** mandando sólo el odómetro |
+| `despacho` (URL) | Que el viaje abierto viva en `?viaje=ID` —recargar y compartir vuelven al mismo sitio—, que nunca se autoseleccione, y que la respuesta tardía del viaje anterior no pise al actual |
+| `pruebas/router.ts` | No es una prueba: un `next/navigation` que SÍ navega. Con un `replace` de mentira, una pantalla que escribiera la URL y nunca la leyera pasaría |
 | `api/cambios` | Lo que manda un PATCH: sólo lo que cambió, vaciar es `null`, y la hora local de un `datetime-local` vuelve al mismo instante |
 | `operacion/despacho` | Toda la Fase 1C: qué momento abre cada estado del §8.2, y que la pantalla **no deje declarar un precinto intacto** |
 | `operacion/informes` | Los cuatro informes del §14, el estado en la URL, y que la cadena del volumen **calcule y nombre el descuadre** en vez de dejar la resta a quien mira |
@@ -63,12 +65,12 @@ cuela en una revisión visual, porque en pantalla se ve perfecto.
 
 ## El umbral
 
-| | al empezar | componentes | despacho (1C) | informes (§14) | administración | §21 y bitácora | Jest 30 | mutaciones | bandejas | ediciones | umbral |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| Sentencias | 7,24 % | 92,00 % | 93,24 % | 93,71 % | 94,48 % | 94,62 % | 94,65 % | 95,58 % | 95,58 % | **95,86 %** | 95 |
-| Ramas | 6,75 % | 81,17 % | 81,40 % | 81,51 % | 81,91 % | 82,48 % | 83,28 % | 88,44 % | 89,33 % | **89,88 %** | 89 |
-| Funciones | 4,65 % | 82,42 % | 85,34 % | 86,76 % | 88,58 % | 89,17 % | 89,19 % | 90,13 % | 90,66 % | **91,57 %** | 91 |
-| Líneas | 7,44 % | 93,33 % | 94,56 % | 95,40 % | 96,11 % | 96,12 % | 96,14 % | 96,77 % | 96,56 % | **96,69 %** | 96 |
+| | al empezar | componentes | despacho (1C) | informes (§14) | administración | §21 y bitácora | Jest 30 | mutaciones | bandejas | ediciones | URL de despacho | umbral |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Sentencias | 7,24 % | 92,00 % | 93,24 % | 93,71 % | 94,48 % | 94,62 % | 94,65 % | 95,58 % | 95,58 % | 95,86 % | **95,90 %** | 95 |
+| Ramas | 6,75 % | 81,17 % | 81,40 % | 81,51 % | 81,91 % | 82,48 % | 83,28 % | 88,44 % | 89,33 % | 89,88 % | **90,14 %** | 90 |
+| Funciones | 4,65 % | 82,42 % | 85,34 % | 86,76 % | 88,58 % | 89,17 % | 89,19 % | 90,13 % | 90,66 % | 91,57 % | **91,63 %** | 91 |
+| Líneas | 7,44 % | 93,33 % | 94,56 % | 95,40 % | 96,11 % | 96,12 % | 96,14 % | 96,77 % | 96,56 % | 96,69 % | **96,72 %** | 96 |
 
 **Las cuatro pasan el 80 % que pide la disciplina.**
 
