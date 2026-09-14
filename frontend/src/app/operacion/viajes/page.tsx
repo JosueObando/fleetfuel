@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@/componentes/Button/Button';
 import { Campo } from '@/componentes/Campo/Campo';
 import { api, ErrorApi } from '@/api/cliente';
@@ -15,6 +15,15 @@ import { finDelDia, inicioDelDia } from './fechas';
 export default function Viajes() {
   const [viajes, setViajes] = useState<Fila[] | null>(null);
   const [sel, setSel] = useState<Fila | null>(null);
+  /* Al volver a la lista en pantalla estrecha, el foco regresa a la tarjeta del
+     viaje que se cerró. DESPUÉS de pintar: antes, la lista sigue oculta. */
+  const volverA = useRef<string | null>(null);
+  const lista = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (sel || !volverA.current) return;
+    lista.current?.querySelector<HTMLElement>(`[data-viaje="${volverA.current}"]`)?.focus();
+    volverA.current = null;
+  }, [sel]);
   const [error, setError] = useState<string | null>(null);
   const [abierto, setAbierto] = useState(false);
   const [editando, setEditando] = useState(false);
@@ -125,7 +134,7 @@ export default function Viajes() {
     lineas.viajeId === String(sel?.id ?? '') ? lineas.filas : [];
 
   return (
-    <div className={estilos.dos}>
+    <div className={estilos.dos} data-vista={sel ? 'detalle' : 'lista'}>
       {/* El aviso va FUERA de las dos columnas a propósito. Estuvo dentro del
           panel de detalle, y ahí sólo se veía con un viaje seleccionado: un 403
           al cargar la lista, o un fallo al crear el PRIMER viaje, dejaban la
@@ -136,7 +145,7 @@ export default function Viajes() {
           <p className={catalogo.aviso}>{error}</p>
         </div>
       )}
-      <section className={estilos.lista} aria-label="Viajes">
+      <section className={estilos.lista} aria-label="Viajes" ref={lista}>
         <div className={catalogo.barra}>
           <h1 className={catalogo.titulo}>Viajes</h1>
           <Button icono="mas" onClick={() => { setEditando(false); setAbierto(a => !a); }}>Nuevo</Button>
@@ -166,7 +175,7 @@ export default function Viajes() {
           ) : viajes.length === 0 ? (
             <p className={estilos.vacio}>Todavía no hay viajes.</p>
           ) : viajes.map(v => (
-            <button key={String(v.id)} type="button"
+            <button key={String(v.id)} type="button" data-viaje={String(v.id)}
                     className={`${estilos.tarjeta} ${sel?.id === v.id ? estilos.activa : ''}`}
                     aria-pressed={sel?.id === v.id}
                     onClick={() => {
@@ -194,6 +203,13 @@ export default function Viajes() {
         ) : (
           <>
             <div className={catalogo.barra}>
+              <div className={estilos.volver}>
+                <Button variante="secundario" onClick={() => {
+                  volverA.current = String(sel.id);
+                  setEditando(false);
+                  setSel(null);
+                }}>Volver a la lista</Button>
+              </div>
               <h2 className={catalogo.titulo}>{sel.codigoViaje}</h2>
               <div className={estilos.acciones}>
                 <Button variante="secundario" onClick={() => { setAbierto(false); setEditando(true); }}>

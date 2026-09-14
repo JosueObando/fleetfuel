@@ -119,13 +119,14 @@ describe('la navegación', () => {
       'Auditoría', 'Dispositivos',
     ];
     render(<ShellApp><p>x</p></ShellApp>);
-    const nav = await screen.findByRole('navigation');
+    const nav = await screen.findByRole('navigation', { name: 'Navegación principal' });
 
     for (const etiqueta of DESTINOS) {
       expect(within(nav).getByRole('button', { name: new RegExp(etiqueta) })).toBeInTheDocument();
     }
-    // Los destinos, más «Cerrar sesión» y las dos utilidades de la barra.
-    expect(within(nav).getAllByRole('button')).toHaveLength(DESTINOS.length + 3);
+    // Los destinos, más «Cerrar sesión», las dos utilidades de la barra y
+    // «Cerrar el menú», que sólo se VE cuando la navegación es un cajón.
+    expect(within(nav).getAllByRole('button')).toHaveLength(DESTINOS.length + 4);
     // Y las secciones, que el nombre de esta prueba prometía y no comprobaba.
     expect(within(nav).getAllByRole('heading').map(h => h.textContent))
       .toEqual(['Operación', 'Finanzas', 'Catálogos', 'Administración']);
@@ -134,8 +135,8 @@ describe('la navegación', () => {
   it('marca como actual SOLO la sección en la que se está', async () => {
     rutaActual = '/catalogos/vehiculos';
     render(<ShellApp><p>x</p></ShellApp>);
-    await screen.findByRole('navigation');
-    const actuales = screen.getAllByRole('button')
+    const nav = await screen.findByRole('navigation', { name: 'Navegación principal' });
+    const actuales = within(nav).getAllByRole('button')
       .filter(b => b.getAttribute('aria-current') === 'page');
     expect(actuales).toHaveLength(1);
     expect(actuales[0]).toHaveAccessibleName(expect.stringContaining('Vehículos'));
@@ -148,7 +149,7 @@ describe('la navegación', () => {
        delató con una línea sin ejecutar. */
     const usuario = userEvent.setup();
     render(<ShellApp><p>x</p></ShellApp>);
-    const nav = await screen.findByRole('navigation');
+    const nav = await screen.findByRole('navigation', { name: 'Navegación principal' });
     await usuario.click(within(nav).getByRole('button', { name: /Usuarios/ }));
     expect(empujar).toHaveBeenCalledWith('/administracion/usuarios');
   });
@@ -171,8 +172,180 @@ describe('la navegación', () => {
   it('en una ruta que no está en el menú, no marca nada', async () => {
     rutaActual = '/tablero';
     render(<ShellApp><p>x</p></ShellApp>);
-    await screen.findByRole('navigation');
+    await screen.findByRole('navigation', { name: 'Navegación principal' });
     expect(screen.getAllByRole('button').filter(b => b.getAttribute('aria-current') === 'page'))
       .toHaveLength(0);
+  });
+});
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * Pantallas estrechas (spec §7 · Responsive)
+ *
+ * 768–1023: la navegación es un CAJÓN que se abre con «Menú».
+ * <768: barra inferior de 5 destinos —cuatro accesos y «Más», que abre el
+ * mismo cajón—.
+ *
+ * Hasta el 2026-09-14 ninguno de los dos existía: por debajo de 1024 el menú se
+ * estrechaba a 72 px sin ocultar las etiquetas, y en un teléfono se veían
+ * cortadas. Lo que es LAYOUT —qué se ve a cada ancho— lo mide la sonda
+ * responsive en un navegador; jsdom no aplica media queries. Aquí va lo que sí
+ * se puede comprobar: abrir, cerrar, el foco y a dónde lleva cada destino.
+ * ───────────────────────────────────────────────────────────────────────── */
+describe('la navegación en pantallas estrechas', () => {
+  let anchoAmplio: { matches: boolean; oyentes: Array<(e: { matches: boolean }) => void> };
+  beforeEach(() => {
+    leerSesion.mockReturnValue(SESION);
+    anchoAmplio = { matches: false, oyentes: [] };
+    window.matchMedia = jest.fn().mockImplementation((consulta: string) => ({
+      media: consulta, get matches() { return anchoAmplio.matches; },
+      addEventListener: (_: string, f: (e: { matches: boolean }) => void) => anchoAmplio.oyentes.push(f),
+      removeEventListener: (_: string, f: (e: { matches: boolean }) => void) => {
+        anchoAmplio.oyentes = anchoAmplio.oyentes.filter(o => o !== f);
+      },
+    })) as never;
+  });
+
+  const principal = () => screen.findByRole('navigation', { name: 'Navegación principal' });
+
+  it('«Menú» abre el cajón, lo dice con aria-expanded y lleva el foco dentro', async () => {
+    const usuario = userEvent.setup();
+    render(<ShellApp><p>x</p></ShellApp>);
+    const nav = await principal();
+    const menu = screen.getByRole('button', { name: 'Abrir el menú' });
+    expect(menu).toHaveAttribute('aria-expanded', 'false');
+    expect(menu).toHaveAttribute('aria-controls', nav.id);
+
+    await usuario.click(menu);
+    expect(menu).toHaveAttribute('aria-expanded', 'true');
+    // Sin mover el foco, quien navega con teclado sigue DETRÁS del cajón.
+    expect(within(nav).getByRole('button', { name: 'Cerrar el menú' })).toHaveFocus();
+  });
+
+  it('Escape cierra y devuelve el foco a quien lo abrió', async () => {
+    const usuario = userEvent.setup();
+    render(<ShellApp><p>x</p></ShellApp>);
+    await principal();
+    const menu = screen.getByRole('button', { name: 'Abrir el menú' });
+    await usuario.click(menu);
+    await usuario.keyboard('{Escape}');
+    expect(menu).toHaveAttribute('aria-expanded', 'false');
+    expect(menu).toHaveFocus();
+  });
+
+  it('otras teclas no cierran: con el cajón abierto se navega con Tab', async () => {
+    const usuario = userEvent.setup();
+    render(<ShellApp><p>x</p></ShellApp>);
+    await principal();
+    const menu = screen.getByRole('button', { name: 'Abrir el menú' });
+    await usuario.click(menu);
+    await usuario.keyboard('{Tab}{ArrowDown}x');
+    expect(menu).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('«Cerrar el menú» también, con el foco de vuelta', async () => {
+    const usuario = userEvent.setup();
+    render(<ShellApp><p>x</p></ShellApp>);
+    const nav = await principal();
+    const menu = screen.getByRole('button', { name: 'Abrir el menú' });
+    await usuario.click(menu);
+    await usuario.click(within(nav).getByRole('button', { name: 'Cerrar el menú' }));
+    expect(menu).toHaveAttribute('aria-expanded', 'false');
+    expect(menu).toHaveFocus();
+  });
+
+  it('Escape con el cajón CERRADO no roba el foco', async () => {
+    // El Escape también cierra diálogos y desplegables de las pantallas. Se
+    // abre y se cierra antes a propósito: así HAY un botón al que el foco
+    // podría volver, y la prueba puede fallar.
+    const usuario = userEvent.setup();
+    render(<ShellApp><input aria-label="campo" /></ShellApp>);
+    await principal();
+    await usuario.click(screen.getByRole('button', { name: 'Abrir el menú' }));
+    await usuario.keyboard('{Escape}');
+    const campo = screen.getByRole('textbox', { name: 'campo' });
+    await usuario.click(campo);
+    await usuario.keyboard('{Escape}');
+    expect(campo).toHaveFocus();
+  });
+
+  it('pulsar un destino dentro del cajón navega y lo cierra', async () => {
+    const usuario = userEvent.setup();
+    render(<ShellApp><p>x</p></ShellApp>);
+    const nav = await principal();
+    await usuario.click(screen.getByRole('button', { name: 'Abrir el menú' }));
+    await usuario.click(within(nav).getByRole('button', { name: /Cisternas/ }));
+    expect(empujar).toHaveBeenCalledWith('/catalogos/cisternas');
+    expect(screen.getByRole('button', { name: 'Abrir el menú' })).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('con el cajón abierto, la pantalla de detrás es INERTE', async () => {
+    // Si no, el tabulador recorre los botones de una pantalla que no se ve.
+    const usuario = userEvent.setup();
+    render(<ShellApp><p>pantalla</p></ShellApp>);
+    await principal();
+    const contenido = screen.getByText('pantalla').parentElement!;
+    expect(contenido).not.toHaveAttribute('inert');
+    await usuario.click(screen.getByRole('button', { name: 'Abrir el menú' }));
+    expect(contenido).toHaveAttribute('inert');
+  });
+
+  it('pulsar el telón de fondo cierra el cajón', async () => {
+    // Es un atajo de ratón y dedo: no se anuncia —para eso están Escape y
+    // «Cerrar el menú»—, así que se busca por su marca y no por su rol.
+    const usuario = userEvent.setup();
+    const { container } = render(<ShellApp><p>x</p></ShellApp>);
+    await principal();
+    await usuario.click(screen.getByRole('button', { name: 'Abrir el menú' }));
+    await usuario.click(container.querySelector('[data-telon]')!);
+    expect(screen.getByRole('button', { name: 'Abrir el menú' })).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('si la ventana se ensancha hasta ≥1024 con el cajón abierto, se cierra', async () => {
+    // Allí la navegación ya es el menú lateral: un cajón «abierto» dejaría la
+    // pantalla inerte sin nada que cerrar.
+    const usuario = userEvent.setup();
+    render(<ShellApp><p>pantalla</p></ShellApp>);
+    await principal();
+    await usuario.click(screen.getByRole('button', { name: 'Abrir el menú' }));
+    act(() => { anchoAmplio.matches = true; anchoAmplio.oyentes.forEach(f => f({ matches: true })); });
+    expect(screen.getByRole('button', { name: 'Abrir el menú' })).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByText('pantalla').parentElement).not.toHaveAttribute('inert');
+  });
+
+  describe('la barra inferior (<768)', () => {
+    const barra = () => screen.findByRole('navigation', { name: 'Accesos rápidos' });
+
+    it('cinco destinos: cuatro accesos y «Más»', async () => {
+      render(<ShellApp><p>x</p></ShellApp>);
+      const b = await barra();
+      expect(within(b).getAllByRole('button').map(x => x.textContent))
+        .toEqual(['Órdenes', 'Viajes', 'Despacho', 'Alertas', 'Más']);
+    });
+
+    it('marca el destino actual y lleva a su ruta', async () => {
+      rutaActual = '/operacion/despacho';
+      const usuario = userEvent.setup();
+      render(<ShellApp><p>x</p></ShellApp>);
+      const b = await barra();
+      expect(within(b).getByRole('button', { name: 'Despacho' })).toHaveAttribute('aria-current', 'page');
+      expect(within(b).getByRole('button', { name: 'Viajes' })).not.toHaveAttribute('aria-current');
+      await usuario.click(within(b).getByRole('button', { name: 'Alertas' }));
+      expect(empujar).toHaveBeenCalledWith('/operacion/alertas');
+    });
+
+    it('«Más» abre el mismo cajón, y Escape devuelve el foco a «Más»', async () => {
+      const usuario = userEvent.setup();
+      render(<ShellApp><p>x</p></ShellApp>);
+      const b = await barra();
+      const nav = await principal();
+      const mas = within(b).getByRole('button', { name: 'Más' });
+      expect(mas).toHaveAttribute('aria-controls', nav.id);
+
+      await usuario.click(mas);
+      expect(mas).toHaveAttribute('aria-expanded', 'true');
+      await usuario.keyboard('{Escape}');
+      expect(mas).toHaveAttribute('aria-expanded', 'false');
+      expect(mas).toHaveFocus();
+    });
   });
 });

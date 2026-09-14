@@ -1,3 +1,15 @@
+/*
+ * Los cuatro tramos del spec §7 (Responsive), todos por media query:
+ *
+ *   ≥1280      menú lateral de 228 px                      (base)
+ *   1024–1279  menú lateral de 72 px, sólo iconos con tooltip
+ *   768–1023   cabecera con «Menú» y la navegación en CAJÓN
+ *   <768       barra inferior de 5 destinos; «Más» abre el mismo cajón
+ *
+ * Hasta el 2026-09-14 sólo existía el primero y un 72 px aplicado por debajo de
+ * 1024 que NO ocultaba las etiquetas: en un teléfono se veían cortadas.
+ */
+
 .shell { display: grid; grid-template-columns: var(--ancho-sidebar) 1fr; height: 100dvh; overflow: hidden; }
 .sidebar {
   display: flex; flex-direction: column;
@@ -21,8 +33,91 @@
 .contenido { min-width: 0; min-height: 0; overflow: hidden; background: var(--bg-base); }
 .cargando { display: grid; place-items: center; height: 100dvh; color: var(--fg-muted); }
 
-@media (max-width: 1023px) {
+/* La marca CEDE sitio al botón de cerrar: sin `min-width: 0`, marca (204 px) y
+   botón (44) no cabían en los 228 del cajón, el cajón desplazaba 61 px en
+   horizontal y llevar el foco a «Cerrar el menú» lo corría, cortando todas las
+   etiquetas por la izquierda. Lo vio una captura; ahora lo mide la sonda. */
+.cabeceraCajon { display: flex; align-items: center; justify-content: space-between; min-width: 0; }
+.cabeceraCajon > .marca { flex: 1 1 auto; min-width: 0; }
+.botonCerrar { flex: 0 0 auto; }
+.marcaColapsada { display: none; }
+
+/* Lo que sólo existe en pantallas estrechas. */
+.cabeceraCompacta, .botonCerrar, .telon, .barraInferior { display: none; }
+
+.botonMenu, .botonCerrar {
+  align-items: center; justify-content: center; gap: var(--esp-2);
+  min-width: 44px; min-height: 44px; padding: 0 var(--esp-3);
+  border: none; border-radius: var(--radius-sm);
+  background: transparent; color: var(--nav-fg);
+  font: inherit; font-size: var(--texto-md); font-weight: var(--peso-medio);
+}
+.botonMenu:hover, .botonCerrar:hover { background: var(--nav-hover); color: var(--fg-on-action); }
+.botonMenu:focus-visible, .botonCerrar:focus-visible { outline: none; box-shadow: var(--anillo-foco-nav); }
+
+/* ── 1024–1279 · colapsado a iconos ──────────────────────────────────────── */
+@media (min-width: 1024px) and (max-width: 1279px) {
   .shell { grid-template-columns: var(--ancho-sidebar-colapsado) 1fr; }
-  .sidebar { padding: 0 var(--esp-2) var(--esp-2); align-items: center; }
+  .sidebar { padding: 0 var(--esp-2) var(--esp-2); }
   .marca, .rotulo { display: none; }
+  .marcaColapsada { display: block; margin: 0 auto; }
+  /* Las dos utilidades no caben en fila en 56 px: en columna. */
+  .utilidades > * { flex-direction: column; }
+}
+
+/* ── <1024 · la navegación pasa a cajón ──────────────────────────────────── */
+@media (max-width: 1023px) {
+  .shell { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+  .cabeceraCompacta {
+    display: flex; align-items: center; justify-content: space-between;
+    grid-row: 1; height: 56px; padding: 0 var(--esp-3);
+    background: var(--bg-inverse);
+  }
+  .botonMenu { display: flex; }
+  .contenido { grid-row: 2; }
+
+  /* Fuera de la pantalla y `visibility: hidden` —no sólo desplazado—: así lo
+     cerrado tampoco se tabula ni se anuncia. La visibilidad cambia al final
+     de la transición al cerrar y al principio al abrir. */
+  .sidebar {
+    position: fixed; inset: 0 auto 0 0; z-index: 30;
+    width: min(var(--ancho-sidebar), 85vw);
+    transform: translateX(-100%); visibility: hidden;
+    transition: transform var(--transicion-media), visibility 0s linear var(--transicion-media);
+  }
+  .abierto .sidebar {
+    transform: none; visibility: visible;
+    transition: transform var(--transicion-media), visibility 0s;
+  }
+  .botonCerrar { display: flex; padding: 0; }
+  .abierto .telon {
+    display: block; position: fixed; inset: 0; z-index: 20;
+    background: rgba(0, 0, 0, .4);
+  }
+}
+
+/* ── <768 · barra inferior ───────────────────────────────────────────────── */
+@media (max-width: 767px) {
+  .shell { grid-template-rows: 1fr 56px; }
+  .cabeceraCompacta { display: none; }
+  .contenido { grid-row: 1; }
+  .barraInferior {
+    display: grid; grid-template-columns: repeat(5, 1fr);
+    grid-row: 2; height: 56px;
+    background: var(--bg-inverse);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .acceso {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+    min-width: 44px; min-height: 44px;
+    border: none; background: transparent; color: var(--nav-fg);
+    /* 12 px: el mínimo del spec para móvil. */
+    font: inherit; font-size: var(--texto-sm); font-weight: var(--peso-medio);
+  }
+  .acceso[aria-current='page'] { color: var(--nav-activo-fg); background: var(--nav-activo-bg); }
+  .acceso:focus-visible { outline: none; box-shadow: var(--anillo-foco-nav); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar, .abierto .sidebar { transition: none; }
 }

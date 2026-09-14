@@ -52,3 +52,15 @@
   padding: 0; margin: -1px; overflow: hidden;
   clip-path: inset(50%); white-space: nowrap;
 }
+
+/* Colapsable: lo mismo que `.colapsado`, pero sólo entre 1024 y 1279 px (spec
+   §7). Por debajo de 1024 la navegación es un cajón de ancho completo y las
+   etiquetas vuelven a verse. */
+@media (min-width: 1024px) and (max-width: 1279px) {
+  .colapsable { justify-content: center; padding: 0; }
+  .colapsable .etiqueta {
+    position: absolute; width: 1px; height: 1px;
+    padding: 0; margin: -1px; overflow: hidden;
+    clip-path: inset(50%); white-space: nowrap;
+  }
+}

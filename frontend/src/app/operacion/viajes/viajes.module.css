@@ -45,3 +45,14 @@
   border-radius: var(--radius-card); padding: var(--esp-4);
 }
 .vacio { color: var(--fg-muted); font-size: var(--texto-sm); padding: var(--esp-4) 0; }
+
+/* <1024 (spec §7): maestro/detalle CONMUTADO. La lista de 420 px no cabe en un
+   teléfono; lista y detalle se turnan, y `data-vista` dice cuál toca. */
+.volver { display: none; }
+@media (max-width: 1023px) {
+  .dos { grid-template-columns: 1fr; }
+  .lista { border-right: none; }
+  .dos[data-vista='detalle'] .lista { display: none; }
+  .dos[data-vista='lista'] .detalle { display: none; }
+  .volver { display: block; }
+}

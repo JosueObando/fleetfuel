@@ -41,6 +41,7 @@ El entorno es **jsdom** y no node: lo que se prueba aquí —`localStorage`,
 | `operacion/informes` | Los cuatro informes del §14, el estado en la URL, y que la cadena del volumen **calcule y nombre el descuadre** en vez de dejar la resta a quien mira |
 | `api/cliente` (almacén) | Que la instantánea de sesión devuelva la MISMA referencia mientras no cambie —requisito de `useSyncExternalStore`— y que un cierre en otra pestaña avise |
 | `app/entrar` | La puerta de MFA sin inscribir, la **inscripción del segundo factor**, y que un 200 no baste para entrar |
+| `componentes/ShellApp` (estrecho) | §7: por debajo de 1024 la navegación es un CAJÓN —abre con «Menú», cierra con Escape, con «Cerrar» o con el telón, el foco entra y vuelve a quien lo abrió, lo de detrás queda `inert`, y se cierra solo al ensanchar—; por debajo de 768, barra inferior de cuatro accesos y «Más». Lo visual lo mide la sonda, que desde ese día también mide controles cortados y el cajón ABIERTO |
 | `componentes/PuertaDeSesion` | La puerta, sola. Vivía dentro de `ShellApp` y por eso no protegía `/tablero` |
 | `administracion/Usuarios` | Que el MFA de cada cuenta sea **visible**, y que suspender exija un motivo antes de salir del navegador (§21) |
 | `administracion/Roles` | El recuento «N de M permisos» —la cifra que habría delatado el incidente del Administrador de 11 sobre 48— y que guardar mande el conjunto ENTERO, porque es un PUT |
@@ -67,12 +68,12 @@ cuela en una revisión visual, porque en pantalla se ve perfecto.
 
 ## El umbral
 
-| | al empezar | componentes | despacho (1C) | informes (§14) | administración | §21 y bitácora | Jest 30 | mutaciones | bandejas | ediciones | URL de despacho | planificador | umbral |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| Sentencias | 7,24 % | 92,00 % | 93,24 % | 93,71 % | 94,48 % | 94,62 % | 94,65 % | 95,58 % | 95,58 % | 95,86 % | 95,90 % | **96,15 %** | 96 |
-| Ramas | 6,75 % | 81,17 % | 81,40 % | 81,51 % | 81,91 % | 82,48 % | 83,28 % | 88,44 % | 89,33 % | 89,88 % | 90,14 % | **90,56 %** | 90 |
-| Funciones | 4,65 % | 82,42 % | 85,34 % | 86,76 % | 88,58 % | 89,17 % | 89,19 % | 90,13 % | 90,66 % | 91,57 % | 91,63 % | **92,15 %** | 92 |
-| Líneas | 7,44 % | 93,33 % | 94,56 % | 95,40 % | 96,11 % | 96,12 % | 96,14 % | 96,77 % | 96,56 % | 96,69 % | 96,72 % | **96,95 %** | 96 |
+| | al empezar | componentes | despacho (1C) | informes (§14) | administración | §21 y bitácora | Jest 30 | mutaciones | bandejas | ediciones | URL de despacho | planificador | shell móvil | umbral |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Sentencias | 7,24 % | 92,00 % | 93,24 % | 93,71 % | 94,48 % | 94,62 % | 94,65 % | 95,58 % | 95,58 % | 95,86 % | 95,90 % | 96,15 % | **96,27 %** | 96 |
+| Ramas | 6,75 % | 81,17 % | 81,40 % | 81,51 % | 81,91 % | 82,48 % | 83,28 % | 88,44 % | 89,33 % | 89,88 % | 90,14 % | 90,56 % | **90,62 %** | 90 |
+| Funciones | 4,65 % | 82,42 % | 85,34 % | 86,76 % | 88,58 % | 89,17 % | 89,19 % | 90,13 % | 90,66 % | 91,57 % | 91,63 % | 92,15 % | **92,35 %** | 92 |
+| Líneas | 7,44 % | 93,33 % | 94,56 % | 95,40 % | 96,11 % | 96,12 % | 96,14 % | 96,77 % | 96,56 % | 96,69 % | 96,72 % | 96,95 % | **97,03 %** | 97 |
 
 **Las cuatro pasan el 80 % que pide la disciplina.**
 

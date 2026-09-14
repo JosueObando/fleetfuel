@@ -43,8 +43,9 @@ export default crearConfig({
     // de alertas y solicitudes: (95,58 / 89,33 / 90,66 / 96,56). Con las ediciones de
     // cisternas, órdenes y viajes: (95,86 / 89,88 / 91,57 / 96,69). Con el viaje de
     // despacho en la URL: (95,90 / 90,14 / 91,63 / 96,72). Con el planificador
-    // del §15.3: (96,15 / 90,56 / 92,15 / 96,95). Ver PRUEBAS.md.
-    global: { statements: 96, branches: 90, functions: 92, lines: 96 },
+    // del §15.3: (96,15 / 90,56 / 92,15 / 96,95). Con el shell móvil del §7:
+    // (96,27 / 90,62 / 92,35 / 97,03). Ver PRUEBAS.md.
+    global: { statements: 96, branches: 90, functions: 92, lines: 97 },
   },
   collectCoverageFrom: [
     'src/**/*.{ts,tsx}',

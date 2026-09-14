@@ -1,6 +1,8 @@
 'use client';
 
+import { useEffect, useId, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
+import { Icon } from '@/componentes/Icon/Icon';
 import { BrandBlock } from '@/componentes/BrandBlock/BrandBlock';
 import { NavItem } from '@/componentes/NavItem/NavItem';
 import { IconToolbar } from '@/componentes/IconToolbar/IconToolbar';
@@ -72,9 +74,63 @@ const GRUPOS: Array<{ rotulo: string; items: Array<{ ruta: string; etiqueta: str
   },
 ];
 
+/* <768: la barra inferior del spec (§7) lleva CINCO destinos. Cuatro accesos
+   —los de quien opera en la calle: la cola de órdenes, los viajes, el despacho
+   y las alertas— y «Más», que abre el menú entero. El resto de secciones no
+   desaparece: está a un toque. */
+const ACCESOS: Array<{ ruta: string; etiqueta: string; icono: NombreIcono }> = [
+  { ruta: '/operacion/ordenes',  etiqueta: 'Órdenes',  icono: 'ordenes' },
+  { ruta: '/operacion/viajes',   etiqueta: 'Viajes',   icono: 'seguimiento' },
+  { ruta: '/operacion/despacho', etiqueta: 'Despacho', icono: 'flota' },
+  { ruta: '/operacion/alertas',  etiqueta: 'Alertas',  icono: 'campana' },
+];
+
 export function ShellApp({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const ruta = usePathname();
+  const idNav = useId();
+
+  /* Qué se VE a cada ancho lo deciden las media queries de ShellApp.module.css
+     —menú lateral, colapsado, cajón o barra inferior—, no JavaScript: medir la
+     ventana haría que el primer pintado saliera con el ancho equivocado. Aquí
+     sólo vive lo que CSS no puede tener: si el cajón está abierto, y el foco. */
+  const [abierto, setAbierto] = useState(false);
+  const abridor = useRef<HTMLButtonElement | null>(null);
+  const cerrarBoton = useRef<HTMLButtonElement | null>(null);
+
+  const abrir = (e: React.MouseEvent<HTMLButtonElement>) => {
+    abridor.current = e.currentTarget;
+    setAbierto(true);
+  };
+  const cerrar = () => {
+    setAbierto(false);
+    abridor.current?.focus();
+  };
+  const ir = (destino: string) => {
+    setAbierto(false);
+    router.push(destino);
+  };
+
+  /* El foco entra DESPUÉS de pintar abierto: antes, el botón está en
+     `visibility: hidden` y el navegador ignora el `focus()`. */
+  useEffect(() => { if (abierto) cerrarBoton.current?.focus(); }, [abierto]);
+
+  useEffect(() => {
+    if (!abierto) return;
+    const alPulsar = (e: KeyboardEvent) => { if (e.key === 'Escape') cerrar(); };
+    document.addEventListener('keydown', alPulsar);
+    return () => document.removeEventListener('keydown', alPulsar);
+  }, [abierto]);
+
+  /* A ≥1024 la navegación vuelve a ser el menú lateral: un cajón «abierto»
+     dejaría la pantalla inerte sin nada visible que cerrar. */
+  useEffect(() => {
+    const amplio = window.matchMedia?.('(min-width: 1024px)');
+    if (!amplio) return;
+    const alCambiar = (e: { matches: boolean }) => { if (e.matches) setAbierto(false); };
+    amplio.addEventListener('change', alCambiar);
+    return () => amplio.removeEventListener('change', alCambiar);
+  }, []);
 
   /* La puerta ya no vive aquí: es `PuertaDeSesion`, para que también la tengan
      las pantallas que NO llevan esta navegación —`/tablero` tiene su propio
@@ -83,9 +139,26 @@ export function ShellApp({ children }: { children: React.ReactNode }) {
      divergirían en cuanto se añadiera una sección. */
   return (
     <PuertaDeSesion>
-      <div className={estilos.shell}>
-        <nav className={estilos.sidebar} aria-label="Navegación principal">
-          <div className={estilos.marca}><BrandBlock /></div>
+      <div className={`${estilos.shell} ${abierto ? estilos.abierto : ''}`}>
+        {/* 768–1023: la marca y el botón del cajón, en una cabecera. */}
+        <header className={estilos.cabeceraCompacta}>
+          <BrandBlock />
+          <button type="button" className={estilos.botonMenu} onClick={abrir}
+                  aria-label="Abrir el menú" aria-expanded={abierto} aria-controls={idNav}>
+            <Icon nombre="menu" tamano={20} />
+            <span>Menú</span>
+          </button>
+        </header>
+
+        <nav id={idNav} className={estilos.sidebar} aria-label="Navegación principal">
+          <div className={estilos.cabeceraCajon}>
+            <div className={estilos.marca}><BrandBlock /></div>
+            <div className={estilos.marcaColapsada}><BrandBlock soloMarca /></div>
+            <button type="button" ref={cerrarBoton} className={estilos.botonCerrar}
+                    onClick={cerrar} aria-label="Cerrar el menú">
+              <Icon nombre="cerrar" tamano={20} />
+            </button>
+          </div>
 
           <div className={estilos.navegacion}>
             {GRUPOS.map(g => (
@@ -94,27 +167,51 @@ export function ShellApp({ children }: { children: React.ReactNode }) {
                     quien navega por encabezados salta entre grupos. */}
                 <h2 className={estilos.rotulo}>{g.rotulo}</h2>
                 {g.items.map(i => (
-                  <NavItem key={i.ruta} icono={i.icono} etiqueta={i.etiqueta}
-                           activo={ruta.startsWith(i.ruta)} onClick={() => router.push(i.ruta)} />
+                  <NavItem key={i.ruta} icono={i.icono} etiqueta={i.etiqueta} colapsable
+                           activo={ruta.startsWith(i.ruta)} onClick={() => ir(i.ruta)} />
                 ))}
               </div>
             ))}
           </div>
 
-          <IconToolbar utilidades={[
-            { icono: 'campana', titulo: 'Notificaciones' },
-            { icono: 'ajustes', titulo: 'Ajustes' },
-          ]} />
+          <div className={estilos.utilidades}>
+            <IconToolbar utilidades={[
+              { icono: 'campana', titulo: 'Notificaciones' },
+              { icono: 'ajustes', titulo: 'Ajustes' },
+            ]} />
+          </div>
           {/* `cerrarSesion` y no `guardarSesion(null)`: hay que revocar el
               refresh token en el servidor, o sigue vivo en Redis hasta vencer.
               La navegación va DESPUÉS del await —y el await no puede fallar,
               porque la función limpia la sesión local pase lo que pase—, así
               que no hay camino en el que se salte de pantalla dejando la
               sesión entera en pie. */}
-          <NavItem icono="salir" etiqueta="Cerrar sesión"
+          <NavItem icono="salir" etiqueta="Cerrar sesión" colapsable
                    onClick={() => { void cerrarSesion().then(() => router.replace('/entrar')); }} />
         </nav>
-        <div className={estilos.contenido}>{children}</div>
+
+        {/* Atajo de ratón y dedo, no un control: quien usa teclado cierra con
+            Escape o con «Cerrar el menú». */}
+        <div className={estilos.telon} data-telon onClick={cerrar} aria-hidden />
+
+        {/* Con el cajón abierto, lo de detrás no se ve: tampoco se tabula. */}
+        <div className={estilos.contenido} inert={abierto}>{children}</div>
+
+        <nav className={estilos.barraInferior} aria-label="Accesos rápidos">
+          {ACCESOS.map(a => (
+            <button key={a.ruta} type="button" onClick={() => ir(a.ruta)}
+                    className={estilos.acceso}
+                    aria-current={ruta.startsWith(a.ruta) ? 'page' : undefined}>
+              <Icon nombre={a.icono} tamano={20} />
+              <span>{a.etiqueta}</span>
+            </button>
+          ))}
+          <button type="button" className={estilos.acceso} onClick={abrir}
+                  aria-expanded={abierto} aria-controls={idNav}>
+            <Icon nombre="menu" tamano={20} />
+            <span>Más</span>
+          </button>
+        </nav>
       </div>
     </PuertaDeSesion>
   );

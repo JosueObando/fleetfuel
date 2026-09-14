@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/componentes/Button/Button';
 import { api, ErrorApi } from '@/api/cliente';
@@ -40,6 +40,15 @@ export function Despacho() {
   const idEnUrl = params.get('viaje');
 
   const [viajes, setViajes] = useState<Fila[] | null>(null);
+  /* Al volver a la lista (pantalla estrecha) el foco regresa a la tarjeta del
+     viaje cerrado, cuando la URL ya no pide ninguno y la lista vuelve a verse. */
+  const volverA = useRef<string | null>(null);
+  const lista = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (!volverA.current) return;
+    lista.current?.querySelector<HTMLElement>(`[data-viaje="${volverA.current}"]`)?.focus();
+    volverA.current = null;
+  }, [idEnUrl]);
   const [cargado, setSel] = useState<Fila | null>(null);
   const sel = cargado && String(cargado.id) === idEnUrl ? cargado : null;
   const [error, setError] = useState<string | null>(null);
@@ -147,7 +156,7 @@ export function Despacho() {
   }
 
   return (
-    <div className={estilos.dos}>
+    <div className={estilos.dos} data-vista={sel ? 'detalle' : 'lista'}>
       {/* El aviso va fuera de las dos columnas, igual que en viajes: un 403 al
           cargar la lista deja la pantalla sin nada seleccionado, y dentro del
           panel de detalle no se vería. */}
@@ -157,7 +166,7 @@ export function Despacho() {
         </div>
       )}
 
-      <section className={estilos.lista} aria-label="Viajes en despacho">
+      <section className={estilos.lista} aria-label="Viajes en despacho" ref={lista}>
         <div className={catalogo.barra}>
           <h1 className={catalogo.titulo}>Despacho y cierre</h1>
         </div>
@@ -167,7 +176,7 @@ export function Despacho() {
           ) : viajes.length === 0 ? (
             <p className={estilos.vacio}>No hay viajes en despacho todavía.</p>
           ) : viajes.map(v => (
-            <button key={String(v.id)} type="button"
+            <button key={String(v.id)} type="button" data-viaje={String(v.id)}
                     className={`${estilos.tarjeta} ${sel?.id === v.id ? estilos.activa : ''}`}
                     aria-pressed={sel?.id === v.id}
                     onClick={() => abrir(String(v.id))}>
@@ -189,6 +198,15 @@ export function Despacho() {
         ) : (
           <>
             <div className={catalogo.barra}>
+              <div className={estilos.volver}>
+                <Button variante="secundario" onClick={() => {
+                  volverA.current = String(sel.id);
+                  const p = new URLSearchParams(params.toString());
+                  p.delete('viaje');
+                  const q = p.toString();
+                  router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
+                }}>Volver a la lista</Button>
+              </div>
               <h2 className={catalogo.titulo}>{sel.codigoViaje}</h2>
               <span className={estilos.pastilla}>{sel.estado}</span>
 

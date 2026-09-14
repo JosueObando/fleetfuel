@@ -1,6 +1,3 @@
-/* Tres botones no caben junto al título en un teléfono: la barra pasa a dos
-   líneas en vez de empujarlos fuera de la pantalla. */
-.barra { flex-wrap: wrap; }
 .navegacion { display: flex; flex-wrap: wrap; gap: var(--esp-2); min-width: 0; }
 .rango {
   margin: 0 0 var(--esp-4); color: var(--fg-muted); font-size: var(--texto-sm);

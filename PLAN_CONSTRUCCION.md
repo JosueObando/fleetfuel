@@ -322,15 +322,22 @@ conductor, sin fin previsto y retrasado.
 Queda de §15.3: la **terminal de carga** en el bloque (el viaje no la trae en
 la lista) y las **horas**, que llegarán con el arreglo de los días en UTC.
 
-**Encontrado de paso, y ABIERTO: el shell no cumple el breakpoint <768.** A 360
-px el menú lateral asoma recortado y los botones de las barras se cortan por la
-derecha en TODAS las pantallas (visto en cisternas y planificador), cuando UX-1
-da por hecho «<768 tab bar de 5 destinos». La sonda responsive no lo detecta:
-mide que la ventana no se desplace, y aquí no se desplaza — el contenido se
-corta dentro de un ancestro. **Lo vio una captura, otra vez**, como el menú que
-se pisaba. La sonda también destapó una regresión real de este mismo día —la
-tabla de órdenes, fuera de `TablaDesplazable`, desbordaba a 360 px por el
-`span.solo-lectores` del botón «Editar»— y ésa sí está arreglada.
+**El shell en pantallas estrechas — CERRADO el mismo 2026-09-14.** A 360 px el
+menú lateral asomaba recortado y los botones de las barras se cortaban en TODAS
+las pantallas, con UX-1 dándolo por hecho. Ahora los cuatro tramos del §7:
+≥1280 menú entero; 1024–1279 colapsado a iconos con tooltip; 768–1023 cabecera
+con «Menú» y la navegación en cajón (foco, Escape, `inert` detrás); <768 barra
+inferior de cuatro accesos y «Más». Viajes y despacho pasan a maestro/detalle
+conmutado por debajo de 1024, con «Volver a la lista».
+
+**Por qué nadie lo había visto, y lo que cambió en la sonda.** La sonda medía
+que la ventana no se desplazara y que las TABLAS no quedaran recortadas; un
+botón cortado por un `overflow: hidden` pasaba limpio. Ahora mide también los
+controles cortados, el texto partido sin nombre completo y el cajón ABIERTO —ese
+último, porque la primera versión del cajón salió con las etiquetas cortadas y
+lo vio una captura—. Cada medida nueva se vio fallar contra el build anterior
+antes de darla por buena. La sonda sigue sin ver lo que no mide: las capturas
+de cada tramo siguen siendo parte de la verificación.
 
 ### El hueco que no estaba en ninguna fase — §7.13 `cargas_terminal`
 

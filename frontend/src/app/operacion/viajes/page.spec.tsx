@@ -628,3 +628,29 @@ describe('editar un viaje', () => {
     expect(screen.queryByRole('button', { name: 'Crear' })).not.toBeInTheDocument();
   });
 });
+
+describe('en pantalla estrecha, lista y detalle se turnan', () => {
+  /* Spec §7, <1024: «maestro / detalle conmutado». La lista medía 420 px fijos
+     y en un teléfono de 360 salía cortada. Qué columna se VE lo decide el CSS
+     con `data-vista`; aquí se fija el estado y el botón para volver. */
+  it('sin viaje abierto la vista es la lista; con uno, el detalle', async () => {
+    const usuario = userEvent.setup();
+    const { container } = render(<Viajes />);
+    await screen.findAllByText('V-001');
+    expect(container.querySelector('[data-vista]')).toHaveAttribute('data-vista', 'lista');
+    await abrirViaje(usuario);
+    await screen.findByRole('heading', { name: 'V-001' });
+    expect(container.querySelector('[data-vista]')).toHaveAttribute('data-vista', 'detalle');
+  });
+
+  it('«Volver a la lista» cierra el viaje, y el foco vuelve a su tarjeta', async () => {
+    const usuario = userEvent.setup();
+    const { container } = render(<Viajes />);
+    await abrirViaje(usuario);
+    await usuario.click(await screen.findByRole('button', { name: 'Volver a la lista' }));
+    expect(container.querySelector('[data-vista]')).toHaveAttribute('data-vista', 'lista');
+    expect(screen.queryByRole('heading', { name: 'V-001' })).not.toBeInTheDocument();
+    // Sin esto, quien navega con teclado aterriza en ningún sitio al volver.
+    expect(screen.getByRole('button', { name: /V-001/, pressed: false })).toHaveFocus();
+  });
+});

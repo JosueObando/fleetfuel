@@ -181,6 +181,99 @@ for (const ruta of PANTALLAS) {
       fallos.push(`${ruta} @ ${bp.nombre} · navegación solapada`);
     }
 
+    /* 4. **Controles cortados.** La medida 2 sólo mira `table, img, pre`, y el
+       2026-09-14 una CAPTURA a 360 px enseñó el menú lateral asomando cortado
+       y el botón «Nueva cisterna» partido por el borde, en todas las pantallas,
+       con esta sonda en ✅. Un botón del que se ve la mitad no es un problema
+       de estética: la otra mitad —a veces la entera— no se puede pulsar.
+
+       Se mira cada control VISIBLE contra sus ancestros: si uno con
+       `overflow-x: auto|scroll` lo contiene, se alcanza desplazando; si uno con
+       `hidden` —o la propia ventana— lo deja fuera, está perdido. */
+    const cortados = await pag.evaluate(() => {
+      const malos = [];
+      for (const el of document.querySelectorAll('button, a[href], input, select, textarea')) {
+        const r = el.getBoundingClientRect();
+        if (r.width === 0 || r.height === 0) continue;
+        if (getComputedStyle(el).visibility === 'hidden') continue;   // cajón cerrado
+        let izquierda = 0, derecha = window.innerWidth, alcanzable = false;
+        for (let p = el.parentElement; p && p !== document.documentElement; p = p.parentElement) {
+          const ox = getComputedStyle(p).overflowX;
+          if (ox === 'visible') continue;
+          const c = p.getBoundingClientRect();
+          if (ox === 'auto' || ox === 'scroll') {
+            // Una caja que desplaza en horizontal y de verdad puede hacerlo.
+            if (p.scrollWidth > p.clientWidth + 1) { alcanzable = true; break; }
+          }
+          izquierda = Math.max(izquierda, c.left);
+          derecha = Math.min(derecha, c.right);
+        }
+        /* El control cabe, pero su TEXTO no: la etiqueta se corta dentro del
+           botón. Con `title` o `aria-label` el nombre entero sigue a mano (los
+           bloques del planificador); sin ellos, lo cortado no está en ningún sitio.
+
+           NO cuentan, porque son deliberados:
+             · el texto de 1 px para lectores de pantalla (`.solo-lectores`);
+             · el truncado con `text-overflow: ellipsis` —el «…» avisa de que
+               hay más, y el spec lo pide para nombres largos (§ handoff,
+               «truncados verificados con datos máximos»)—. */
+        const nombreCompleto = el.hasAttribute('title') || el.hasAttribute('aria-label');
+        const textoCortado = [el, ...el.querySelectorAll('*')].some(n => {
+          if (n.clientWidth <= 1 || n.textContent.trim() === '') return false;
+          const e = getComputedStyle(n);
+          return n.scrollWidth > n.clientWidth + 1 && e.overflowX !== 'visible'
+            && e.textOverflow !== 'ellipsis' && e.clipPath === 'none';
+        });
+        if (textoCortado && !nombreCompleto) {
+          malos.push(`«${(el.textContent || '').trim().slice(0, 24)}» con el texto cortado`);
+          continue;
+        }
+        if (alcanzable) continue;
+        if (r.left < izquierda - 2 || r.right > derecha + 2) {
+          const nombre = (el.getAttribute('aria-label') || el.textContent || el.tagName).trim().slice(0, 24);
+          malos.push(`«${nombre}» ${Math.round(r.left)}–${Math.round(r.right)} fuera de ${Math.round(izquierda)}–${Math.round(derecha)}`);
+        }
+      }
+      return malos;
+    });
+    if (cortados.length) {
+      marcas.push(`❌ ${bp.nombre}: ${cortados.length} control(es) cortado(s) · ${cortados.slice(0, 3).join(', ')}`);
+      fallos.push(`${ruta} @ ${bp.nombre} · controles cortados`);
+    }
+
+    /* 5. **El cajón, ABIERTO.** Por debajo de 1024 la navegación es un cajón,
+       y todo lo anterior la mide cerrada (`visibility: hidden`). El
+       2026-09-14 una captura con el cajón abierto enseñó las etiquetas
+       cortadas por la izquierda: la cabecera del cajón era más ancha que él,
+       el cajón desplazaba en horizontal y llevar el foco a «Cerrar el menú» lo
+       corría. Se abre, se mide que no desplace ni corte, y se cierra con Escape. */
+    if (bp.w < 1024 && ruta !== '/tablero') {
+      const abridor = bp.w < 768
+        ? pag.getByRole('navigation', { name: 'Accesos rápidos' }).getByRole('button', { name: 'Más' })
+        : pag.getByRole('button', { name: 'Abrir el menú' });
+      await abridor.click();
+      await pag.waitForTimeout(300);
+      const cajon = await pag.evaluate(() => {
+        const nav = document.querySelector('nav[aria-label="Navegación principal"]');
+        const malos = [];
+        if (nav.scrollWidth > nav.clientWidth + 1) malos.push(`desplaza ${nav.scrollWidth - nav.clientWidth}px en horizontal`);
+        const n = nav.getBoundingClientRect();
+        for (const el of nav.querySelectorAll('button')) {
+          const r = el.getBoundingClientRect();
+          if (r.width === 0) continue;
+          if (r.left < n.left - 1 || r.right > n.right + 1) {
+            malos.push(`«${(el.getAttribute('aria-label') || el.textContent).trim().slice(0, 20)}» fuera del cajón`);
+          }
+        }
+        return malos;
+      });
+      if (cajon.length) {
+        marcas.push(`❌ ${bp.nombre}: el cajón abierto · ${cajon.slice(0, 3).join(', ')}`);
+        fallos.push(`${ruta} @ ${bp.nombre} · cajón abierto roto`);
+      }
+      await pag.keyboard.press('Escape');
+    }
+
     if (bp.w < 768) {
       const pequenos = await pag.evaluate(() => {
         const malos = [];

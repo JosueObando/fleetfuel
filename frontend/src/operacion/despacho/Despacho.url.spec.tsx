@@ -130,3 +130,18 @@ it('quitar ?viaje de la URL cierra el detalle', async () => {
   act(() => irA('/operacion/despacho'));
   await waitFor(() => expect(screen.getByText(/Selecciona un viaje/)).toBeInTheDocument());
 });
+
+it('«Volver a la lista» quita ?viaje de la URL: en un teléfono, lista y detalle se turnan', async () => {
+  /* Spec §7, <1024: maestro/detalle conmutado. Volver es quitar la selección de
+     la URL, así que el botón «atrás» del navegador y éste hacen lo mismo. */
+  reiniciarUrl('/operacion/despacho?origen=alertas&viaje=1');
+  const usuario = userEvent.setup();
+  const { container } = render(<Despacho />);
+  expect(await titulo('V-001')).toBeInTheDocument();
+  expect(container.querySelector('[data-vista]')).toHaveAttribute('data-vista', 'detalle');
+
+  await usuario.click(screen.getByRole('button', { name: 'Volver a la lista' }));
+  expect(reemplazos).toHaveBeenLastCalledWith('/operacion/despacho?origen=alertas', { scroll: false });
+  await waitFor(() => expect(container.querySelector('[data-vista]')).toHaveAttribute('data-vista', 'lista'));
+  expect(screen.getByRole('button', { name: /V-001/ })).toHaveFocus();
+});

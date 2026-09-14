@@ -222,6 +222,19 @@ describe('NavItem', () => {
     expect(screen.getByRole('button', { name: /Órdenes/ })).toBeInTheDocument();
   });
 
+  it('colapsable lleva la etiqueta como tooltip, porque a 1024–1279 sólo se verá el icono', () => {
+    // El colapso lo hace una media query: el componente no sabe el ancho, así
+    // que el tooltip tiene que estar puesto siempre que PUEDA colapsarse.
+    render(<NavItem icono="ordenes" etiqueta="Órdenes" colapsable />);
+    const boton = screen.getByRole('button', { name: /Órdenes/ });
+    expect(boton).toHaveAttribute('title', 'Órdenes');
+  });
+
+  it('sin colapso posible, no repite la etiqueta en un tooltip', () => {
+    render(<NavItem icono="ordenes" etiqueta="Órdenes" />);
+    expect(screen.getByRole('button', { name: /Órdenes/ })).not.toHaveAttribute('title');
+  });
+
   it('deshabilitado no llama', async () => {
     const usuario = userEvent.setup();
     const onClick = jest.fn();

@@ -1,6 +1,9 @@
 .panel { display: flex; flex-direction: column; min-height: 0; height: 100%; }
+/* `flex-wrap`: en un teléfono, título y botón no caben en una fila y el botón
+   salía cortado por el borde («Nueva cisterna», «Nuevo conductor»; la sonda
+   responsive lo mide desde el 2026-09-14). Así pasa debajo del título. */
 .barra {
-  display: flex; align-items: center; justify-content: space-between;
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
   gap: var(--esp-3); padding: var(--esp-6) var(--esp-6) var(--esp-3);
 }
 .titulo {

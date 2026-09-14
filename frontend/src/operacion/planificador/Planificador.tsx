@@ -125,7 +125,7 @@ export function Planificador() {
 
   return (
     <section className={catalogo.panel}>
-      <div className={`${catalogo.barra} ${estilos.barra}`}>
+      <div className={catalogo.barra}>
         <h1 className={catalogo.titulo}>Planificador</h1>
         <div className={estilos.navegacion}>
           <Button variante="secundario" onClick={() => irA(sumarDias(lunes, -7))}>Semana anterior</Button>

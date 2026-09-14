@@ -9,15 +9,17 @@ interface Props {
   activo?: boolean;
   deshabilitado?: boolean;
   cargando?: boolean;
-  /** 1024-1279: sidebar de 72 px, solo icono. */
+  /** Siempre colapsado: sólo icono (el kit y la maqueta). */
   colapsado?: boolean;
+  /** Colapsa a icono ENTRE 1024 y 1279 px, por media query (el shell). */
+  colapsable?: boolean;
   onClick?: () => void;
 }
 
 /** Ficha 2 · Navegación principal. */
-export function NavItem({ icono, etiqueta, activo, deshabilitado, cargando, colapsado, onClick }: Props) {
+export function NavItem({ icono, etiqueta, activo, deshabilitado, cargando, colapsado, colapsable, onClick }: Props) {
   const clases = [estilos.item, activo && estilos.activo, cargando && estilos.cargando,
-    colapsado && estilos.colapsado]
+    colapsado && estilos.colapsado, colapsable && estilos.colapsable]
     .filter(Boolean).join(' ');
 
   return (
@@ -26,9 +28,11 @@ export function NavItem({ icono, etiqueta, activo, deshabilitado, cargando, cola
       className={clases}
       disabled={deshabilitado || cargando}
       onClick={onClick}
-      /* El tooltip nativo solo cuando está colapsado: con la etiqueta
-         visible sería una repetición molesta al pasar el ratón. */
-      title={colapsado ? etiqueta : undefined}
+      /* El tooltip nativo sólo cuando puede verse sin etiqueta. En el modo
+         `colapsable` va puesto también a pantalla ancha —el componente no sabe
+         el ancho, lo decide una media query—: es una repetición al pasar el
+         ratón, y es lo que cuesta no medir la ventana con JavaScript. */
+      title={colapsado || colapsable ? etiqueta : undefined}
       /* aria-current marca la página actual para el lector de pantalla. Sin
          esto, el estado activo existiría solo como color — y el color no se
          anuncia. */
