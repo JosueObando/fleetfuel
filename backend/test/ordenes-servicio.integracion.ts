@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import { config as cargarEnv } from 'dotenv';
 import { DataSource } from 'typeorm';
+import { BadRequestException } from '@nestjs/common';
 import { join } from 'path';
 
 import { OrdenesService } from '../src/modules/ordenes/ordenes.service';
@@ -233,12 +234,53 @@ describe('actualizar · una orden que ya salió no se reprograma editando', () =
     });
   });
 
+  it('la lista y el detalle dicen si la orden ADMITE edición, calculado aquí', async () => {
+    // Igual que `transicionesPosibles`: sin esto la interfaz copiaría la lista
+    // de estados editables, y la copia diverge el día que cambie la regla.
+    await enServicio(async s => {
+      const o = await s.crear(ordenBase());
+      const deLaLista = async () =>
+        (await s.listar()).find((f: { id: unknown }) => String(f.id) === String(o.id));
+      expect((await deLaLista()).admiteEdicion).toBe(true);
+      expect((await s.obtener(String(o.id))).admiteEdicion).toBe(true);
+
+      await s.cambiarEstado(String(o.id), { estado: 'validada' });
+      await s.cambiarEstado(String(o.id), { estado: 'planificada' });
+      expect((await deLaLista()).admiteEdicion).toBe(false);
+      expect((await s.obtener(String(o.id))).admiteEdicion).toBe(false);
+    });
+  });
+
   it('una suspendida SÍ se puede corregir: es de lo que se vuelve', async () => {
     await enServicio(async s => {
       const o = await s.crear(ordenBase());
       await s.cambiarEstado(String(o.id), { estado: 'suspendida', motivo: 'Falta documento' });
       const editada = await s.actualizar(String(o.id), { observaciones: 'Documento recibido' });
       expect(editada.observaciones).toBe('Documento recibido');
+    });
+  });
+});
+
+describe('la ventana de entrega no termina antes de empezar', () => {
+  /* `ck_ordenes_ventana` la decide el motor sobre la fila ENTERA. Se fija que
+     llegue como 400 legible: la pantalla de edición cambia un extremo de la
+     ventana y el otro ya está guardado, así que la petición sola no lo delata. */
+  it('al crear, una ventana invertida es un 400 que dice qué corregir', async () => {
+    await enServicio(async s => {
+      const intento = s.crear(ordenBase({
+        ventanaInicio: '2026-10-01T14:00:00Z', ventanaFin: '2026-10-01T08:00:00Z' }));
+      await expect(intento).rejects.toBeInstanceOf(BadRequestException);
+      await expect(intento).rejects.toThrow('La ventana de entrega termina antes de empezar');
+    });
+  });
+
+  it('al editar SÓLO el fin, se compara con el inicio ya guardado', async () => {
+    await enServicio(async s => {
+      const o = await s.crear(ordenBase({
+        ventanaInicio: '2026-10-01T08:00:00Z', ventanaFin: '2026-10-01T14:00:00Z' }));
+      const intento = s.actualizar(String(o.id), { ventanaFin: '2026-10-01T06:00:00Z' });
+      await expect(intento).rejects.toBeInstanceOf(BadRequestException);
+      await expect(intento).rejects.toThrow('La ventana de entrega termina antes de empezar');
     });
   });
 });

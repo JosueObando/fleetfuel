@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { auditar, contextoActual, gestor } from '../../common/contexto/contexto-peticion';
 import { CrearOrdenDto, ActualizarOrdenDto, CambiarEstadoOrdenDto } from './dto/ordenes.dto';
-import { FLUJO_ORDEN, EXIGEN_MOTIVO } from './estados';
+import { ADMITEN_EDICION, FLUJO_ORDEN, EXIGEN_MOTIVO } from './estados';
 
 const CAMPOS = `o.orden_id AS id, o.numero_orden_externa AS "numeroOrdenExterna",
                 o.cliente_id AS "clienteId", c.nombre AS cliente,
@@ -14,6 +14,15 @@ const CAMPOS = `o.orden_id AS id, o.numero_orden_externa AS "numeroOrdenExterna"
 const DESDE = `FROM ordenes_abastecimiento o
                  JOIN clientes c ON c.cliente_id = o.cliente_id
                  JOIN estaciones_servicio e ON e.estacion_id = o.estacion_id`;
+
+/* `ck_ordenes_ventana` compara los dos extremos de la fila guardada: al editar
+   uno solo, el otro no viene en la petición. La regla sigue en el motor; aquí
+   sólo se cambia el 500 con el nombre de la restricción por algo corregible. */
+function traducirVentana(e: unknown): never {
+  if ((e as { constraint?: string }).constraint === 'ck_ordenes_ventana')
+    throw new BadRequestException('La ventana de entrega termina antes de empezar');
+  throw e;
+}
 
 @Injectable()
 export class OrdenesService {
@@ -29,6 +38,7 @@ export class OrdenesService {
         ORDER BY o.fecha_requerida NULLS LAST, o.orden_id DESC`, [estado ?? null]);
     return filas.map((f: { estado: string }) => ({
       ...f, transicionesPosibles: FLUJO_ORDEN[f.estado] ?? [],
+      admiteEdicion: ADMITEN_EDICION.has(f.estado),
     }));
   }
 
@@ -45,6 +55,7 @@ export class OrdenesService {
         WHERE d.orden_id = $1 ORDER BY d.detalle_orden_id`, [id]);
     /** Transiciones legales desde aquí: la interfaz no tiene que replicarlas. */
     orden.transicionesPosibles = FLUJO_ORDEN[orden.estado] ?? [];
+    orden.admiteEdicion = ADMITEN_EDICION.has(orden.estado);
     return orden;
   }
 
@@ -66,7 +77,7 @@ export class OrdenesService {
       [ctx.empresaId, dto.numeroOrdenExterna ?? null, dto.clienteId, dto.estacionId,
        dto.fechaRequerida ?? null, dto.ventanaInicio ?? null, dto.ventanaFin ?? null,
        dto.prioridad ?? 'normal', dto.fuente ?? 'manual', dto.observaciones ?? null,
-       volumenTotal, ctx.usuarioId]);
+       volumenTotal, ctx.usuarioId]).catch(traducirVentana);
 
     for (const d of dto.detalles) {
       await gestor().query(
@@ -82,9 +93,7 @@ export class OrdenesService {
 
   async actualizar(id: string, dto: ActualizarOrdenDto) {
     const antes = await this.obtener(id);
-    /* Una orden que ya salió a la calle no se reprograma editando campos: sus
-       viajes ya están armados sobre esos datos. Se cancela y se rehace. */
-    if (!['recibida', 'validada', 'suspendida'].includes(antes.estado))
+    if (!antes.admiteEdicion)
       throw new ConflictException(
         `Una orden en estado "${antes.estado}" ya no admite cambios de programación`);
 
@@ -98,7 +107,7 @@ export class OrdenesService {
     await gestor().query(
       `UPDATE ordenes_abastecimiento
           SET ${presentes.map(([c], i) => `${c} = $${i + 2}`).join(', ')}, actualizado_en = now()
-        WHERE orden_id = $1`, [id, ...presentes.map(([, v]) => v)]);
+        WHERE orden_id = $1`, [id, ...presentes.map(([, v]) => v)]).catch(traducirVentana);
     const despues = await this.obtener(id);
     auditar({ entidad: 'ordenes_abastecimiento', entidadId: String(id), valorAnterior: antes, valorNuevo: despues });
     return despues;

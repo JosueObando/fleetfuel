@@ -5,10 +5,12 @@ import { ErrorApi } from '@/api/cliente';
 
 jest.mock('@/api/cliente', () => {
   const real = jest.requireActual('@/api/cliente');
-  return { ...real, api: { listar: jest.fn(), crear: jest.fn(), desactivar: jest.fn() } };
+  return { ...real, api: {
+    listar: jest.fn(), obtener: jest.fn(), crear: jest.fn(), actualizar: jest.fn(), desactivar: jest.fn(),
+  } };
 });
 const { api } = jest.requireMock('@/api/cliente') as {
-  api: Record<'listar' | 'crear' | 'desactivar', jest.Mock>;
+  api: Record<'listar' | 'obtener' | 'crear' | 'actualizar' | 'desactivar', jest.Mock>;
 };
 
 /*
@@ -29,6 +31,20 @@ const VEHICULOS = [
 const PRODUCTOS = [{ id: '9', nombre: 'Gasolina 95' }];
 const CISTERNAS = [{ id: '7', placa: 'CL-001', capacidadTotal: 10000, estado: 'disponible' }];
 
+/* La forma de `GET /cisternas/:id` tal como la arma `CAMPOS` en el servicio:
+   `numeric` llega como TEXTO y las columnas `date` como un ISO completo. */
+const DETALLE = {
+  id: '7', vehiculoId: '1', placa: 'CL-001', capacidadTotal: '10000.00',
+  cantidadCompartimentos: 2, certificadoCalibracion: 'CAL-2026-14',
+  fechaCalibracion: '2026-01-15T05:00:00.000Z', fechaProximaCalibracion: '2027-01-15T05:00:00.000Z',
+  material: 'aluminio', estadoLimpieza: 'limpia', productoAnterior: null,
+  estado: 'disponible', calibracionVencida: false,
+  compartimentos: [
+    { id: '70', numero: 1, capacidadNominal: '5000.00', capacidadCalibrada: '4980.00' },
+    { id: '71', numero: 2, capacidadNominal: '4000.00', capacidadCalibrada: '3990.00' },
+  ],
+};
+
 const listarPor = (ruta: string) =>
   ruta === '/cisternas' ? CISTERNAS : ruta === '/vehiculos' ? VEHICULOS : PRODUCTOS;
 
@@ -37,6 +53,8 @@ beforeEach(() => {
   api.listar.mockImplementation((ruta: string) => Promise.resolve(listarPor(ruta)));
   api.crear.mockResolvedValue({ id: '8' });
   api.desactivar.mockResolvedValue(undefined);
+  api.obtener.mockResolvedValue(DETALLE);
+  api.actualizar.mockResolvedValue(DETALLE);
 });
 
 const abrirFormulario = async (usuario: ReturnType<typeof userEvent.setup>) => {
@@ -289,5 +307,224 @@ describe('la lista', () => {
     await screen.findAllByText('CL-001');
     await usuario.click(screen.getByRole('button', { name: /Dar de baja/ }));
     await waitFor(() => expect(api.desactivar).toHaveBeenCalledWith('/cisternas/7'));
+  });
+});
+
+describe('editar una cisterna', () => {
+  /* `PATCH /cisternas/:id` existía desde 1A y no tenía pantalla: una cisterna
+     recalibrada, o que entraba en mantenimiento, sólo se podía corregir dándola
+     de baja y creándola otra vez — con un id nuevo y el historial partido. */
+
+  const abrirEdicion = async (usuario: ReturnType<typeof userEvent.setup>) => {
+    await screen.findAllByText('CL-001');
+    await usuario.click(screen.getByRole('button', { name: 'Editar CL-001' }));
+    return screen.findByRole('form', { name: 'Editar la cisterna CL-001' });
+  };
+
+  it('abre con los datos ACTUALES, pedidos a la API al abrir', async () => {
+    // La fila de la lista puede llevar minutos pintada; editar sobre ella
+    // pisaría lo que otro cambió mientras tanto.
+    const usuario = userEvent.setup();
+    render(<Cisternas />);
+    const form = await abrirEdicion(usuario);
+
+    expect(api.obtener).toHaveBeenCalledWith('/cisternas/7');
+    expect(within(form).getByLabelText(/Capacidad total/)).toHaveValue(10000);
+    expect(within(form).getByLabelText(/Certificado de calibración/)).toHaveValue('CAL-2026-14');
+    expect(within(form).getByLabelText(/Fecha de calibración/)).toHaveValue('2026-01-15');
+    expect(within(form).getByLabelText(/Próxima calibración/)).toHaveValue('2027-01-15');
+    expect(within(form).getByLabelText(/^Material/)).toHaveValue('aluminio');
+    expect(within(form).getByRole('combobox', { name: 'Estado de limpieza' })).toHaveValue('limpia');
+    expect(within(form).getByRole('combobox', { name: 'Estado' })).toHaveValue('disponible');
+  });
+
+  it('manda SÓLO lo que cambió', async () => {
+    const usuario = userEvent.setup();
+    render(<Cisternas />);
+    const form = await abrirEdicion(usuario);
+
+    const material = within(form).getByLabelText(/^Material/);
+    await usuario.clear(material);
+    await usuario.type(material, 'acero');
+    await usuario.click(within(form).getByRole('button', { name: 'Guardar cambios' }));
+
+    await waitFor(() => expect(api.actualizar).toHaveBeenCalled());
+    expect(api.actualizar.mock.calls[0]).toEqual(['/cisternas/7', { material: 'acero' }]);
+  });
+
+  it('y lo que se cambia viaja entero, con cada tipo en su forma', async () => {
+    // La positiva de «sólo lo que cambió»: sin ella, un formulario que no
+    // mandara nada pasaría la prueba anterior.
+    const usuario = userEvent.setup();
+    render(<Cisternas />);
+    const form = await abrirEdicion(usuario);
+
+    const capacidad = within(form).getByLabelText(/Capacidad total/);
+    await usuario.clear(capacidad);
+    await usuario.type(capacidad, '9500');
+    const proxima = within(form).getByLabelText(/Próxima calibración/);
+    await usuario.clear(proxima);
+    await usuario.type(proxima, '2027-06-30');
+    await usuario.selectOptions(within(form).getByRole('combobox', { name: 'Estado de limpieza' }), 'pendiente');
+    await usuario.selectOptions(within(form).getByRole('combobox', { name: 'Producto anterior' }), '9');
+    await usuario.selectOptions(within(form).getByRole('combobox', { name: 'Estado' }), 'mantenimiento');
+    await usuario.click(within(form).getByRole('button', { name: 'Guardar cambios' }));
+
+    await waitFor(() => expect(api.actualizar).toHaveBeenCalled());
+    expect(api.actualizar.mock.calls[0][1]).toEqual({
+      capacidadTotal: 9500, fechaProximaCalibracion: '2027-06-30',
+      estadoLimpieza: 'pendiente', productoAnterior: '9', estado: 'mantenimiento',
+    });
+  });
+
+  it('vaciar el certificado lo QUITA: viaja como null', async () => {
+    const usuario = userEvent.setup();
+    render(<Cisternas />);
+    const form = await abrirEdicion(usuario);
+
+    await usuario.clear(within(form).getByLabelText(/Certificado de calibración/));
+    await usuario.click(within(form).getByRole('button', { name: 'Guardar cambios' }));
+
+    await waitFor(() => expect(api.actualizar).toHaveBeenCalled());
+    expect(api.actualizar.mock.calls[0][1]).toEqual({ certificadoCalibracion: null });
+  });
+
+  it('sin cambios no hay nada que guardar', async () => {
+    const usuario = userEvent.setup();
+    render(<Cisternas />);
+    const form = await abrirEdicion(usuario);
+    expect(within(form).getByRole('button', { name: 'Guardar cambios' })).toBeDisabled();
+  });
+
+  it('bajar la capacidad por debajo de lo que suman los compartimentos avisa y BLOQUEA', async () => {
+    // Los compartimentos no se editan aquí: encoger el tanque dejaría dentro
+    // 9.000 L que ya no caben. El servidor lo rechaza; aquí se ve antes.
+    const usuario = userEvent.setup();
+    render(<Cisternas />);
+    const form = await abrirEdicion(usuario);
+
+    const capacidad = within(form).getByLabelText(/Capacidad total/);
+    await usuario.clear(capacidad);
+    await usuario.type(capacidad, '8000');
+
+    expect(within(form).getByText('Los compartimentos suman 9,000: la capacidad no puede ser menor.'))
+      .toBeInTheDocument();
+    expect(within(form).getByRole('button', { name: 'Guardar cambios' })).toBeDisabled();
+  });
+
+  it('igualar la suma SÍ vale: el límite es «menor que»', async () => {
+    const usuario = userEvent.setup();
+    render(<Cisternas />);
+    const form = await abrirEdicion(usuario);
+
+    const capacidad = within(form).getByLabelText(/Capacidad total/);
+    await usuario.clear(capacidad);
+    await usuario.type(capacidad, '9000');
+
+    expect(within(form).queryByText(/la capacidad no puede ser menor/)).not.toBeInTheDocument();
+    expect(within(form).getByRole('button', { name: 'Guardar cambios' })).not.toBeDisabled();
+  });
+
+  it('el estado se elige entre disponible y mantenimiento, nada más', async () => {
+    // «cargada» y «en viaje» los describe la OPERACIÓN. Ofrecerlos en un
+    // catálogo permitiría declarar en ruta un tanque que está en el patio.
+    const usuario = userEvent.setup();
+    render(<Cisternas />);
+    const form = await abrirEdicion(usuario);
+
+    const opciones = within(within(form).getByRole('combobox', { name: 'Estado' }))
+      .getAllByRole('option').map(o => (o as HTMLOptionElement).value).filter(Boolean);
+    expect(opciones).toEqual(['disponible', 'mantenimiento']);
+  });
+
+  it('capacidad, limpieza y estado no se pueden vaciar', async () => {
+    // Las tres son NOT NULL. Vaciadas, `cambios` las mandaría como null y la
+    // base contestaría con un 500: el freno tiene que estar antes de enviar.
+    const usuario = userEvent.setup();
+    render(<Cisternas />);
+    const form = await abrirEdicion(usuario);
+
+    expect(within(form).getByLabelText(/Capacidad total/)).toBeRequired();
+    expect(within(form).getByRole('combobox', { name: 'Estado de limpieza' })).toBeRequired();
+    expect(within(form).getByRole('combobox', { name: 'Estado' })).toBeRequired();
+  });
+
+  it('una cisterna EN VIAJE enseña su estado pero no deja cambiarlo', async () => {
+    api.obtener.mockResolvedValue({ ...DETALLE, estado: 'en_viaje' });
+    const usuario = userEvent.setup();
+    render(<Cisternas />);
+    const form = await abrirEdicion(usuario);
+
+    const estado = within(form).getByRole('combobox', { name: 'Estado' });
+    expect(estado).toHaveValue('en_viaje');
+    expect(estado).toBeDisabled();
+  });
+
+  it('si el servidor rechaza, el motivo se ve y el formulario sigue abierto', async () => {
+    api.actualizar.mockRejectedValue(
+      new ErrorApi(400, 'La próxima calibración no puede ser anterior a la última'));
+    const usuario = userEvent.setup();
+    render(<Cisternas />);
+    const form = await abrirEdicion(usuario);
+
+    const proxima = within(form).getByLabelText(/Próxima calibración/);
+    await usuario.clear(proxima);
+    await usuario.type(proxima, '2025-01-01');
+    await usuario.click(within(form).getByRole('button', { name: 'Guardar cambios' }));
+
+    expect(await within(form).findByText('La próxima calibración no puede ser anterior a la última'))
+      .toBeInTheDocument();
+    expect(screen.getByRole('form', { name: 'Editar la cisterna CL-001' })).toBeInTheDocument();
+  });
+
+  it('al guardar, cierra y recarga la lista', async () => {
+    const usuario = userEvent.setup();
+    render(<Cisternas />);
+    const form = await abrirEdicion(usuario);
+
+    await usuario.selectOptions(within(form).getByRole('combobox', { name: 'Estado' }), 'mantenimiento');
+    await usuario.click(within(form).getByRole('button', { name: 'Guardar cambios' }));
+
+    await waitFor(() =>
+      expect(screen.queryByRole('form', { name: 'Editar la cisterna CL-001' })).not.toBeInTheDocument());
+    expect(api.listar.mock.calls.filter(c => c[0] === '/cisternas')).toHaveLength(2);
+  });
+
+  it('nunca hay dos formularios a la vez: abrir uno cierra el otro', async () => {
+    // Con el alta y la edición abiertas habría dos «Capacidad total» en la
+    // misma pantalla, y nada diría cuál de las dos se guarda.
+    const usuario = userEvent.setup();
+    render(<Cisternas />);
+    await abrirFormulario(usuario);
+    await usuario.click(screen.getByRole('button', { name: 'Editar CL-001' }));
+    await screen.findByRole('form', { name: 'Editar la cisterna CL-001' });
+    expect(screen.queryByRole('button', { name: 'Crear cisterna' })).not.toBeInTheDocument();
+
+    await usuario.click(screen.getByRole('button', { name: /Nueva cisterna/ }));
+    expect(screen.queryByRole('form', { name: 'Editar la cisterna CL-001' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Crear cisterna' })).toBeInTheDocument();
+  });
+
+  it('cancelar cierra sin mandar nada', async () => {
+    const usuario = userEvent.setup();
+    render(<Cisternas />);
+    const form = await abrirEdicion(usuario);
+
+    await usuario.click(within(form).getByRole('button', { name: 'Cancelar' }));
+    expect(screen.queryByRole('form', { name: 'Editar la cisterna CL-001' })).not.toBeInTheDocument();
+    expect(api.actualizar).not.toHaveBeenCalled();
+  });
+
+  it('si no se puede leer la cisterna, se dice en vez de abrir un formulario vacío', async () => {
+    // Un formulario en blanco invitaría a «guardar» campos vacíos encima de
+    // los datos buenos.
+    api.obtener.mockRejectedValue(new ErrorApi(404, 'Cisterna no encontrada'));
+    const usuario = userEvent.setup();
+    render(<Cisternas />);
+    await screen.findAllByText('CL-001');
+    await usuario.click(screen.getByRole('button', { name: 'Editar CL-001' }));
+
+    expect(await screen.findByText('Cisterna no encontrada')).toBeInTheDocument();
+    expect(screen.queryByRole('form', { name: /Editar la cisterna/ })).not.toBeInTheDocument();
   });
 });

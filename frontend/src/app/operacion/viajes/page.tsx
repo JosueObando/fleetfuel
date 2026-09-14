@@ -8,6 +8,7 @@ import { useCargaInicial } from '@/api/carga';
 import type { Fila } from '@/api/tipos';
 import catalogo from '@/catalogos/Catalogo.module.css';
 import estilos from './viajes.module.css';
+import { EditarViaje } from './EditarViaje';
 
 
 export default function Viajes() {
@@ -15,6 +16,7 @@ export default function Viajes() {
   const [sel, setSel] = useState<Fila | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [abierto, setAbierto] = useState(false);
+  const [editando, setEditando] = useState(false);
   const [guardando, setGuardando] = useState(false);
 
   // Catálogos para los desplegables
@@ -136,7 +138,7 @@ export default function Viajes() {
       <section className={estilos.lista} aria-label="Viajes">
         <div className={catalogo.barra}>
           <h1 className={catalogo.titulo}>Viajes</h1>
-          <Button icono="mas" onClick={() => setAbierto(a => !a)}>Nuevo</Button>
+          <Button icono="mas" onClick={() => { setEditando(false); setAbierto(a => !a); }}>Nuevo</Button>
         </div>
         <div className={estilos.listaCuerpo}>
           {abierto && (
@@ -166,7 +168,13 @@ export default function Viajes() {
             <button key={String(v.id)} type="button"
                     className={`${estilos.tarjeta} ${sel?.id === v.id ? estilos.activa : ''}`}
                     aria-pressed={sel?.id === v.id}
-                    onClick={() => void abrir(String(v.id))}>
+                    onClick={() => {
+                      /* El formulario abierto es del viaje ANTERIOR: dejarlo
+                         junto al detalle del nuevo haría que «Guardar»
+                         escribiera en un viaje que ya no está en pantalla. */
+                      setEditando(false);
+                      void abrir(String(v.id));
+                    }}>
               <div className={estilos.codigo}>{v.codigoViaje}</div>
               <div className={estilos.meta}>
                 {String(v.fechaProgramada).slice(0, 10)} · {v.conductor ?? 'sin conductor'}
@@ -187,6 +195,9 @@ export default function Viajes() {
             <div className={catalogo.barra}>
               <h2 className={catalogo.titulo}>{sel.codigoViaje}</h2>
               <div className={estilos.acciones}>
+                <Button variante="secundario" onClick={() => { setAbierto(false); setEditando(true); }}>
+                  Editar<span className="solo-lectores"> el viaje</span>
+                </Button>
                 {/* Autorizar es una acción propia con su propio permiso: quien
                     planifica no autoriza. Si el rol no lo tiene, la API
                     responde 403 y el mensaje aparece abajo. */}
@@ -209,6 +220,17 @@ export default function Viajes() {
                 ))}
               </div>
             </div>
+
+            {editando && (
+              <div className={estilos.seccion}>
+                <EditarViaje key={String(sel.id)} viaje={sel} cisternas={cisternas} conductores={conductores}
+                             onCancelar={() => setEditando(false)}
+                             onGuardado={() => {
+                               setEditando(false);
+                               void (async () => { await abrir(String(sel.id)); await cargar(); })();
+                             }} />
+              </div>
+            )}
 
             <div className={estilos.seccion}>
               <h3 className={estilos.tituloSeccion}>Órdenes del viaje</h3>

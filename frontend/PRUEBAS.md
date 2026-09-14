@@ -29,9 +29,10 @@ El entorno es **jsdom** y no node: lo que se prueba aquí —`localStorage`,
 | `src/api/cliente.ts` | El token, la clave de idempotencia de cada POST, y qué hace con cada código de error |
 | `catalogos/Catalogo.tsx` | La pantalla que comparten los cinco catálogos: esqueletos, vacío, error, alta, edición y baja |
 | Las cinco páginas de catálogo | Que cada una monte SU definición y no la del vecino |
-| `catalogos/cisternas` | La suma de compartimentos en vivo, el tope de doce y el filtro de vehículos |
-| `operacion/ordenes` | Que la estación dependa del cliente, y los motivos obligatorios |
-| `operacion/viajes` | Que **autorizar** sea una acción aparte del §7, no una transición más |
+| `catalogos/cisternas` | La suma de compartimentos en vivo, el tope de doce y el filtro de vehículos; al **editar**, que la capacidad no baje de lo que suman y que «cargada» o «en viaje» no se declaren desde el catálogo |
+| `operacion/ordenes` | Que la estación dependa del cliente, y los motivos obligatorios; editar la programación sólo donde la API dice `admiteEdicion`, con la ventana en **hora local** |
+| `operacion/viajes` | Que **autorizar** sea una acción aparte del §7, no una transición más; y que un viaje en marcha deje anotar el **odómetro** mandando sólo el odómetro |
+| `api/cambios` | Lo que manda un PATCH: sólo lo que cambió, vaciar es `null`, y la hora local de un `datetime-local` vuelve al mismo instante |
 | `operacion/despacho` | Toda la Fase 1C: qué momento abre cada estado del §8.2, y que la pantalla **no deje declarar un precinto intacto** |
 | `operacion/informes` | Los cuatro informes del §14, el estado en la URL, y que la cadena del volumen **calcule y nombre el descuadre** en vez de dejar la resta a quien mira |
 | `api/cliente` (almacén) | Que la instantánea de sesión devuelva la MISMA referencia mientras no cambie —requisito de `useSyncExternalStore`— y que un cierre en otra pestaña avise |
@@ -62,14 +63,29 @@ cuela en una revisión visual, porque en pantalla se ve perfecto.
 
 ## El umbral
 
-| | al empezar | componentes | despacho (1C) | informes (§14) | administración | §21 y bitácora | Jest 30 | mutaciones | bandejas | umbral |
-|---|---|---|---|---|---|---|---|---|---|---|
-| Sentencias | 7,24 % | 92,00 % | 93,24 % | 93,71 % | 94,48 % | 94,62 % | 94,65 % | 95,58 % | **95,58 %** | 95 |
-| Ramas | 6,75 % | 81,17 % | 81,40 % | 81,51 % | 81,91 % | 82,48 % | 83,28 % | 88,44 % | **89,33 %** | 89 |
-| Funciones | 4,65 % | 82,42 % | 85,34 % | 86,76 % | 88,58 % | 89,17 % | 89,19 % | 90,13 % | **90,66 %** | 90 |
-| Líneas | 7,44 % | 93,33 % | 94,56 % | 95,40 % | 96,11 % | 96,12 % | 96,14 % | 96,77 % | **96,56 %** | 96 |
+| | al empezar | componentes | despacho (1C) | informes (§14) | administración | §21 y bitácora | Jest 30 | mutaciones | bandejas | ediciones | umbral |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| Sentencias | 7,24 % | 92,00 % | 93,24 % | 93,71 % | 94,48 % | 94,62 % | 94,65 % | 95,58 % | 95,58 % | **95,86 %** | 95 |
+| Ramas | 6,75 % | 81,17 % | 81,40 % | 81,51 % | 81,91 % | 82,48 % | 83,28 % | 88,44 % | 89,33 % | **89,88 %** | 89 |
+| Funciones | 4,65 % | 82,42 % | 85,34 % | 86,76 % | 88,58 % | 89,17 % | 89,19 % | 90,13 % | 90,66 % | **91,57 %** | 91 |
+| Líneas | 7,44 % | 93,33 % | 94,56 % | 95,40 % | 96,11 % | 96,12 % | 96,14 % | 96,77 % | 96,56 % | **96,69 %** | 96 |
 
 **Las cuatro pasan el 80 % que pide la disciplina.**
+
+**La columna «ediciones»** (2026-09-14) da pantalla a los tres `PATCH` que la
+auditoría encontró sin ella: cisternas, órdenes y viajes. Hasta entonces no se
+podía corregir ninguna de las tres sin darla de baja o cancelarla. Todas mandan
+sólo lo que cambió (`api/cambios.ts`), y no es por ahorrar bytes: `PATCH
+/viajes/:id` responde 409 a un viaje en marcha si el cuerpo trae la cisterna,
+aunque sea la misma, así que reenviar el formulario entero hacía imposible
+anotar el odómetro. 60 pruebas nuevas y 60 mutaciones; las que sobrevivieron
+eran condiciones que no podían cambiar el resultado y se quitaron.
+
+**Las pruebas corren en hora de Panamá** (`process.env.TZ` en
+`jest.config.mjs`). La máquina y CI están en UTC, donde hora local y UTC
+coinciden y cualquier conversión que las confunda pasa en verde. Cambiar `TZ`
+dentro de una prueba NO funciona: el `process.env` del sandbox es una copia. Lo
+delató una mutación que «murió» sobre una prueba que ya estaba roja.
 
 **La columna «Jest 30» no tiene pruebas nuevas** (2026-09-13). Se actualizó Jest
 de 29 a 30 porque trae jsdom 26, y en jsdom 20 `getComputedStyle` costaba ~2 ms

@@ -27,3 +27,10 @@ export const FLUJO_ORDEN: Record<string, string[]> = {
 
 /** Estados que exigen justificación escrita. */
 export const EXIGEN_MOTIVO = new Set(['rechazada', 'cancelada', 'suspendida', 'con_incidencia']);
+
+/**
+ * Estados en los que la orden todavía admite cambios de programación. Una que
+ * ya salió a la calle no se reprograma editando campos: sus viajes ya están
+ * armados sobre esos datos. Se cancela y se rehace.
+ */
+export const ADMITEN_EDICION = new Set(['recibida', 'validada', 'suspendida']);

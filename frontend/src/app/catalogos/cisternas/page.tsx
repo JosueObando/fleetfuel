@@ -9,6 +9,7 @@ import type { Fila } from '@/api/tipos';
 import catalogo from '@/catalogos/Catalogo.module.css';
 import estilos from './cisternas.module.css';
 import { TablaDesplazable } from '@/componentes/TablaDesplazable/TablaDesplazable';
+import { EditarCisterna } from './EditarCisterna';
 
 /*
  * Cisternas no usa el molde genérico: sus compartimentos son filas anidadas
@@ -30,6 +31,7 @@ export default function Cisternas() {
   const [vehiculos, setVehiculos] = useState<Fila[]>([]);
   const [productos, setProductos] = useState<Fila[]>([]);
   const [abierto, setAbierto] = useState(false);
+  const [editando, setEditando] = useState<Fila | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
 
@@ -47,8 +49,9 @@ export default function Cisternas() {
   }, []);
   useCargaInicial(cargar);
 
+  const conFormulario = abierto || editando !== null;
   useEffect(() => {
-    if (!abierto) return;
+    if (!conFormulario) return;
     /* Solo cabezal y unidad integrada pueden llevar cisterna: la API lo
        rechaza igualmente, pero filtrar aquí evita ofrecer una opción que se
        sabe que va a fallar. */
@@ -56,7 +59,7 @@ export default function Cisternas() {
       .then(vs => setVehiculos(vs.filter(v => ['cisterna', 'integrada'].includes(v.tipoVehiculo))))
       .catch(() => undefined);
     void api.listar<Fila>('/productos').then(setProductos).catch(() => undefined);
-  }, [abierto]);
+  }, [conFormulario]);
 
   const suma = comps.reduce((t, c) => t + (Number(c.capacidadNominal) || 0), 0);
   const total = Number(capacidadTotal) || 0;
@@ -93,6 +96,20 @@ export default function Cisternas() {
     } finally { setGuardando(false); }
   }
 
+  /* Se edita sobre la cisterna LEÍDA AL ABRIR, no sobre la fila de la lista:
+     esa puede llevar minutos pintada, y además no trae los compartimentos
+     cuya suma limita la capacidad. */
+  async function editar(fila: Fila) {
+    setError(null);
+    try {
+      const detalle = await api.obtener<Fila>(`/cisternas/${fila.id}`);
+      setAbierto(false);
+      setEditando(detalle);
+    } catch (err) {
+      setError(err instanceof ErrorApi ? err.message : 'No se pudo abrir la cisterna');
+    }
+  }
+
   async function darDeBaja(fila: Fila) {
     if (!window.confirm(`¿Dar de baja la cisterna de ${fila.placa}?`)) return;
     try { await api.desactivar(`/cisternas/${fila.id}`); await cargar(); }
@@ -103,7 +120,7 @@ export default function Cisternas() {
     <section className={catalogo.panel}>
       <div className={catalogo.barra}>
         <h1 className={catalogo.titulo}>Cisternas</h1>
-        <Button icono="mas" onClick={() => setAbierto(a => !a)}>Nueva cisterna</Button>
+        <Button icono="mas" onClick={() => { setEditando(null); setAbierto(a => !a); }}>Nueva cisterna</Button>
       </div>
 
       <div className={catalogo.cuerpo}>
@@ -165,6 +182,12 @@ export default function Cisternas() {
           </form>
         )}
 
+        {editando && (
+          <EditarCisterna key={String(editando.id)} cisterna={editando} productos={productos}
+                          onCancelar={() => setEditando(null)}
+                          onGuardada={() => { setEditando(null); void cargar(); }} />
+        )}
+
         {!abierto && error && <p className={catalogo.aviso}>{error}</p>}
 
         {filas === null ? (
@@ -194,6 +217,9 @@ export default function Cisternas() {
                   <td>{f.estado}</td>
                   <td>
                     <div className={catalogo.acciones}>
+                      <Button variante="secundario" onClick={() => void editar(f)}>
+                        Editar<span className="solo-lectores"> {String(f.placa)}</span>
+                      </Button>
                       <Button variante="secundario" onClick={() => void darDeBaja(f)}>
                         Dar de baja<span className="solo-lectores"> {String(f.placa)}</span>
                       </Button>

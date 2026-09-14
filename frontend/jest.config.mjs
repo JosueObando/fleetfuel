@@ -10,6 +10,13 @@ import nextJest from 'next/jest.js';
 
 const crearConfig = nextJest({ dir: './' });
 
+/* Las pruebas corren en la zona de quien usa el sistema, no en la de la
+   máquina. Desarrollo y CI están en UTC, donde hora local y UTC coinciden, y
+   ahí cualquier conversión que confunda las dos pasa en verde. Tiene que
+   fijarse AQUÍ, antes de que arranquen los workers: dentro de una prueba,
+   `process.env` es una copia y cambiar TZ no llega al motor. */
+process.env.TZ = 'America/Panama';
+
 export default crearConfig({
   // jsdom y no node: aquí se prueban cosas que sólo existen en un navegador
   // —localStorage, fetch, el DOM—, y son justo las que fallan distinto.
@@ -33,8 +40,9 @@ export default crearConfig({
     // (94,62 / 82,48 / 89,17 / 96,12). Y con Jest 30 (2026-09-13), que mide las
     // ramas distinto: (94,65 / 83,28 / 89,19 / 96,14). Y tras las pruebas
     // verificadas por mutación: (95,58 / 88,44 / 90,13 / 96,77). Con las bandejas
-    // de alertas y solicitudes: (95,58 / 89,33 / 90,66 / 96,56). Ver PRUEBAS.md.
-    global: { statements: 95, branches: 89, functions: 90, lines: 96 },
+    // de alertas y solicitudes: (95,58 / 89,33 / 90,66 / 96,56). Con las ediciones de
+    // cisternas, órdenes y viajes: (95,86 / 89,88 / 91,57 / 96,69). Ver PRUEBAS.md.
+    global: { statements: 95, branches: 89, functions: 91, lines: 96 },
   },
   collectCoverageFrom: [
     'src/**/*.{ts,tsx}',

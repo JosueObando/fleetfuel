@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import Viajes from './page';
 import { ErrorApi } from '@/api/cliente';
@@ -327,4 +327,274 @@ describe('asignar órdenes y armar el plan de carga', () => {
     await abrirViaje(usuario);
     expect(await screen.findByText(/3000|3,000/)).toBeInTheDocument();
   }, 30_000);
+});
+
+describe('editar un viaje', () => {
+  /* `PATCH /viajes/:id` no tenía pantalla: cambiar el conductor de un viaje
+     programado obligaba a cancelarlo y crearlo otra vez, y el odómetro —que el
+     §25 pide registrar en la salida— no se podía anotar desde ningún sitio. */
+
+  const CISTERNAS = [{ id: '3', placa: 'CL-003' }, { id: '8', placa: 'CL-008' }];
+  const CONDUCTORES = [{ id: '4', nombreCompleto: 'Ana Pérez' }, { id: '5', nombreCompleto: 'Luis Gómez' }];
+  /* La forma de `GET /viajes/:id` según `CAMPOS`: `fecha_programada` y
+     `fecha_fin` son timestamptz, los odómetros `numeric` (texto) o null. */
+  const detalle = (extra: Record<string, unknown> = {}) => programado({
+    fechaProgramada: '2027-03-01T00:00:00.000Z', fechaFin: null,
+    cisternaId: '3', conductorId: '4', rutaPlanificada: 'Vía Centenario',
+    odometroInicial: null, odometroFinal: null,
+    admiteReplanificacion: true, planCarga: [],
+    ...extra,
+  });
+
+  beforeEach(() => {
+    api.listar.mockImplementation((r: string) => Promise.resolve(
+      r === '/viajes' ? [...LISTA, { id: '2', codigoViaje: 'V-002', estado: 'borrador' }]
+      : r === '/cisternas' ? CISTERNAS : r === '/conductores' ? CONDUCTORES : []));
+    api.obtener.mockResolvedValue(detalle());
+  });
+
+  const abrirEdicion = async (usuario: ReturnType<typeof userEvent.setup>) => {
+    await abrirViaje(usuario);
+    await usuario.click(await screen.findByRole('button', { name: 'Editar el viaje' }));
+    return screen.findByRole('form', { name: 'Editar el viaje V-001' });
+  };
+  const reescribir = async (usuario: ReturnType<typeof userEvent.setup>, campo: HTMLElement, texto: string) => {
+    await usuario.clear(campo);
+    if (texto) await usuario.type(campo, texto);
+  };
+  const guardar = (usuario: ReturnType<typeof userEvent.setup>, form: HTMLElement) =>
+    usuario.click(within(form).getByRole('button', { name: 'Guardar cambios' }));
+
+  it('abre con los datos del viaje abierto', async () => {
+    const usuario = userEvent.setup();
+    render(<Viajes />);
+    const form = await abrirEdicion(usuario);
+
+    expect(within(form).getByLabelText(/Código del viaje/)).toHaveValue('V-001');
+    expect(within(form).getByLabelText(/Programado para/)).toHaveValue('2027-03-01');
+    expect(within(form).getByLabelText(/Fin previsto/)).toHaveValue('');
+    await waitFor(() => expect(within(form).getByRole('combobox', { name: 'Cisterna' })).toHaveValue('3'));
+    expect(within(form).getByRole('combobox', { name: 'Conductor' })).toHaveValue('4');
+    expect(within(form).getByLabelText(/Ruta planificada/)).toHaveValue('Vía Centenario');
+  });
+
+  it('manda SÓLO lo que cambió', async () => {
+    const usuario = userEvent.setup();
+    render(<Viajes />);
+    const form = await abrirEdicion(usuario);
+
+    await reescribir(usuario, within(form).getByLabelText(/Ruta planificada/), 'Corredor Norte');
+    await guardar(usuario, form);
+
+    await waitFor(() => expect(api.actualizar).toHaveBeenCalled());
+    expect(api.actualizar.mock.calls[0]).toEqual(['/viajes/1', { rutaPlanificada: 'Corredor Norte' }]);
+  });
+
+  it('y la replanificación viaja entera, con las fechas en ISO', async () => {
+    const usuario = userEvent.setup();
+    render(<Viajes />);
+    const form = await abrirEdicion(usuario);
+
+    await reescribir(usuario, within(form).getByLabelText(/Código del viaje/), 'V-001B');
+    await reescribir(usuario, within(form).getByLabelText(/Programado para/), '2027-03-05');
+    await reescribir(usuario, within(form).getByLabelText(/Fin previsto/), '2027-03-06');
+    await usuario.selectOptions(await within(form).findByRole('combobox', { name: 'Cisterna' }), '8');
+    await usuario.selectOptions(within(form).getByRole('combobox', { name: 'Conductor' }), '5');
+    await guardar(usuario, form);
+
+    await waitFor(() => expect(api.actualizar).toHaveBeenCalled());
+    expect(api.actualizar.mock.calls[0][1]).toEqual({
+      codigoViaje: 'V-001B',
+      fechaProgramada: new Date('2027-03-05').toISOString(),
+      fechaFin: new Date('2027-03-06').toISOString(),
+      cisternaId: '8', conductorId: '5',
+    });
+  });
+
+  it('con el viaje EN MARCHA se anota el odómetro, y viaja solo', async () => {
+    // El caso por el que existe `cambios`: la API responde 409 a un viaje en
+    // marcha si el cuerpo trae la cisterna, el conductor o la fecha — aunque
+    // sean los mismos. Reenviar el formulario entero bloquearía el odómetro.
+    api.obtener.mockResolvedValue(detalle({ estado: 'cargando', admiteReplanificacion: false }));
+    const usuario = userEvent.setup();
+    render(<Viajes />);
+    const form = await abrirEdicion(usuario);
+
+    await usuario.type(within(form).getByLabelText(/Odómetro inicial/), '120000');
+    await guardar(usuario, form);
+
+    await waitFor(() => expect(api.actualizar).toHaveBeenCalled());
+    expect(api.actualizar.mock.calls[0][1]).toEqual({ odometroInicial: 120000 });
+  });
+
+  it('en marcha, fecha, cisterna y conductor se ven pero no se cambian', async () => {
+    api.obtener.mockResolvedValue(detalle({ estado: 'cargando', admiteReplanificacion: false,
+                                            planCarga: [{ id: 'p1', compartimento: 1, volumenPlanificado: 3000 }] }));
+    const usuario = userEvent.setup();
+    render(<Viajes />);
+    const form = await abrirEdicion(usuario);
+
+    expect(within(form).getByLabelText(/Programado para/)).toBeDisabled();
+    expect(within(form).getByRole('combobox', { name: 'Cisterna' })).toBeDisabled();
+    expect(within(form).getByRole('combobox', { name: 'Conductor' })).toBeDisabled();
+    expect(within(form).getByText('El viaje ya salió: la asignación y la fecha no se cambian.')).toBeInTheDocument();
+    // «Vacía el plan» sería un consejo imposible: con el viaje en marcha el
+    // plan tampoco se toca.
+    expect(within(form).queryByText('Vacía el plan de carga para cambiar la cisterna.')).not.toBeInTheDocument();
+    expect(within(form).getByLabelText(/Odómetro final/)).not.toBeDisabled();
+  });
+
+  it('en planificación, fecha, cisterna y conductor SÍ se cambian', async () => {
+    // La otra mitad: sin ella, deshabilitarlos siempre pasaría la prueba anterior.
+    const usuario = userEvent.setup();
+    render(<Viajes />);
+    const form = await abrirEdicion(usuario);
+
+    expect(within(form).getByLabelText(/Programado para/)).not.toBeDisabled();
+    expect(within(form).getByRole('combobox', { name: 'Cisterna' })).not.toBeDisabled();
+    expect(within(form).getByRole('combobox', { name: 'Conductor' })).not.toBeDisabled();
+  });
+
+  it('con plan de carga, la cisterna no se cambia y se dice por qué', async () => {
+    // El plan apunta a compartimentos de ESTA cisterna. El conductor sí.
+    api.obtener.mockResolvedValue(detalle({ planCarga: [{ id: 'p1', compartimento: 1, volumenPlanificado: 3000 }] }));
+    const usuario = userEvent.setup();
+    render(<Viajes />);
+    const form = await abrirEdicion(usuario);
+
+    expect(within(form).getByRole('combobox', { name: 'Cisterna' })).toBeDisabled();
+    expect(within(form).getByText('Vacía el plan de carga para cambiar la cisterna.')).toBeInTheDocument();
+    expect(within(form).getByRole('combobox', { name: 'Conductor' })).not.toBeDisabled();
+  });
+
+  it('un odómetro final menor que el inicial avisa y BLOQUEA', async () => {
+    api.obtener.mockResolvedValue(detalle({ estado: 'retornando', admiteReplanificacion: false,
+                                            odometroInicial: '120000.00' }));
+    const usuario = userEvent.setup();
+    render(<Viajes />);
+    const form = await abrirEdicion(usuario);
+
+    await usuario.type(within(form).getByLabelText(/Odómetro final/), '119500');
+    expect(within(form).getByText('El odómetro final no puede ser menor que el inicial.')).toBeInTheDocument();
+    expect(within(form).getByRole('button', { name: 'Guardar cambios' })).toBeDisabled();
+  });
+
+  it('igual al inicial SÍ vale, y se compara como NÚMERO', async () => {
+    // '99999' < '120000' como texto: comparar cadenas daría un aviso falso.
+    api.obtener.mockResolvedValue(detalle({ estado: 'retornando', admiteReplanificacion: false,
+                                            odometroInicial: '99999.00' }));
+    const usuario = userEvent.setup();
+    render(<Viajes />);
+    const form = await abrirEdicion(usuario);
+
+    await usuario.type(within(form).getByLabelText(/Odómetro final/), '120000');
+    expect(within(form).queryByText(/odómetro final no puede ser menor/)).not.toBeInTheDocument();
+    await reescribir(usuario, within(form).getByLabelText(/Odómetro final/), '99999');
+    expect(within(form).queryByText(/odómetro final no puede ser menor/)).not.toBeInTheDocument();
+    expect(within(form).getByRole('button', { name: 'Guardar cambios' })).not.toBeDisabled();
+  });
+
+  it('un fin previsto anterior a la programación avisa y BLOQUEA', async () => {
+    const usuario = userEvent.setup();
+    render(<Viajes />);
+    const form = await abrirEdicion(usuario);
+
+    await reescribir(usuario, within(form).getByLabelText(/Fin previsto/), '2027-02-20');
+    expect(within(form).getByText('El fin previsto no puede ser anterior a la programación.')).toBeInTheDocument();
+    expect(within(form).getByRole('button', { name: 'Guardar cambios' })).toBeDisabled();
+  });
+
+  it('terminar el MISMO día que se programa es lo normal, no un error', async () => {
+    const usuario = userEvent.setup();
+    render(<Viajes />);
+    const form = await abrirEdicion(usuario);
+
+    await reescribir(usuario, within(form).getByLabelText(/Fin previsto/), '2027-03-01');
+    expect(within(form).queryByText(/no puede ser anterior a la programación/)).not.toBeInTheDocument();
+    expect(within(form).getByRole('button', { name: 'Guardar cambios' })).not.toBeDisabled();
+  });
+
+  it('vaciar la ruta la QUITA; código y fecha no se pueden vaciar', async () => {
+    const usuario = userEvent.setup();
+    render(<Viajes />);
+    const form = await abrirEdicion(usuario);
+
+    expect(within(form).getByLabelText(/Código del viaje/)).toBeRequired();
+    expect(within(form).getByLabelText(/Programado para/)).toBeRequired();
+    await reescribir(usuario, within(form).getByLabelText(/Ruta planificada/), '');
+    await guardar(usuario, form);
+    await waitFor(() => expect(api.actualizar).toHaveBeenCalled());
+    expect(api.actualizar.mock.calls[0][1]).toEqual({ rutaPlanificada: null });
+  });
+
+  it('sin cambios no hay nada que guardar', async () => {
+    const usuario = userEvent.setup();
+    render(<Viajes />);
+    const form = await abrirEdicion(usuario);
+    expect(within(form).getByRole('button', { name: 'Guardar cambios' })).toBeDisabled();
+  });
+
+  it('un choque de ocupación se enseña y el formulario sigue abierto', async () => {
+    api.actualizar.mockRejectedValue(
+      new ErrorApi(409, 'El conductor ya tiene otro viaje que se superpone en esas fechas'));
+    const usuario = userEvent.setup();
+    render(<Viajes />);
+    const form = await abrirEdicion(usuario);
+
+    await usuario.selectOptions(within(form).getByRole('combobox', { name: 'Conductor' }), '5');
+    await guardar(usuario, form);
+
+    expect(await within(form).findByText('El conductor ya tiene otro viaje que se superpone en esas fechas'))
+      .toBeInTheDocument();
+    expect(screen.getByRole('form', { name: 'Editar el viaje V-001' })).toBeInTheDocument();
+  });
+
+  it('al guardar, cierra y vuelve a leer el viaje y la lista', async () => {
+    const usuario = userEvent.setup();
+    render(<Viajes />);
+    const form = await abrirEdicion(usuario);
+
+    await usuario.selectOptions(within(form).getByRole('combobox', { name: 'Conductor' }), '5');
+    await guardar(usuario, form);
+
+    await waitFor(() =>
+      expect(screen.queryByRole('form', { name: 'Editar el viaje V-001' })).not.toBeInTheDocument());
+    expect(api.obtener.mock.calls.filter(c => c[0] === '/viajes/1')).toHaveLength(2);
+    expect(api.listar.mock.calls.filter(c => c[0] === '/viajes')).toHaveLength(2);
+  });
+
+  it('cancelar cierra sin mandar nada', async () => {
+    const usuario = userEvent.setup();
+    render(<Viajes />);
+    const form = await abrirEdicion(usuario);
+    await usuario.click(within(form).getByRole('button', { name: 'Cancelar' }));
+    expect(screen.queryByRole('form', { name: 'Editar el viaje V-001' })).not.toBeInTheDocument();
+    expect(api.actualizar).not.toHaveBeenCalled();
+  });
+
+  it('abrir OTRO viaje cierra la edición del anterior', async () => {
+    // Si se quedara abierta, el formulario de V-001 convivería con el detalle
+    // de V-002 y «Guardar» escribiría en un viaje que ya no está en pantalla.
+    api.obtener.mockImplementation((r: string) => Promise.resolve(
+      r === '/viajes/2' ? detalle({ id: '2', codigoViaje: 'V-002' }) : detalle()));
+    const usuario = userEvent.setup();
+    render(<Viajes />);
+    await abrirEdicion(usuario);
+
+    await usuario.click(screen.getByRole('button', { name: /V-002/ }));
+    await screen.findByRole('heading', { name: 'V-002' });
+    expect(screen.queryByRole('form', { name: /Editar el viaje/ })).not.toBeInTheDocument();
+  });
+
+  it('nunca hay dos formularios a la vez', async () => {
+    const usuario = userEvent.setup();
+    render(<Viajes />);
+    await abrirEdicion(usuario);
+
+    await usuario.click(screen.getByRole('button', { name: 'Nuevo' }));
+    expect(screen.queryByRole('form', { name: 'Editar el viaje V-001' })).not.toBeInTheDocument();
+    await usuario.click(screen.getByRole('button', { name: 'Editar el viaje' }));
+    await screen.findByRole('form', { name: 'Editar el viaje V-001' });
+    expect(screen.queryByRole('button', { name: 'Crear' })).not.toBeInTheDocument();
+  });
 });

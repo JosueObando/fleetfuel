@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import { config as cargarEnv } from 'dotenv';
 import { DataSource } from 'typeorm';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 import { join } from 'path';
 
 import { ViajesService } from '../src/modules/viajes/viajes.service';
@@ -325,6 +326,92 @@ describe('actualizar · un viaje en marcha ya no se replanifica', () => {
   });
 });
 
+describe('actualizar · lo que la base rechaza llega como error de negocio, no como 500', () => {
+  /* La pantalla de edición cambia UN campo y el resto ya está guardado: la
+     petición sola no delata la fila incoherente, la delata el motor. Lo que se
+     fija aquí es que la respuesta diga qué corregir. */
+  it('un odómetro final menor que el inicial ya anotado', async () => {
+    await enServicio(async s => {
+      const id = await viajeCompleto(s, 'cargando');
+      await s.actualizar(id, { odometroInicial: 120000 } as never);
+      const intento = s.actualizar(id, { odometroFinal: 119000 } as never);
+      await expect(intento).rejects.toBeInstanceOf(BadRequestException);
+      await expect(intento).rejects.toThrow('El odómetro final no puede ser menor que el inicial');
+    });
+  });
+
+  it('un fin previsto anterior a la fecha programada, al editar', async () => {
+    // El periodo de ocupación es `tstzrange(programada, fin)`: invertido, ni
+    // siquiera se puede construir el rango.
+    await enServicio(async s => {
+      const id = await viajeCompleto(s, 'programado');
+      const intento = s.actualizar(id, { fechaFin: '2027-02-01T08:00:00Z' } as never);
+      await expect(intento).rejects.toBeInstanceOf(BadRequestException);
+      await expect(intento).rejects.toThrow('El fin previsto no puede ser anterior al inicio del viaje');
+    });
+  });
+
+  it('y lo mismo al crear', async () => {
+    await enServicio(async s => {
+      const intento = s.crear({
+        codigoViaje: `INV-${Math.random().toString(36).slice(2, 9)}`, cisternaId: cisterna,
+        fechaProgramada: '2027-03-01T08:00:00Z', fechaFin: '2027-02-01T08:00:00Z',
+      });
+      await expect(intento).rejects.toBeInstanceOf(BadRequestException);
+      await expect(intento).rejects.toThrow('El fin previsto no puede ser anterior al inicio del viaje');
+    });
+  });
+
+  it('un fin anterior a la hora REAL de salida, con el viaje ya en marcha', async () => {
+    // Ya arrancado, el periodo cuenta desde `fecha_inicio`, que puso el sistema.
+    await enServicio(async s => {
+      const id = await viajeCompleto(s, 'programado');
+      const { gestor } = await import('../src/common/contexto/contexto-peticion');
+      await gestor().query(
+        `UPDATE viajes SET estado = 'cargando', fecha_inicio = '2027-03-02T08:00:00Z' WHERE viaje_id = $1`, [id]);
+      const intento = s.actualizar(id, { fechaFin: '2027-03-01T20:00:00Z' } as never);
+      await expect(intento).rejects.toBeInstanceOf(BadRequestException);
+      await expect(intento).rejects.toThrow('El fin previsto no puede ser anterior al inicio del viaje');
+    });
+  });
+
+  it('un código de viaje que ya usa otro viaje', async () => {
+    await enServicio(async s => {
+      const a = await viajeCompleto(s, 'programado');
+      const b = await s.crear({ codigoViaje: `DUP-${Math.random().toString(36).slice(2, 9)}`,
+                                fechaProgramada: '2028-01-01T08:00:00Z' });
+      const codigoDeA = (await s.obtener(a)).codigoViaje;
+      const intento = s.actualizar(String(b.id), { codigoViaje: codigoDeA } as never);
+      await expect(intento).rejects.toBeInstanceOf(ConflictException);
+      await expect(intento).rejects.toThrow(`Ya existe un viaje con el código ${codigoDeA}`);
+    });
+  });
+});
+
+describe('crear · un código repetido también se dice con el código', () => {
+  it('nombra el código que choca', async () => {
+    await enServicio(async s => {
+      const codigo = `DUP-${Math.random().toString(36).slice(2, 9)}`;
+      await s.crear({ codigoViaje: codigo, fechaProgramada: '2028-02-01T08:00:00Z' });
+      const intento = s.crear({ codigoViaje: codigo, fechaProgramada: '2028-03-01T08:00:00Z' });
+      await expect(intento).rejects.toBeInstanceOf(ConflictException);
+      await expect(intento).rejects.toThrow(`Ya existe un viaje con el código ${codigo}`);
+    });
+  });
+});
+
+describe('obtener · dice si el viaje admite replanificación, calculado aquí', () => {
+  // Igual que `transicionesPosibles`: la interfaz no copia la lista EN_MARCHA.
+  it('programado sí; en marcha no', async () => {
+    await enServicio(async s => {
+      const id = await viajeCompleto(s, 'programado');
+      expect((await s.obtener(id)).admiteReplanificacion).toBe(true);
+      await forzarEstado(id, 'cargando');
+      expect((await s.obtener(id)).admiteReplanificacion).toBe(false);
+    });
+  });
+});
+
 describe('autorizar · la separación entre quien planifica y quien deja salir', () => {
   it('sólo desde `programado`', async () => {
     await enServicio(async s => {
@@ -424,7 +511,7 @@ describe('autorizar · la separación entre quien planifica y quien deja salir',
  *
  * Es una situación de negocio corriente —«esa cisterna ya está ocupada»— y hasta
  * el 2026-09-12 salía como un **500 con el nombre de una restricción dentro**:
- * `crear` y `actualizar` envolvían la consulta en `traducirSolapamiento` y
+ * `crear` y `actualizar` envolvían la consulta en `traducirSolapamiento` (hoy `traducirRestricciones`) y
  * `cambiarEstado` no, que es justo el único de los tres donde el periodo cambia
  * sin que nadie toque una fecha.
  *

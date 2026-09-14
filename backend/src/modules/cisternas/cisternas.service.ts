@@ -13,6 +13,17 @@ const CAMPOS = `c.cisterna_id AS id, c.vehiculo_id AS "vehiculoId", v.placa,
                 (c.fecha_proxima_calibracion IS NOT NULL
                  AND c.fecha_proxima_calibracion < current_date) AS "calibracionVencida"`;
 
+/* `ck_cisternas_calibracion` la decide el motor, que compara la fila ENTERA:
+   al editar sólo la próxima fecha, la última ya guardada está en la base y no
+   en la petición. Repetir la comparación aquí obligaría a leer la fila y a
+   convertir fechas sin mover un día por la zona horaria; traducir el error
+   deja la regla en un solo sitio y cambia un 500 por algo que se puede corregir. */
+function traducirCalibracion(e: unknown): never {
+  if ((e as { constraint?: string }).constraint === 'ck_cisternas_calibracion')
+    throw new BadRequestException('La próxima calibración no puede ser anterior a la última');
+  throw e;
+}
+
 @Injectable()
 export class CisternasService {
   listar() {
@@ -54,7 +65,8 @@ export class CisternasService {
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING cisterna_id AS id`,
       [ctx.empresaId, dto.vehiculoId, dto.capacidadTotal, dto.compartimentos.length,
        dto.certificadoCalibracion ?? null, dto.fechaCalibracion ?? null,
-       dto.fechaProximaCalibracion ?? null, dto.material ?? null, dto.productoAnterior ?? null]);
+       dto.fechaProximaCalibracion ?? null, dto.material ?? null, dto.productoAnterior ?? null])
+      .catch(traducirCalibracion);
 
     /* Todo en la misma transacción de la petición: si un compartimento falla,
        la cisterna tampoco se guarda. Una cisterna a medio compartimentar es
@@ -93,7 +105,7 @@ export class CisternasService {
     await gestor().query(
       `UPDATE cisternas SET ${presentes.map(([c], i) => `${c} = $${i + 2}`).join(', ')},
               actualizado_en = now() WHERE cisterna_id = $1`,
-      [id, ...presentes.map(([, v]) => v)]);
+      [id, ...presentes.map(([, v]) => v)]).catch(traducirCalibracion);
     const despues = await this.obtener(id);
     auditar({ entidad: 'cisternas', entidadId: String(id), valorAnterior: antes, valorNuevo: despues });
     return despues;

@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import { config as cargarEnv } from 'dotenv';
 import { DataSource } from 'typeorm';
+import { BadRequestException } from '@nestjs/common';
 import { join } from 'path';
 
 import { ClientesService } from '../src/modules/clientes/clientes.service';
@@ -235,6 +236,51 @@ describe('cisternas · la aritmética de los compartimentos', () => {
         cisternaCon(String(v.id), [compartimento(1, 5000), compartimento(2, 4000)], 10000));
       await expect(cisternas.actualizar(String(c.id), { capacidadTotal: 8000 }))
         .rejects.toThrow(/suman 9000, más que la capacidad total propuesta \(8000\)/);
+    });
+  });
+});
+
+describe('cisternas · la calibración no se invierte', () => {
+  /* La regla la decide el MOTOR (`ck_cisternas_calibracion`); lo que se fija
+     aquí es que llegue como un 400 que dice qué corregir y no como un 500
+     con el nombre de una restricción. La pantalla de edición la dispara con
+     un solo campo, así que el caso de `actualizar` es el que importa. */
+  it('al crear, una próxima calibración anterior a la última es un 400 legible', async () => {
+    await enContexto(async () => {
+      const v = await vehiculos.crear({ tipoVehiculo: 'cisterna', placa: `P-${unico()}` });
+      const intento = cisternas.crear({
+        vehiculoId: String(v.id), capacidadTotal: 10000, compartimentos: [compartimento(1, 5000)],
+        fechaCalibracion: '2026-06-01', fechaProximaCalibracion: '2026-01-01',
+      });
+      await expect(intento).rejects.toBeInstanceOf(BadRequestException);
+      await expect(intento).rejects.toThrow(
+        'La próxima calibración no puede ser anterior a la última');
+    });
+  });
+
+  it('al editar SOLO la próxima, se compara con la última ya guardada', async () => {
+    // El DTO trae un único campo: ninguna validación que mire sólo la petición
+    // lo vería. Es la fila entera la que queda invertida.
+    await enContexto(async () => {
+      const v = await vehiculos.crear({ tipoVehiculo: 'cisterna', placa: `P-${unico()}` });
+      const c = await cisternas.crear({
+        vehiculoId: String(v.id), capacidadTotal: 10000, compartimentos: [compartimento(1, 5000)],
+        fechaCalibracion: '2026-06-01', fechaProximaCalibracion: '2027-06-01',
+      });
+      const intento = cisternas.actualizar(String(c.id), { fechaProximaCalibracion: '2026-01-01' });
+      await expect(intento).rejects.toBeInstanceOf(BadRequestException);
+      await expect(intento).rejects.toThrow(
+        'La próxima calibración no puede ser anterior a la última');
+    });
+  });
+
+  it('la misma fecha en las dos SÍ vale: la regla es «anterior», no «igual»', async () => {
+    await enContexto(async () => {
+      const v = await vehiculos.crear({ tipoVehiculo: 'cisterna', placa: `P-${unico()}` });
+      const c = await cisternas.crear(cisternaCon(String(v.id), [compartimento(1, 5000)]));
+      const editada = await cisternas.actualizar(String(c.id), {
+        fechaCalibracion: '2026-06-01', fechaProximaCalibracion: '2026-06-01' });
+      expect(editada.fechaProximaCalibracion).toBeTruthy();
     });
   });
 });

@@ -17,16 +17,33 @@ const CAMPOS = `v.viaje_id AS id, v.codigo_viaje AS "codigoViaje", v.tipo_viaje 
 
 const DESDE = `FROM viajes v LEFT JOIN conductores cd ON cd.conductor_id = v.conductor_id`;
 
-/** Un choque con la exclusión de §5.1 llega como 23P01. Traducirlo aquí evita
- *  que la interfaz reciba un 500 por una regla de negocio perfectamente
- *  normal: «esa cisterna ya está ocupada a esa hora». */
-function traducirSolapamiento(e: unknown): never {
-  const codigo = (e as { code?: string })?.code;
-  const restriccion = (e as { constraint?: string })?.constraint ?? '';
+/**
+ * Lo que la base rechaza de un viaje, traducido a algo que se puede corregir.
+ *
+ * Un choque con la exclusión de §5.1 llega como 23P01: «esa cisterna ya está
+ * ocupada a esa hora» es una regla de negocio perfectamente normal, no un 500.
+ *
+ * Las otras tres tampoco las puede ver el servicio mirando sólo la petición:
+ * una edición trae UN campo y el resto está guardado. El odómetro final se
+ * compara con el inicial ya anotado; el fin previsto, con la hora a la que el
+ * viaje empieza a ocupar —la programada o, ya arrancado, la real—, y cuando es
+ * anterior ni siquiera se puede construir el `tstzrange` del periodo (22000).
+ */
+function traducirRestricciones(e: unknown, codigoViaje?: string): never {
+  const { code: codigo, constraint: restriccion = '', message: mensaje = '' } =
+    (e ?? {}) as { code?: string; constraint?: string; message?: string };
   if (codigo === '23P01') {
     const quien = restriccion.includes('conductor') ? 'El conductor' : 'La cisterna';
     throw new ConflictException(`${quien} ya tiene otro viaje que se superpone en esas fechas`);
   }
+  if (restriccion === 'ck_viajes_odometro')
+    throw new BadRequestException('El odómetro final no puede ser menor que el inicial');
+  /* No se mira `ck_viajes_fechas`: la columna generada `periodo` se calcula
+     ANTES que los CHECK, así que un fin invertido revienta siempre aquí. */
+  if (codigo === '22000' && mensaje.includes('range lower bound'))
+    throw new BadRequestException('El fin previsto no puede ser anterior al inicio del viaje');
+  if (restriccion === 'uq_viajes_empresa_codigo')
+    throw new ConflictException(`Ya existe un viaje con el código ${codigoViaje}`);
   throw e as Error;
 }
 
@@ -66,6 +83,8 @@ export class ViajesService {
         WHERE pc.viaje_id = $1 ORDER BY cc.numero`, [id]);
 
     viaje.transicionesPosibles = FLUJO_VIAJE[viaje.estado] ?? [];
+    /** Cisterna, conductor y fecha sólo se cambian antes de salir. */
+    viaje.admiteReplanificacion = !EN_MARCHA.has(viaje.estado);
     return viaje;
   }
 
@@ -85,7 +104,7 @@ export class ViajesService {
       const completo = await this.obtener(creado.id);
       auditar({ entidad: 'viajes', entidadId: String(creado.id), valorNuevo: completo });
       return completo;
-    } catch (e) { traducirSolapamiento(e); }
+    } catch (e) { traducirRestricciones(e, dto.codigoViaje); }
   }
 
   async actualizar(id: string, dto: ActualizarViajeDto) {
@@ -93,7 +112,7 @@ export class ViajesService {
     /* Un viaje autorizado ya no se replanifica: cambiarle la cisterna o el
        conductor cuando el camión va camino de la terminal deja el papel y la
        realidad contando cosas distintas. */
-    if (EN_MARCHA.has(antes.estado) && (dto.cisternaId || dto.conductorId || dto.fechaProgramada))
+    if (!antes.admiteReplanificacion && (dto.cisternaId || dto.conductorId || dto.fechaProgramada))
       throw new ConflictException(
         `El viaje está "${antes.estado}": ya no admite cambios de asignación ni de fecha`);
 
@@ -132,7 +151,7 @@ export class ViajesService {
         `UPDATE viajes SET ${presentes.map(([c], i) => `${c} = $${i + 2}`).join(', ')},
                 actualizado_en = now() WHERE viaje_id = $1`,
         [id, ...presentes.map(([, v]) => v)]);
-    } catch (e) { traducirSolapamiento(e); }
+    } catch (e) { traducirRestricciones(e, dto.codigoViaje); }
 
     const despues = await this.obtener(id);
     auditar({ entidad: 'viajes', entidadId: String(id), valorAnterior: antes, valorNuevo: despues });
@@ -178,7 +197,7 @@ export class ViajesService {
         `UPDATE viajes SET estado = $2, motivo_cancelacion = coalesce($3, motivo_cancelacion),
                 actualizado_en = now()${marca}
           WHERE viaje_id = $1`, [id, dto.estado, dto.motivo ?? null]);
-    } catch (e) { traducirSolapamiento(e); }
+    } catch (e) { traducirRestricciones(e); }
 
     auditar({
       entidad: 'viajes', entidadId: String(id),
@@ -335,7 +354,7 @@ export class ViajesService {
       // petición planificó parte de esta misma línea entre que la regla 4 leyó
       // el acumulado y este UPDATE lo escribió. Es un conflicto de negocio
       // perfectamente normal, y sin esta traducción sería un 500 —el mismo
-      // motivo por el que `traducirSolapamiento` existe para el 23P01—.
+      // motivo por el que `traducirRestricciones` existe para el 23P01—.
       if ((e as { constraint?: string }).constraint === 'ck_detalles_planificado_cabe')
         throw new ConflictException(
           'Otra planificación ocupó ese volumen mientras se guardaba esta; vuelva a consultar lo que queda por planificar');

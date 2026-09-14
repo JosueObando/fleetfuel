@@ -7,7 +7,7 @@ interface Props {
   etiqueta: string;
   valor: string;
   onCambio: (v: string) => void;
-  tipo?: 'text' | 'email' | 'password' | 'number' | 'date' | 'tel';
+  tipo?: 'text' | 'email' | 'password' | 'number' | 'date' | 'datetime-local' | 'tel';
   requerido?: boolean;
   deshabilitado?: boolean;
   marcador?: string;

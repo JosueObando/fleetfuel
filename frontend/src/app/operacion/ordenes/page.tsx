@@ -9,6 +9,7 @@ import { useCargaInicial } from '@/api/carga';
 import type { Fila } from '@/api/tipos';
 import catalogo from '@/catalogos/Catalogo.module.css';
 import estilos from './ordenes.module.css';
+import { EditarOrden } from './EditarOrden';
 
 interface Linea { productoId: string; volumenSolicitado: string; tolerancia: string }
 
@@ -36,6 +37,7 @@ export default function Ordenes() {
   const [estaciones, setEstaciones] = useState<Fila[]>([]);
   const [productos, setProductos] = useState<Fila[]>([]);
   const [abierto, setAbierto] = useState(false);
+  const [editando, setEditando] = useState<Fila | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
 
@@ -107,6 +109,19 @@ export default function Ordenes() {
     } finally { setGuardando(false); }
   }
 
+  /* Sobre la orden LEÍDA AL ABRIR: la fila puede llevar rato pintada, y si
+     otra persona la planificó entretanto, el formulario ni debería abrirse. */
+  async function editar(fila: Fila) {
+    setError(null);
+    try {
+      const orden = await api.obtener<Fila>(`/ordenes/${fila.id}`);
+      setAbierto(false);
+      setEditando(orden);
+    } catch (err) {
+      setError(err instanceof ErrorApi ? err.message : 'No se pudo abrir la orden');
+    }
+  }
+
   async function transicionar(fila: Fila, estado: string) {
     let motivo: string | null = null;
     if (EXIGEN_MOTIVO.has(estado)) {
@@ -125,7 +140,7 @@ export default function Ordenes() {
     <section className={catalogo.panel}>
       <div className={catalogo.barra}>
         <h1 className={catalogo.titulo}>Órdenes</h1>
-        <Button icono="mas" onClick={() => setAbierto(a => !a)}>Nueva orden</Button>
+        <Button icono="mas" onClick={() => { setEditando(null); setAbierto(a => !a); }}>Nueva orden</Button>
       </div>
 
       <div className={catalogo.cuerpo}>
@@ -179,6 +194,12 @@ export default function Ordenes() {
           </form>
         )}
 
+        {editando && (
+          <EditarOrden key={String(editando.id)} orden={editando}
+                       onCancelar={() => setEditando(null)}
+                       onGuardada={() => { setEditando(null); void cargar(); }} />
+        )}
+
         {!abierto && error && <p className={catalogo.aviso}>{error}</p>}
 
         {filas === null ? (
@@ -208,6 +229,11 @@ export default function Ordenes() {
                     {/* Las transiciones vienen en la propia lista: la interfaz
                         no replica la máquina de estados, la muestra. */}
                     <div className={estilos.transiciones}>
+                      {f.admiteEdicion && (
+                        <Button variante="secundario" onClick={() => void editar(f)}>
+                          Editar<span className="solo-lectores"> {String(f.numeroOrdenExterna ?? `#${f.id}`)}</span>
+                        </Button>
+                      )}
                       {(f.transicionesPosibles ?? []).length === 0
                         ? <span className={estilos.estadoTexto}>final</span>
                         : (f.transicionesPosibles as string[]).slice(0, 3).map(e => (

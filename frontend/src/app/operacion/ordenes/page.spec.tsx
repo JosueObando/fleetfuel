@@ -5,10 +5,10 @@ import { ErrorApi } from '@/api/cliente';
 
 jest.mock('@/api/cliente', () => {
   const real = jest.requireActual('@/api/cliente');
-  return { ...real, api: { listar: jest.fn(), crear: jest.fn(), actualizar: jest.fn() } };
+  return { ...real, api: { listar: jest.fn(), obtener: jest.fn(), crear: jest.fn(), actualizar: jest.fn() } };
 });
 const { api } = jest.requireMock('@/api/cliente') as {
-  api: Record<'listar' | 'crear' | 'actualizar', jest.Mock>;
+  api: Record<'listar' | 'obtener' | 'crear' | 'actualizar', jest.Mock>;
 };
 
 /*
@@ -25,7 +25,17 @@ const PRODUCTOS = [{ id: '9', nombre: 'Gasolina 95' }];
 const ORDENES = [{
   id: '5', numeroOrdenExterna: 'EXT-1', cliente: 'Terpelo', estacion: 'Vía España',
   estado: 'recibida', volumenTotal: 4000, transicionesPosibles: ['validada', 'rechazada'],
+  admiteEdicion: true,
 }];
+
+/* `GET /ordenes/:id` con la forma de `CAMPOS`: `fecha_requerida` es `date`
+   y las ventanas `timestamptz`. `admiteEdicion` lo calcula la API. */
+const DETALLE = {
+  ...ORDENES[0], fechaRequerida: '2026-10-01T05:00:00.000Z',
+  ventanaInicio: '2026-10-01T13:00:00.000Z', ventanaFin: null,
+  prioridad: 'normal', observaciones: null, admiteEdicion: true,
+  detalles: [{ id: '50', productoId: '9', producto: 'Gasolina 95', volumenSolicitado: '4000.00' }],
+};
 
 const listarPor = (r: string) =>
   r === '/ordenes' ? ORDENES : r === '/clientes' ? CLIENTES
@@ -36,6 +46,7 @@ beforeEach(() => {
   api.listar.mockImplementation((r: string) => Promise.resolve(listarPor(r)));
   api.crear.mockResolvedValue({ id: '6' });
   api.actualizar.mockResolvedValue({ id: '5' });
+  api.obtener.mockResolvedValue(DETALLE);
 });
 
 const abrir = async (usuario: ReturnType<typeof userEvent.setup>) => {
@@ -156,7 +167,7 @@ describe('cambiar el estado de una orden', () => {
     // Una celda de acciones vacía se lee como «no ha cargado» o «no tengo
     // permiso»; «final» dice que no hay nada más que hacer con ella.
     api.listar.mockImplementation((r: string) => Promise.resolve(r === '/ordenes'
-      ? [{ ...ORDENES[0], estado: 'entregada', transicionesPosibles: [] }] : listarPor(r)));
+      ? [{ ...ORDENES[0], estado: 'entregada', transicionesPosibles: [], admiteEdicion: false }] : listarPor(r)));
     render(<Ordenes />);
     const fila = (await screen.findByText('EXT-1')).closest('tr')!;
     expect(within(fila).getByText('final')).toBeInTheDocument();
@@ -250,5 +261,189 @@ describe('la lista', () => {
                        : Promise.resolve(listarPor(r)));
     render(<Ordenes />);
     expect(await screen.findByText(/Faltan: ordenes:leer/)).toBeInTheDocument();
+  });
+});
+
+describe('editar la programación de una orden', () => {
+  /* `PATCH /ordenes/:id` no tenía pantalla: mover la fecha o la ventana de
+     entrega que pide el cliente obligaba a cancelar la orden y rehacerla. */
+
+  const abrirEdicion = async (usuario: ReturnType<typeof userEvent.setup>) => {
+    await screen.findAllByText('EXT-1');
+    await usuario.click(screen.getByRole('button', { name: 'Editar EXT-1' }));
+    return screen.findByRole('form', { name: 'Editar la orden EXT-1' });
+  };
+
+  const reescribir = async (usuario: ReturnType<typeof userEvent.setup>, campo: HTMLElement, texto: string) => {
+    await usuario.clear(campo);
+    if (texto) await usuario.type(campo, texto);
+  };
+
+  it('sólo se ofrece en las órdenes que la API declara editables', async () => {
+    // La lista de estados editables vive en el servidor y llega como
+    // `admiteEdicion`: copiarla aquí sería una segunda definición que diverge.
+    api.listar.mockImplementation((r: string) => Promise.resolve(r === '/ordenes'
+      ? [{ ...ORDENES[0], admiteEdicion: true },
+         { ...ORDENES[0], id: '6', numeroOrdenExterna: 'EXT-2', estado: 'planificada', admiteEdicion: false }]
+      : listarPor(r)));
+    render(<Ordenes />);
+    await screen.findAllByText('EXT-2');
+    expect(screen.getByRole('button', { name: 'Editar EXT-1' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Editar EXT-2' })).not.toBeInTheDocument();
+  });
+
+  it('abre con la programación ACTUAL, leída al abrir y en hora local', async () => {
+    const usuario = userEvent.setup();
+    render(<Ordenes />);
+    const form = await abrirEdicion(usuario);
+
+    expect(api.obtener).toHaveBeenCalledWith('/ordenes/5');
+    expect(within(form).getByRole('combobox', { name: 'Prioridad' })).toHaveValue('normal');
+    expect(within(form).getByLabelText(/Fecha requerida/)).toHaveValue('2026-10-01');
+    // 13:00 UTC son las 8:00 en Panamá: es la hora que dio el cliente.
+    expect(within(form).getByLabelText(/Inicio de la ventana/)).toHaveValue('2026-10-01T08:00');
+    expect(within(form).getByLabelText(/Fin de la ventana/)).toHaveValue('');
+  });
+
+  it('manda SÓLO lo que cambió', async () => {
+    const usuario = userEvent.setup();
+    render(<Ordenes />);
+    const form = await abrirEdicion(usuario);
+
+    await usuario.selectOptions(within(form).getByRole('combobox', { name: 'Prioridad' }), 'urgente');
+    await usuario.click(within(form).getByRole('button', { name: 'Guardar cambios' }));
+
+    await waitFor(() => expect(api.actualizar).toHaveBeenCalled());
+    expect(api.actualizar.mock.calls[0]).toEqual(['/ordenes/5', { prioridad: 'urgente' }]);
+  });
+
+  it('y lo que se cambia viaja, con la ventana como instante', async () => {
+    const usuario = userEvent.setup();
+    render(<Ordenes />);
+    const form = await abrirEdicion(usuario);
+
+    await reescribir(usuario, within(form).getByLabelText(/Fecha requerida/), '2026-10-02');
+    await reescribir(usuario, within(form).getByLabelText(/Fin de la ventana/), '2026-10-01T14:00');
+    await reescribir(usuario, within(form).getByLabelText(/Observaciones/), 'Llamar antes de llegar');
+    await usuario.click(within(form).getByRole('button', { name: 'Guardar cambios' }));
+
+    await waitFor(() => expect(api.actualizar).toHaveBeenCalled());
+    expect(api.actualizar.mock.calls[0][1]).toEqual({
+      fechaRequerida: '2026-10-02',
+      ventanaFin: '2026-10-01T19:00:00.000Z',
+      observaciones: 'Llamar antes de llegar',
+    });
+  });
+
+  it('vaciar la fecha requerida la QUITA', async () => {
+    const usuario = userEvent.setup();
+    render(<Ordenes />);
+    const form = await abrirEdicion(usuario);
+
+    await reescribir(usuario, within(form).getByLabelText(/Fecha requerida/), '');
+    await usuario.click(within(form).getByRole('button', { name: 'Guardar cambios' }));
+
+    await waitFor(() => expect(api.actualizar).toHaveBeenCalled());
+    expect(api.actualizar.mock.calls[0][1]).toEqual({ fechaRequerida: null });
+  });
+
+  it('una ventana que termina antes de empezar avisa y BLOQUEA', async () => {
+    const usuario = userEvent.setup();
+    render(<Ordenes />);
+    const form = await abrirEdicion(usuario);
+
+    await reescribir(usuario, within(form).getByLabelText(/Fin de la ventana/), '2026-10-01T07:00');
+    expect(within(form).getByText('La ventana termina antes de empezar.')).toBeInTheDocument();
+    expect(within(form).getByRole('button', { name: 'Guardar cambios' })).toBeDisabled();
+  });
+
+  it('terminar a la MISMA hora que empieza tampoco vale: la base pide «después»', async () => {
+    const usuario = userEvent.setup();
+    render(<Ordenes />);
+    const form = await abrirEdicion(usuario);
+
+    await reescribir(usuario, within(form).getByLabelText(/Fin de la ventana/), '2026-10-01T08:00');
+    expect(within(form).getByRole('button', { name: 'Guardar cambios' })).toBeDisabled();
+  });
+
+  it('una ventana abierta por un lado no se juzga', async () => {
+    // Sin fin, no hay nada con qué comparar: marcarla sería gritarle a quien
+    // aún no ha terminado de escribir.
+    const usuario = userEvent.setup();
+    render(<Ordenes />);
+    const form = await abrirEdicion(usuario);
+
+    await reescribir(usuario, within(form).getByLabelText(/Inicio de la ventana/), '2026-10-01T09:00');
+    expect(within(form).queryByText('La ventana termina antes de empezar.')).not.toBeInTheDocument();
+    expect(within(form).getByRole('button', { name: 'Guardar cambios' })).not.toBeDisabled();
+  });
+
+  it('sin cambios no hay nada que guardar, y la prioridad no se puede vaciar', async () => {
+    const usuario = userEvent.setup();
+    render(<Ordenes />);
+    const form = await abrirEdicion(usuario);
+    expect(within(form).getByRole('button', { name: 'Guardar cambios' })).toBeDisabled();
+    expect(within(form).getByRole('combobox', { name: 'Prioridad' })).toBeRequired();
+  });
+
+  it('si el servidor rechaza, el motivo se ve y el formulario sigue abierto', async () => {
+    // El caso real: otra persona planificó la orden mientras esta la editaba.
+    api.actualizar.mockRejectedValue(
+      new ErrorApi(409, 'Una orden en estado "planificada" ya no admite cambios de programación'));
+    const usuario = userEvent.setup();
+    render(<Ordenes />);
+    const form = await abrirEdicion(usuario);
+
+    await usuario.selectOptions(within(form).getByRole('combobox', { name: 'Prioridad' }), 'alta');
+    await usuario.click(within(form).getByRole('button', { name: 'Guardar cambios' }));
+
+    expect(await within(form).findByText(/ya no admite cambios de programación/)).toBeInTheDocument();
+    expect(screen.getByRole('form', { name: 'Editar la orden EXT-1' })).toBeInTheDocument();
+  });
+
+  it('al guardar, cierra y recarga la lista', async () => {
+    const usuario = userEvent.setup();
+    render(<Ordenes />);
+    const form = await abrirEdicion(usuario);
+
+    await usuario.selectOptions(within(form).getByRole('combobox', { name: 'Prioridad' }), 'alta');
+    await usuario.click(within(form).getByRole('button', { name: 'Guardar cambios' }));
+
+    await waitFor(() =>
+      expect(screen.queryByRole('form', { name: 'Editar la orden EXT-1' })).not.toBeInTheDocument());
+    expect(api.listar.mock.calls.filter(c => c[0] === '/ordenes')).toHaveLength(2);
+  });
+
+  it('cancelar cierra sin mandar nada', async () => {
+    const usuario = userEvent.setup();
+    render(<Ordenes />);
+    const form = await abrirEdicion(usuario);
+    await usuario.click(within(form).getByRole('button', { name: 'Cancelar' }));
+    expect(screen.queryByRole('form', { name: 'Editar la orden EXT-1' })).not.toBeInTheDocument();
+    expect(api.actualizar).not.toHaveBeenCalled();
+  });
+
+  it('nunca hay dos formularios a la vez', async () => {
+    const usuario = userEvent.setup();
+    render(<Ordenes />);
+    await screen.findAllByText('EXT-1');
+    await usuario.click(screen.getByRole('button', { name: /Nueva orden/ }));
+    await usuario.click(screen.getByRole('button', { name: 'Editar EXT-1' }));
+    await screen.findByRole('form', { name: 'Editar la orden EXT-1' });
+    expect(screen.queryByRole('button', { name: 'Crear orden' })).not.toBeInTheDocument();
+
+    await usuario.click(screen.getByRole('button', { name: /Nueva orden/ }));
+    expect(screen.queryByRole('form', { name: 'Editar la orden EXT-1' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Crear orden' })).toBeInTheDocument();
+  });
+
+  it('si no se puede leer la orden, se dice en vez de abrir un formulario vacío', async () => {
+    api.obtener.mockRejectedValue(new ErrorApi(404, 'Orden no encontrada'));
+    const usuario = userEvent.setup();
+    render(<Ordenes />);
+    await screen.findAllByText('EXT-1');
+    await usuario.click(screen.getByRole('button', { name: 'Editar EXT-1' }));
+    expect(await screen.findByText('Orden no encontrada')).toBeInTheDocument();
+    expect(screen.queryByRole('form', { name: /Editar la orden/ })).not.toBeInTheDocument();
   });
 });
