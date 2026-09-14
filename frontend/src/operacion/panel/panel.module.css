@@ -1,0 +1,15 @@
+.cabecera {
+  display: flex; gap: var(--esp-4); align-items: flex-end; flex-wrap: wrap;
+  margin: var(--esp-4) 0;
+}
+.sello { font-size: var(--texto-sm); color: var(--fg-muted); margin: 0 0 var(--esp-2); }
+.aviso { margin: 0 0 var(--esp-3); }
+.tarjetas {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--esp-3);
+}
+.esqueleto { height: 112px; margin: 0; }
+.enlace {
+  display: inline-flex; align-items: center; min-height: 44px;
+  font-size: var(--texto-sm); color: var(--action); font-weight: var(--peso-semi);
+}

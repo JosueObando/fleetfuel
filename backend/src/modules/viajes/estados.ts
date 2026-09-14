@@ -41,3 +41,15 @@ export const SIN_SALIR = ['borrador', 'programado', 'autorizado'];
 
 /** La lista de arriba escrita para un `IN (...)` de SQL. Son constantes, no datos. */
 export const SIN_SALIR_SQL = SIN_SALIR.map(e => `'${e}'`).join(', ');
+
+/**
+ * Estados de un viaje que ya salió y todavía no ha vuelto: el camión está en la
+ * calle. Lo usan el informe operativo (§14.1, «cisternas en ruta») y el
+ * dashboard (§15.1, «viajes en curso»), por el mismo motivo que `SIN_SALIR`.
+ */
+export const EN_RUTA = [
+  'desplazamiento_terminal', 'espera_carga', 'cargando', 'cargado',
+  'transito_estacion', 'descargando', 'retornando',
+];
+
+export const EN_RUTA_SQL = EN_RUTA.map(e => `'${e}'`).join(', ');

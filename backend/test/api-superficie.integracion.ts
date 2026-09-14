@@ -689,6 +689,32 @@ describe('informes · las cuatro rutas del §14', () => {
 });
 
 /*
+ * §15.1 · Dashboard ejecutivo. Igual que arriba: aquí que la ruta existe y no
+ * revienta; los números, en `informes.integracion.ts`.
+ */
+describe('informes · el dashboard ejecutivo del §15.1', () => {
+  it('responde con las tarjetas y el día al que corresponden', async () => {
+    const r = await ruta('GET /informes/ejecutivo',
+      api().get('/api/informes/ejecutivo?fecha=2033-03-15').set(cab()), [200]);
+    expect(r.body).toMatchObject({ fecha: '2033-03-15' });
+    expect(r.body).toHaveProperty('conductoresPendientesPago');
+  }, 60_000);
+
+  it('una fecha que no es una fecha es un 400, no un 500 de Postgres', async () => {
+    // `$1::date` con «luna» lanza 22007 dentro de la consulta. Lo mismo valía
+    // para el informe operativo y el de volumen, que llevaban la fecha sin mirar.
+    for (const url of ['/api/informes/ejecutivo?fecha=luna',
+                       '/api/informes/ejecutivo?fecha=2033-02-30',
+                       '/api/informes/operativo?fecha=luna',
+                       '/api/informes/volumen?desde=ayer',
+                       '/api/informes/volumen?hasta=2033-13-01']) {
+      const r = await api().get(url).set(cab());
+      expect({ url, status: r.status }).toEqual({ url, status: 400 });
+    }
+  }, 60_000);
+});
+
+/*
  * §7.18 · Liquidaciones. El recorrido llega hasta donde puede con un solo
  * usuario: calcular sí, aprobar no —quien calculó no aprueba, y responde 409—.
  * Las tres firmas se prueban en `liquidaciones.integracion.ts`.

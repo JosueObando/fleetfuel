@@ -20,6 +20,10 @@ const GRUPOS: Array<{ rotulo: string; items: Array<{ ruta: string; etiqueta: str
   {
     rotulo: 'Operación',
     items: [
+      // §15.1: las ocho cifras del día y a dónde se actúa. Primero porque es lo
+      // que se mira al llegar; no es la raíz porque exige `informes:leer`, y
+      // quien no lo tiene se encontraría un 403 como pantalla de bienvenida.
+      { ruta: '/operacion/panel', etiqueta: 'Panel', icono: 'informes' },
       { ruta: '/operacion/ordenes', etiqueta: 'Órdenes', icono: 'ordenes' },
       { ruta: '/operacion/viajes',  etiqueta: 'Viajes',  icono: 'seguimiento' },
       // §15.3: la semana por cisterna. Junto a viajes, porque es donde se

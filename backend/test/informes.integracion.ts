@@ -145,7 +145,8 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  for (const t of ['entregas', 'plan_carga', 'viaje_ordenes', 'viajes', 'detalles_orden',
+  for (const t of ['alertas', 'posiciones_gps', 'liquidaciones_conductor', 'gastos_viaje',
+                   'entregas', 'plan_carga', 'viaje_ordenes', 'viajes', 'detalles_orden',
                    'ordenes_abastecimiento', 'estaciones_servicio', 'clientes',
                    'productos_combustible', 'cisternas', 'vehiculos', 'conductores',
                    'auditoria', 'usuarios']) {
@@ -313,6 +314,268 @@ describe('§14.1 · recorridos', () => {
     await enContexto(async (s) => {
       await viaje('transito_estacion', { odometroInicial: 1, odometroFinal: 2 });
       expect(await s.recorridos()).toEqual([]);
+    });
+  });
+});
+
+/**
+ * §15.1 · Dashboard ejecutivo: las ocho tarjetas superiores.
+ *
+ * Siete salen de aquí; el «margen promedio» no, porque necesita ingreso y costo
+ * completo, que son del motor de la Fase 3 (ver el comentario del servicio).
+ *
+ * Lo que más protege este bloque es EL DÍA. «Del día» es el día de Panamá, no
+ * el de UTC: la base corre en UTC, y una descarga a las 22:00 de un lunes en
+ * Panamá es un martes para `current_date`. Sin la zona explícita el panel de las
+ * siete de la tarde ya estaría enseñando el día siguiente, casi vacío.
+ */
+describe('§15.1 · dashboard ejecutivo', () => {
+  const DIA = '2033-03-15';
+  /** Un instante del DIA en hora de Panamá (UTC−5, sin horario de verano). */
+  const aLas = (hhmm: string, dia = DIA) => new Date(`${dia}T${hhmm}:00-05:00`).toISOString();
+
+  async function vehiculoDe(cisterna: string) {
+    const [f] = await gestor().query(
+      `SELECT vehiculo_id FROM cisternas WHERE cisterna_id = $1`, [cisterna]);
+    return String(f.vehiculo_id);
+  }
+
+  async function posicion(vehiculo: string, viajeId: string | null, cuando: string,
+                          lat: number, lng: number) {
+    await gestor().query(`SELECT fn_asegurar_particion_gps($1::timestamptz)`, [cuando]);
+    await gestor().query(
+      `INSERT INTO posiciones_gps (empresa_id, viaje_id, vehiculo_id, fecha_hora, ubicacion)
+       VALUES ($1,$2,$3,$4, ST_SetSRID(ST_MakePoint($6,$5),4326)::geography)`,
+      [empresa, viajeId, vehiculo, cuando, lat, lng]);
+  }
+
+  async function gasto(viajeId: string, monto: number, estado: string, fecha = DIA) {
+    const resuelto = estado !== 'pendiente';
+    await gestor().query(
+      `INSERT INTO gastos_viaje (empresa_id, viaje_id, categoria, descripcion, monto, fecha,
+                                 pagado_por, estado, registrado_por, aprobado_por, aprobado_en)
+       VALUES ($1,$2,'peaje','Peaje de prueba',$3,$4,'empresa',$5,$6,$7,$8)`,
+      [empresa, viajeId, monto, fecha, estado, usuario,
+       resuelto ? usuario : null, resuelto ? new Date().toISOString() : null]);
+  }
+
+  async function liquidacion(estado: 'pendiente' | 'aprobada' | 'pagada', tarifa: number,
+                             conductor?: string) {
+    // Periodo CERRADO y distinto en cada llamada: dos viajes abiertos del mismo
+    // conductor chocarían con la exclusión del §5.1.
+    const n = secuencia++;
+    const v = await viaje('pendiente_liquidacion', {
+      fechaInicio: aLas('06:00', `2034-01-${String(n % 28 + 1).padStart(2, '0')}`),
+      fechaFin: aLas('18:00', `2034-01-${String(n % 28 + 1).padStart(2, '0')}`) });
+    // `viaje()` estrena conductor con su cisterna: el repetido se pone después.
+    if (conductor) {
+      await gestor().query(`UPDATE viajes SET conductor_id = $1 WHERE viaje_id = $2`,
+        [conductor, v.id]);
+    }
+    const [cd] = await gestor().query(
+      `SELECT conductor_id FROM viajes WHERE viaje_id = $1`, [v.id]);
+    const aprobada = estado !== 'pendiente';
+    const pagada = estado === 'pagada';
+    await gestor().query(
+      `INSERT INTO liquidaciones_conductor
+         (empresa_id, viaje_id, conductor_id, tarifa_base, estado, calculada_por,
+          aprobada_por, fecha_aprobacion, pagada_por, fecha_pago, referencia_pago)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+      [empresa, v.id, cd.conductor_id, tarifa, estado, usuario,
+       aprobada ? usuario : null, aprobada ? new Date().toISOString() : null,
+       pagada ? usuario : null, pagada ? new Date().toISOString() : null,
+       pagada ? 'TRF-1' : null]);
+    return String(cd.conductor_id);
+  }
+
+  async function alerta(severidad: string, estado = 'abierta') {
+    await gestor().query(
+      `INSERT INTO alertas (empresa_id, tipo, severidad, titulo, entidad, clave_dedup,
+                            estado, resuelta_en)
+       VALUES ($1,'prueba',$2,'Alerta de prueba','viajes',$3,$4,$5)`,
+      [empresa, severidad, `ejecutivo:${secuencia++}:${Math.random()}`, estado,
+       estado === 'resuelta' ? new Date().toISOString() : null]);
+  }
+
+  it('sin datos devuelve ceros, no null', async () => {
+    await enContexto(async (s) => {
+      const r = await s.ejecutivo(DIA);
+      for (const clave of ['ordenesActivas', 'viajesEnCurso', 'volumenEntregado',
+        'kilometrosGps', 'unidadesConGps', 'kilometrosOdometro', 'gastosDelDia',
+        'gastosPorAprobar', 'conductoresPendientesPago', 'montoPendientePago',
+        'alertasCriticas', 'alertasAltas']) {
+        expect(r[clave]).not.toBeNull();
+        expect(Number(r[clave])).toBe(0);
+      }
+      expect(r.fecha).toBe(DIA);
+    });
+  });
+
+  it('órdenes activas: todo lo que no llegó a un estado terminal ni se dio de baja', async () => {
+    await enContexto(async (s) => {
+      for (const estado of ['recibida', 'validada', 'asignada', 'suspendida', 'entrega_parcial']) {
+        const { orden: o } = await orden(1000);
+        await gestor().query(
+          `UPDATE ordenes_abastecimiento SET estado = $1 WHERE orden_id = $2`, [estado, o]);
+      }
+      for (const estado of ['cerrada', 'cancelada', 'rechazada']) {
+        const { orden: o } = await orden(1000);
+        await gestor().query(
+          `UPDATE ordenes_abastecimiento SET estado = $1 WHERE orden_id = $2`, [estado, o]);
+      }
+      const { orden: baja } = await orden(1000);
+      await gestor().query(
+        `UPDATE ordenes_abastecimiento SET eliminado_en = now() WHERE orden_id = $1`, [baja]);
+
+      expect(Number((await s.ejecutivo(DIA)).ordenesActivas)).toBe(5);
+    });
+  });
+
+  it('viajes en curso: los que salieron y no han vuelto, ni antes ni después', async () => {
+    await enContexto(async (s) => {
+      await viaje('desplazamiento_terminal');
+      await viaje('transito_estacion');
+      await viaje('retornando');
+      // Autorizado todavía no ha salido; pendiente de liquidar ya volvió.
+      await viaje('autorizado');
+      await viaje('pendiente_liquidacion');
+      await viaje('cerrado', { fechaInicio: aLas('08:00'), fechaFin: aLas('12:00') });
+      expect(Number((await s.ejecutivo(DIA)).viajesEnCurso)).toBe(3);
+    });
+  });
+
+  describe('volumen entregado del día', () => {
+    async function entregaEl(cuando: string, recibido: number, estado = 'aceptada') {
+      const { orden: o, detalle } = await orden(10000, 5000, 0);
+      const v = await viaje('descargando');
+      await gestor().query(
+        `INSERT INTO viaje_ordenes (empresa_id, viaje_id, orden_id, secuencia_entrega)
+         VALUES ($1,$2,$3,1)`, [empresa, v.id, o]);
+      await gestor().query(
+        `INSERT INTO entregas (empresa_id, viaje_id, orden_id, detalle_orden_id, estacion_id,
+                               producto_id, compartimento_id, volumen_cargado, volumen_recibido,
+                               receptor_nombre, latitud, longitud, estado, fecha_descarga)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,5000,$8,'Receptor',8.98,-79.51,$9,$10)`,
+        [empresa, v.id, o, detalle, estacion, producto, v.compartimento, recibido, estado, cuando]);
+    }
+
+    it('suma lo recibido y deja fuera lo rechazado', async () => {
+      await enContexto(async (s) => {
+        await entregaEl(aLas('09:00'), 4000);
+        await entregaEl(aLas('11:00'), 900, 'parcial');
+        await entregaEl(aLas('13:00'), 4990, 'rechazada');
+        expect(Number((await s.ejecutivo(DIA)).volumenEntregado)).toBe(4900);
+      });
+    });
+
+    it('cuenta el día de PANAMÁ: las 22:00 locales son el día siguiente en UTC', async () => {
+      await enContexto(async (s) => {
+        await entregaEl(aLas('22:00'), 3000);          // 03:00 UTC del 16
+        await entregaEl(aLas('23:30', '2033-03-14'), 7); // 04:30 UTC del 15: es del 14
+        expect(Number((await s.ejecutivo(DIA)).volumenEntregado)).toBe(3000);
+        expect(Number((await s.ejecutivo('2033-03-16')).volumenEntregado)).toBe(0);
+      });
+    });
+  });
+
+  describe('kilómetros del día', () => {
+    it('GPS: suma los tramos de cada unidad sin unir los de dos unidades distintas', async () => {
+      await enContexto(async (s) => {
+        const a = await viaje('transito_estacion');
+        const b = await viaje('transito_estacion');
+        const va = await vehiculoDe(a.cisterna);
+        const vb = await vehiculoDe(b.cisterna);
+        // Unidad A: dos tramos de 0,01° de latitud (~1,106 km cada uno).
+        await posicion(va, a.id, aLas('08:00'), 9.00, -79.50);
+        await posicion(va, a.id, aLas('08:10'), 9.01, -79.50);
+        await posicion(va, a.id, aLas('08:20'), 9.02, -79.50);
+        // Unidad B, muy lejos: si se encadenara con A saldrían cientos de km.
+        await posicion(vb, b.id, aLas('08:05'), 7.00, -80.00);
+        await posicion(vb, b.id, aLas('08:15'), 7.01, -80.00);
+        // 23:00 en Panamá ya es el día siguiente en UTC, y sigue siendo del DIA.
+        await posicion(vb, b.id, aLas('23:00'), 7.02, -80.00);
+        // Del día anterior: no cuenta.
+        await posicion(va, a.id, aLas('23:00', '2033-03-14'), 8.00, -79.50);
+
+        const r = await s.ejecutivo(DIA);
+        expect(Number(r.kilometrosGps)).toBeCloseTo(4 * 1.106, 1);
+        expect(Number(r.unidadesConGps)).toBe(2);
+      });
+    });
+
+    it('odómetro: el de los viajes que CERRARON ese día, por su cierre real', async () => {
+      // Sin la app del conductor (Fase 2A) casi no llega GPS, y una tarjeta que
+      // dice 0 todos los días no informa de nada. El odómetro es la otra medida
+      // que el §10.1 reconoce, y la API la da aparte para que la pantalla diga
+      // cuál está enseñando.
+      const cerrar = (id: string, cuando: string) => gestor().query(
+        `UPDATE viajes SET fecha_cierre = $1 WHERE viaje_id = $2`, [cuando, id]);
+      await enContexto(async (s) => {
+        // Cerrado el DIA, aunque su fin PREVISTO fuera el día anterior.
+        const a = await viaje('cerrado', { fechaInicio: aLas('06:00', '2033-03-14'),
+                                           fechaFin: aLas('14:00', '2033-03-14'),
+                                           odometroInicial: 1000, odometroFinal: 1320 });
+        await cerrar(a.id, aLas('10:00'));
+        // Cerrado a las 21:30 del día anterior en Panamá, que son las 02:30 UTC
+        // del DIA: sin la zona se colaría.
+        const b = await viaje('cerrado', { fechaInicio: aLas('06:00', '2033-03-14'),
+                                           fechaFin: aLas('20:00', '2033-03-14'),
+                                           odometroInicial: 1000, odometroFinal: 1500 });
+        await cerrar(b.id, aLas('21:30', '2033-03-14'));
+        // Con fin previsto el DIA y odómetro, pero sin cerrar: no cuenta.
+        await viaje('pendiente_liquidacion', { fechaInicio: aLas('06:00'),
+                                               fechaFin: aLas('18:00'),
+                                               odometroInicial: 1000, odometroFinal: 1077 });
+        expect(Number((await s.ejecutivo(DIA)).kilometrosOdometro)).toBe(320);
+      });
+    });
+  });
+
+  it('gastos del día: aprobados y por aprobar, sin los rechazados ni otros días', async () => {
+    await enContexto(async (s) => {
+      const v = await viaje('transito_estacion');
+      await gasto(v.id, 25.5, 'aprobado');
+      await gasto(v.id, 14.5, 'pendiente');
+      await gasto(v.id, 100, 'rechazado');
+      await gasto(v.id, 70, 'aprobado', '2033-03-14');
+      await gasto(v.id, 9, 'pendiente', '2033-03-14');
+      const r = await s.ejecutivo(DIA);
+      expect(Number(r.gastosDelDia)).toBe(40);
+      expect(Number(r.gastosPorAprobar)).toBe(1);
+    });
+  });
+
+  it('conductores pendientes de pago: personas distintas, no liquidaciones', async () => {
+    await enContexto(async (s) => {
+      const repetido = await liquidacion('pendiente', 100);
+      await liquidacion('aprobada', 50, repetido);
+      await liquidacion('aprobada', 30);
+      await liquidacion('pagada', 999);
+      const r = await s.ejecutivo(DIA);
+      expect(Number(r.conductoresPendientesPago)).toBe(2);
+      expect(Number(r.montoPendientePago)).toBe(180);
+    });
+  });
+
+  it('alertas: críticas y altas sin resolver, cada una por su lado', async () => {
+    await enContexto(async (s) => {
+      await alerta('critica');
+      await alerta('critica', 'reconocida');
+      await alerta('critica', 'resuelta');
+      await alerta('alta');
+      await alerta('alta', 'resuelta');
+      await alerta('media');
+      const r = await s.ejecutivo(DIA);
+      expect(Number(r.alertasCriticas)).toBe(2);
+      expect(Number(r.alertasAltas)).toBe(1);
+    });
+  });
+
+  it('sin fecha usa HOY en Panamá, también cuando en UTC ya es mañana', async () => {
+    await enContexto(async (s) => {
+      // 21:00 del 15 en Panamá = 02:00 UTC del 16.
+      const r = await s.ejecutivo(undefined, new Date('2033-03-16T02:00:00Z'));
+      expect(r.fecha).toBe(DIA);
     });
   });
 });

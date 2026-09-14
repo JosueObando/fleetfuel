@@ -310,6 +310,40 @@ extremo ya está guardado—: calibración invertida, ventana invertida, odómet
 final menor, fin anterior al inicio y código de viaje repetido. El periodo vacío
 no daba un 500: se aceptaba en silencio, que es peor.
 
+### §15.1 · Dashboard ejecutivo — ✅ (2026-09-14)
+
+**No estaba en ninguna fase de este plan**, igual que la administración y
+`cargas_terminal`: la auditoría TDD del 14-09 lo encontró cruzando el §15 del PRD
+contra las casillas, no contra el código. `/` seguía llevando a Órdenes y los
+indicadores del §6.1 no estaban en ninguna pantalla.
+
+`/operacion/panel`, primero del menú: las ocho tarjetas de un día (`?fecha=`),
+de `GET /informes/ejecutivo` —una consulta, como el resto de informes—, con
+enlace a donde se actúa (órdenes, despacho, gastos, liquidaciones, alertas).
+Sin fecha se actualiza cada minuto (§23) y, si un refresco falla, conserva el
+último dato con su hora.
+
+Lo que cada número NO dice solo, y la pantalla sí:
+
+- **El día es el de Panamá**, no el de UTC: la base corre en UTC y a partir de
+  las 19:00 el panel habría enseñado el día siguiente. Los `timestamptz` se
+  pasan a `America/Panama` antes de truncar.
+- **Kilómetros: GPS u odómetro, nunca la suma.** Sin la app 2A casi no llega
+  GPS; sin unidades con GPS se enseña el odómetro de los viajes cerrados ese
+  día y la tarjeta lo dice. Por `fecha_cierre`, **no por `fecha_fin`**: fuera
+  de «cerrado» el fin es el PREVISTO, y al cerrar se conserva si ya existía.
+- **«Gastos del día», no «costos del día»**: sin combustible del cabezal,
+  mantenimiento ni depreciación.
+- **El margen promedio es «—»** y dice que espera el motor de costos.
+- **Las alertas altas no desaparecen** cuando no hay críticas (en desarrollo:
+  0 críticas y 2 altas abiertas).
+
+De paso: `?fecha=luna` en el informe operativo y `?desde=`/`?hasta=` en el de
+volumen daban **500** (22007 de Postgres). `FechaDeConsultaPipe` los convierte
+en 400, también el 30 de febrero.
+
+Queda del §15.1: el margen, con la Fase 3.
+
 ### §15.3 · Planificador de viajes — ✅ (2026-09-14)
 
 `/operacion/planificador`: una semana en `?desde=`, una fila por cisterna

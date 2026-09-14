@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { SIN_SALIR_SQL } from '../viajes/estados';
+import { EN_RUTA_SQL, SIN_SALIR_SQL } from '../viajes/estados';
 import { gestor } from '../../common/contexto/contexto-peticion';
 
 /**
@@ -25,6 +25,12 @@ import { gestor } from '../../common/contexto/contexto-peticion';
  * sitios distintos acaban dando números distintos. La RLS aplica igual dentro
  * de las agregaciones, así que cada empresa ve las suyas sin que nadie lo pida.
  */
+/** La zona de la operación. Hoy una sola empresa y un solo país (§4). */
+const ZONA = 'America/Panama';
+
+/** Una orden en estos estados ya no está activa: de aquí no se sale (§8.1). */
+const ORDEN_TERMINAL_SQL = `'cerrada', 'rechazada', 'cancelada'`;
+
 @Injectable()
 export class InformesService {
   /** §14.1 · La foto operativa de un día: qué hay programado y en qué estado. */
@@ -36,8 +42,7 @@ export class InformesService {
            WHERE fecha_programada::date = dia.d AND estado <> 'cancelado')
            AS "viajesProgramados",
          (SELECT count(*) FROM viajes
-           WHERE estado IN ('desplazamiento_terminal','espera_carga','cargando','cargado',
-                            'transito_estacion','descargando','retornando'))
+           WHERE estado IN (${EN_RUTA_SQL}))
            AS "cisternasEnRuta",
          (SELECT count(*) FROM cisternas c
            WHERE c.eliminado_en IS NULL
@@ -140,5 +145,88 @@ export class InformesService {
         WHERE v.estado = 'cerrado' AND v.odometro_final IS NOT NULL
         ORDER BY v.fecha_fin DESC NULLS LAST
         LIMIT least($1::int, 500)`, [limite]);
+  }
+
+  /**
+   * §15.1 · Las tarjetas superiores del dashboard ejecutivo.
+   *
+   * EL DÍA ES EL DE PANAMÁ
+   *
+   * La base corre en UTC. Con `current_date` o `::date` a secas, una descarga a
+   * las 22:00 de Panamá cuenta para el día siguiente, y a partir de las siete
+   * de la tarde el panel enseñaría un día casi vacío. Los instantes
+   * (`timestamptz`) se pasan a la hora local antes de truncar; `gastos_viaje.fecha`
+   * ya es un `date` de calendario y se compara tal cual.
+   *
+   * LO QUE NO ESTÁ
+   *
+   * El «margen promedio» del §15.1. Necesita ingreso y costo completo —combustible
+   * del cabezal, mantenimiento, depreciación—, que son la Fase 3. Por lo mismo
+   * `gastosDelDia` se llama así y no «costos»: son los gastos de viaje
+   * registrados, no el costo del día.
+   *
+   * KILÓMETROS: DOS MEDIDAS, NO UNA MEZCLA
+   *
+   * Los del GPS son los recorridos DE VERDAD ese día (tramos entre posiciones
+   * consecutivas de cada unidad). Sin la app del conductor (2A) casi no llega
+   * GPS, así que también va el odómetro de los viajes que cerraron ese día.
+   * Sumarlos sería contar dos veces; se dan aparte y la pantalla dice cuál enseña.
+   */
+  async ejecutivo(fecha?: string, ahora: Date = new Date()) {
+    const [fila] = await gestor().query(
+      `WITH dia AS (
+         -- «ahora» llega de fuera y no es now() para que «hoy» se pueda
+         -- probar a las 21:00 de Panamá, que es cuando UTC ya va por mañana.
+         SELECT coalesce($1::date, ($2::timestamptz AT TIME ZONE '${ZONA}')::date) AS d
+       ),
+       tramos AS (
+         SELECT p.vehiculo_id,
+                ST_Distance(p.ubicacion,
+                  lag(p.ubicacion) OVER (PARTITION BY p.vehiculo_id ORDER BY p.fecha_hora)) AS m
+           FROM posiciones_gps p, dia
+          -- El rango sobre la columna, y no truncar la columna, para que la poda
+          -- de particiones por mes siga funcionando.
+          WHERE p.fecha_hora >= (dia.d::timestamp AT TIME ZONE '${ZONA}')
+            AND p.fecha_hora <  ((dia.d + 1)::timestamp AT TIME ZONE '${ZONA}')
+       )
+       SELECT
+         to_char(dia.d, 'YYYY-MM-DD') AS fecha,
+         (SELECT count(*) FROM ordenes_abastecimiento
+           WHERE eliminado_en IS NULL AND estado NOT IN (${ORDEN_TERMINAL_SQL}))
+           AS "ordenesActivas",
+         (SELECT count(*) FROM viajes WHERE estado IN (${EN_RUTA_SQL}))
+           AS "viajesEnCurso",
+         (SELECT coalesce(sum(volumen_recibido), 0) FROM entregas
+           WHERE estado <> 'rechazada'
+             AND (fecha_descarga AT TIME ZONE '${ZONA}')::date = dia.d)
+           AS "volumenEntregado",
+         (SELECT coalesce(round((sum(m) / 1000)::numeric, 3), 0) FROM tramos)
+           AS "kilometrosGps",
+         (SELECT count(DISTINCT vehiculo_id) FROM tramos) AS "unidadesConGps",
+         -- Por fecha_cierre y NO por fecha_fin: fuera de «cerrado» el fin es
+         -- el PREVISTO, y al cerrar se conserva si ya estaba puesto. Contar por
+         -- él pondría los kilómetros en el día planificado, no en el real.
+         (SELECT coalesce(sum(odometro_final - odometro_inicial), 0) FROM viajes
+           WHERE odometro_final IS NOT NULL
+             AND (fecha_cierre AT TIME ZONE '${ZONA}')::date = dia.d)
+           AS "kilometrosOdometro",
+         (SELECT coalesce(sum(monto), 0) FROM gastos_viaje
+           WHERE fecha = dia.d AND estado <> 'rechazado')
+           AS "gastosDelDia",
+         (SELECT count(*) FROM gastos_viaje
+           WHERE fecha = dia.d AND estado = 'pendiente')
+           AS "gastosPorAprobar",
+         (SELECT count(DISTINCT conductor_id) FROM liquidaciones_conductor
+           WHERE estado <> 'pagada')
+           AS "conductoresPendientesPago",
+         (SELECT coalesce(sum(total_pagar), 0) FROM liquidaciones_conductor
+           WHERE estado <> 'pagada')
+           AS "montoPendientePago",
+         (SELECT count(*) FROM alertas WHERE severidad = 'critica' AND estado <> 'resuelta')
+           AS "alertasCriticas",
+         (SELECT count(*) FROM alertas WHERE severidad = 'alta' AND estado <> 'resuelta')
+           AS "alertasAltas"
+       FROM dia`, [fecha ?? null, ahora.toISOString()]);
+    return fila;
   }
 }
