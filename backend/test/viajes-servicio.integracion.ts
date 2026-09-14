@@ -659,6 +659,23 @@ describe('autorizar · la separación entre quien planifica y quien deja salir',
       expect(String(v.autorizadoPor)).toBe(usuario);
     });
   });
+
+  it('autorizar mueve también a sus órdenes: planificada → asignada', async () => {
+    /* `autorizar` NO pasa por `cambiarEstado` —es su propia acción, con su
+       propio permiso—, así que la sincronización del estado de la orden no le
+       llegaba. Lo encontró el recorrido de navegador de 1B, el mismo día: viaje
+       autorizado, orden todavía «planificada». Las pruebas de la sincronización
+       sólo cambiaban el estado por `cambiarEstado`. */
+    await enServicio(async s => {
+      const { gestor } = await import('../src/common/contexto/contexto-peticion');
+      const estadoDeLaOrden = async () => (await gestor().query(
+        `SELECT estado FROM ordenes_abastecimiento WHERE orden_id = $1`, [orden]))[0].estado;
+      const id = await viajeCompleto(s, 'programado');
+      expect(await estadoDeLaOrden()).toBe('planificada');
+      await s.autorizar(id);
+      expect(await estadoDeLaOrden()).toBe('asignada');
+    });
+  });
 });
 
 /**

@@ -268,6 +268,9 @@ export class ViajesService {
     await gestor().query(
       `UPDATE viajes SET estado = 'autorizado', autorizado_por = $2, actualizado_en = now()
         WHERE viaje_id = $1`, [id, ctx.usuarioId]);
+    // Autorizar es un cambio de estado que NO pasa por `cambiarEstado`: sin esta
+    // línea sus órdenes seguían «planificadas» con el viaje ya autorizado.
+    await sincronizarEstadoDeOrdenes(await ordenesDelViaje(id));
     auditar({
       entidad: 'viajes', entidadId: String(id),
       valorAnterior: { estado: 'programado' },

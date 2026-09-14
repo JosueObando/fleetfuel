@@ -92,6 +92,13 @@ await paso('alta de orden con una línea de producto', async () => {
      estaciones por cliente porque la API lo exige, así que un cliente sin
      estaciones deja el segundo desplegable vacío. */
   let cliente = null;
+  /* Se espera a que el desplegable TENGA clientes antes de recorrerlo, como
+     en el recorrido de 1C. Sin esto el bucle encuentra la lista vacía —la
+     petición todavía va en camino—, no entra ni una vez y acusa de «ningún
+     cliente tiene estaciones» a una base que sí las tiene. Pasó el 2026-09-14:
+     primera ejecución en verde, segunda en rojo, mismo código. */
+  await pag.getByLabel('Cliente').locator('option:not([value=""])').first()
+           .waitFor({ state: 'attached', timeout: 15000 });
   const opcionesEstacion = pag.getByLabel('Estación').locator('option:not([value=""])');
   for (const o of await pag.getByLabel('Cliente').locator('option').all()) {
     const v = await o.getAttribute('value');
