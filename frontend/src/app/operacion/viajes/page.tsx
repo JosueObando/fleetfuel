@@ -57,7 +57,9 @@ export default function Viajes() {
   useEffect(() => {
     void api.listar<Fila>('/cisternas').then(setCisternas).catch(() => undefined);
     void api.listar<Fila>('/conductores').then(setConductores).catch(() => undefined);
-    void api.listar<Fila>('/ordenes?estado=validada').then(setOrdenes).catch(() => undefined);
+    /* Las ASIGNABLES, según la API: validadas y también planificadas con volumen
+       por planificar, porque una orden se reparte en varios viajes (§6.2). */
+    void api.listar<Fila>('/ordenes?asignables=true').then(setOrdenes).catch(() => undefined);
   }, []);
 
   /* Los compartimentos son los de LA cisterna del viaje seleccionado: la API
@@ -345,7 +347,7 @@ function AsignarOrden({ ordenes, yaAsignadas, onAsignar }: {
 
   return (
     <div className={estilos.formLinea}>
-      <Campo etiqueta="Orden validada" valor={ordenId} onCambio={setOrdenId}
+      <Campo etiqueta="Orden por asignar" valor={ordenId} onCambio={setOrdenId}
              opciones={disponibles.map(o => ({
                valor: String(o.id),
                etiqueta: `${o.numeroOrdenExterna ?? '#' + o.id} · ${o.estacion}`,

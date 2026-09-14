@@ -8,7 +8,9 @@ export class OrdenesController {
   constructor(private readonly ordenes: OrdenesService) {}
 
   @Get() @RequierePermisos('ordenes:leer')
-  listar(@Query('estado') estado?: string) { return this.ordenes.listar(estado); }
+  listar(@Query('estado') estado?: string, @Query('asignables') asignables?: string) {
+    return this.ordenes.listar(estado, asignables === 'true');
+  }
 
   @Get(':id') @RequierePermisos('ordenes:leer')
   obtener(@Param('id') id: string) { return this.ordenes.obtener(id); }

@@ -493,6 +493,22 @@ describe('rechazar · la estación no acepta la carga', () => {
     });
   });
 
+  it('el estado de la ORDEN sigue a lo entregado: parcial al registrar, en tránsito al rechazar', async () => {
+    // §9 etapa 7: con la entrega, «la orden pasa a Entregada o Entrega parcial».
+    // Y al revés: rechazada la única entrega, la orden no está entregada en
+    // parte — vuelve al momento de su viaje, que sigue descargando.
+    await enServicio(async (s) => {
+      const estadoDeLaOrden = async () => (await gestor().query(
+        `SELECT estado FROM ordenes_abastecimiento WHERE orden_id = $1`, [orden]))[0].estado;
+      const viaje = await viajeDescargando(3000);
+      const e = await s.registrar(viaje, entregaBase({ volumenRecibido: 2800 }));
+      expect(await estadoDeLaOrden()).toBe('entrega_parcial');
+
+      await s.rechazar(String(e.id), { motivo: 'Sello roto a la llegada' });
+      expect(await estadoDeLaOrden()).toBe('en_transito');
+    });
+  });
+
   it('deja constancia de quién rechazó y por qué', async () => {
     await enServicio(async (s) => {
       const viaje = await viajeDescargando(3000);

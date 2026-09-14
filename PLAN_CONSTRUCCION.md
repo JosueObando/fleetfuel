@@ -285,14 +285,19 @@ editar y al mirar los datos de desarrollo con una sonda de navegador:
   (`ck_viajes_periodo_no_vacio`, `NOT VALID`: los existentes no se reescriben,
   pero cualquier escritura nueva tiene que dejar duración) y «Fin previsto»
   significa ahora el ÚLTIMO día ocupado (`viajes/fechas.ts`).
-- **El estado de la orden no sigue al de su viaje — ABIERTO.** Las únicas
-  escrituras sobre `ordenes_abastecimiento.estado` son manuales: hay 28 órdenes
-  «validada» dentro de viajes, 10 de ellos CERRADOS. Mitigado para lo que se
-  construyó —una orden en un viaje que ya salió no admite edición—, pero el
-  §8.1 sigue sin moverse solo, y `asignarOrden` acepta una «validada» que ya se
-  entregó en otro viaje (lo acota `ck_detalles_planificado_cabe`, no el estado).
-  Sincronizar las dos máquinas es un diseño propio: qué transición del viaje
-  mueve cada estado de la orden, y qué pasa con las entregas parciales.
+- **El estado de la orden no seguía al de su viaje — CERRADO el mismo día.**
+  Las únicas escrituras del estado eran manuales: 28 órdenes «validada» dentro
+  de viajes, 10 de ellos cerrados. Ahora `ordenes/estado-derivado.ts` lo deduce
+  de HECHOS tras cada uno que lo mueve (asignar, cambiar el estado del viaje,
+  registrar o rechazar una entrega), con la regla del PRD: lo entregado manda
+  (§9 etapa 7, regla 20); si no, el viaje vivo más avanzado (etapa 2 y
+  §6.2); sin ninguno, vuelve a «validada». Los estados que decide una persona
+  no se tocan, y cada cambio se audita. Queda pendiente: la pantalla de
+  órdenes aún OFRECE transiciones manuales entre estados que ahora mueve el
+  sistema (planificada → asignada…), y la siguiente sincronización las pisa.
+  Recortar `FLUJO_ORDEN` a las humanas es la tanda siguiente. Las órdenes ya
+  existentes se sincronizan con el próximo hecho de su viaje: no hay migración
+  de relleno.
 - **Los días son UTC — ABIERTO, de diseño.** «Programado para el 1 de marzo»
   se guarda como el 1 de marzo a las 00:00 UTC, que en Panamá son las 19:00 del
   28 de febrero. Es coherente en toda la aplicación y por eso nadie lo ve, pero

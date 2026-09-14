@@ -1,8 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { auditar, contextoActual, gestor } from '../../common/contexto/contexto-peticion';
 import { CrearOrdenDto, ActualizarOrdenDto, CambiarEstadoOrdenDto } from './dto/ordenes.dto';
-import { ADMITEN_EDICION, FLUJO_ORDEN, EXIGEN_MOTIVO } from './estados';
-import { PLANIFICABLE } from '../viajes/estados';
+import { ADMITEN_EDICION, ADMITEN_VIAJE, FLUJO_ORDEN, EXIGEN_MOTIVO } from './estados';
 
 const CAMPOS = `o.orden_id AS id, o.numero_orden_externa AS "numeroOrdenExterna",
                 o.cliente_id AS "clienteId", c.nombre AS cliente,
@@ -10,18 +9,7 @@ const CAMPOS = `o.orden_id AS id, o.numero_orden_externa AS "numeroOrdenExterna"
                 o.fecha_orden AS "fechaOrden", o.fecha_requerida AS "fechaRequerida",
                 o.ventana_inicio AS "ventanaInicio", o.ventana_fin AS "ventanaFin",
                 o.prioridad, o.estado, o.volumen_total AS "volumenTotal",
-                o.observaciones, o.fuente,
-                EXISTS (SELECT 1 FROM viaje_ordenes vo JOIN viajes v ON v.viaje_id = vo.viaje_id
-                         WHERE vo.orden_id = o.orden_id
-                           AND v.estado NOT IN (${[...PLANIFICABLE, 'cancelado'].map(e => `'${e}'`).join(', ')})
-                       ) AS "enViajeQueSalio"`;
-
-/* El estado de la orden NO avanza solo cuando avanza su viaje (§8.1 y §8.2 no
-   están sincronizadas todavía): hay órdenes «validada» dentro de viajes
-   cerrados. Por eso admitir edición mira las dos cosas. `enViajeQueSalio` se
-   calcula en la consulta y no viaja en la respuesta: es un paso intermedio. */
-const admiteEdicion = (f: { estado: string; enViajeQueSalio: boolean }) =>
-  ADMITEN_EDICION.has(f.estado) && !f.enViajeQueSalio;
+                o.observaciones, o.fuente`;
 
 const DESDE = `FROM ordenes_abastecimiento o
                  JOIN clientes c ON c.cliente_id = o.cliente_id
@@ -43,14 +31,20 @@ export class OrdenesService {
      botones pintar —una petición por fila— o duplicar la máquina de estados
      en el cliente, que es peor: dos copias que divergen en cuanto cambie el
      flujo. Se calcula aquí, donde vive la única definición. */
-  async listar(estado?: string) {
+  async listar(estado?: string, soloAsignables = false) {
+    /* `soloAsignables`: las que se pueden meter en un viaje —con la misma lista
+       de estados que `asignarOrden`— y que aún tienen volumen por planificar.
+       Una planificada ENTERA no tiene nada más que llevar. */
     const filas = await gestor().query(
       `SELECT ${CAMPOS} ${DESDE}
         WHERE o.eliminado_en IS NULL AND ($1::text IS NULL OR o.estado = $1)
-        ORDER BY o.fecha_requerida NULLS LAST, o.orden_id DESC`, [estado ?? null]);
-    return filas.map(({ enViajeQueSalio, ...f }: { estado: string; enViajeQueSalio: boolean }) => ({
+          AND (NOT $2::boolean OR (o.estado = ANY($3::text[])
+               AND EXISTS (SELECT 1 FROM detalles_orden d
+                            WHERE d.orden_id = o.orden_id AND d.volumen_planificado < d.volumen_solicitado)))
+        ORDER BY o.fecha_requerida NULLS LAST, o.orden_id DESC`, [estado ?? null, soloAsignables, ADMITEN_VIAJE]);
+    return filas.map((f: { estado: string }) => ({
       ...f, transicionesPosibles: FLUJO_ORDEN[f.estado] ?? [],
-      admiteEdicion: admiteEdicion({ ...f, enViajeQueSalio }),
+      admiteEdicion: ADMITEN_EDICION.has(f.estado),
     }));
   }
 
@@ -68,8 +62,7 @@ export class OrdenesService {
     /* Transiciones legales y si admite edición: la interfaz no tiene que
        replicar ninguna de las dos reglas. */
     orden.transicionesPosibles = FLUJO_ORDEN[orden.estado] ?? [];
-    orden.admiteEdicion = admiteEdicion(orden);
-    delete orden.enViajeQueSalio;
+    orden.admiteEdicion = ADMITEN_EDICION.has(orden.estado);
     return orden;
   }
 
@@ -108,9 +101,8 @@ export class OrdenesService {
   async actualizar(id: string, dto: ActualizarOrdenDto) {
     const antes = await this.obtener(id);
     if (!antes.admiteEdicion)
-      throw new ConflictException(ADMITEN_EDICION.has(antes.estado)
-        ? 'La orden va en un viaje que ya salió: no admite cambios de programación'
-        : `Una orden en estado "${antes.estado}" ya no admite cambios de programación`);
+      throw new ConflictException(
+        `Una orden en estado "${antes.estado}" ya no admite cambios de programación`);
 
     const columnas: Record<string, unknown> = {
       fecha_requerida: dto.fechaRequerida, ventana_inicio: dto.ventanaInicio,

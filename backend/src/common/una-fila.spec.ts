@@ -1,4 +1,4 @@
-import { unaFila } from './una-fila';
+import { filasDe, unaFila } from './una-fila';
 
 /*
  * TypeORM devuelve dos formas distintas según la sentencia, y el fallo que
@@ -30,5 +30,22 @@ describe('unaFila', () => {
     // hacer con eso; lo que no puede es explotar aquí.
     expect(unaFila([[], 0])).toBeUndefined();
     expect(unaFila([])).toBeUndefined();
+  });
+});
+
+describe('filasDe', () => {
+  // El mismo problema que `unaFila`, cuando hacen falta TODAS: sincronizar el
+  // estado de las órdenes audita cada fila que cambió, y leyendo el par
+  // [filas, contador] como filas auditó dos cambios de «undefined».
+  it('INSERT … RETURNING: las filas tal cual', () => {
+    expect(filasDe([{ id: 1 }, { id: 2 }])).toEqual([{ id: 1 }, { id: 2 }]);
+  });
+
+  it('UPDATE … RETURNING: las filas, no el par con el contador', () => {
+    expect(filasDe([[{ id: 1 }, { id: 2 }], 2])).toEqual([{ id: 1 }, { id: 2 }]);
+  });
+
+  it('un UPDATE que no afectó a nada: lista vacía', () => {
+    expect(filasDe([[], 0])).toEqual([]);
   });
 });

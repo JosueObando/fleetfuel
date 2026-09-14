@@ -264,7 +264,7 @@ await paso('armar el viaje con su plan de carga y autorizarlo', async () => {
   await pag.getByRole('button', { name: 'Crear', exact: true }).click();
   await pag.getByRole('heading', { name: `E2E-1C-${sello}` }).waitFor({ timeout: 10000 });
 
-  const selOrden = pag.getByLabel('Orden validada');
+  const selOrden = pag.getByLabel('Orden por asignar');
   await selOrden.waitFor({ timeout: 10000 });
   await elegirQueContenga(selOrden, `E2E1C-${sello}`);
   await pag.getByRole('button', { name: /Asignar orden/ }).click();

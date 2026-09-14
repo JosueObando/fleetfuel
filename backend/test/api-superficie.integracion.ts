@@ -211,6 +211,9 @@ describe('órdenes y viajes, ruta por ruta', () => {
     }), [201])).body;
 
     await ruta('GET /ordenes', api().get('/api/ordenes').set(cab()), [200]);
+    // `?asignables=true` llega al servicio: una recibida no se ofrece a un viaje.
+    const asignables = await api().get('/api/ordenes?asignables=true').set(cab()).expect(200);
+    expect(asignables.body.map((o: { id: unknown }) => String(o.id))).not.toContain(String(orden.id));
     await ruta('GET /ordenes/:id', api().get(`/api/ordenes/${orden.id}`).set(cab()), [200]);
     await ruta('PATCH /ordenes/:id',
       api().patch(`/api/ordenes/${orden.id}`).set(cab()).send({ prioridad: 'alta' }), [200]);

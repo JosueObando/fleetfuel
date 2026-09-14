@@ -278,6 +278,10 @@ describe('asignar órdenes y armar el plan de carga', () => {
                   capacidadCalibrada: '4980', volumenPlanificado: '3000' }],
   });
 
+  /* Se piden las ASIGNABLES y no `?estado=validada`: desde que el estado de la
+     orden sigue a su viaje, una orden repartida en varios viajes (§6.2) está
+     «planificada» y con la lista de validadas desaparecía del desplegable. Qué
+     es asignable lo decide la API con la misma regla que `asignarOrden`. */
   it('asignar una orden validada usa la ruta del viaje', async () => {
     const usuario = userEvent.setup();
     api.obtener.mockImplementation(async (r: string) =>
@@ -285,7 +289,7 @@ describe('asignar órdenes y armar el plan de carga', () => {
       : { id: '5', numeroOrdenExterna: 'EXT-1', detalles: [{ id: 'd1', producto: 'Diésel' }] });
     api.listar.mockImplementation((r: string) =>
       Promise.resolve(r === '/viajes' ? LISTA
-        : r === '/ordenes?estado=validada' ? [{ id: '9', numeroOrdenExterna: 'EXT-9' }] : []));
+        : r === '/ordenes?asignables=true' ? [{ id: '9', numeroOrdenExterna: 'EXT-9' }] : []));
     render(<Viajes />);
     await abrirViaje(usuario);
 
@@ -294,7 +298,7 @@ describe('asignar órdenes y armar el plan de carga', () => {
     const boton = await screen.findByRole('button', { name: /Asignar orden/ });
     expect(boton).toBeDisabled();
 
-    await usuario.selectOptions(screen.getByRole('combobox', { name: /Orden validada/ }), '9');
+    await usuario.selectOptions(screen.getByRole('combobox', { name: /Orden por asignar/ }), '9');
     expect(screen.getByRole('button', { name: /Asignar orden/ })).not.toBeDisabled();
     await usuario.click(screen.getByRole('button', { name: /Asignar orden/ }));
 
@@ -312,12 +316,12 @@ describe('asignar órdenes y armar el plan de carga', () => {
       : { id: '5', numeroOrdenExterna: 'EXT-1', detalles: [{ id: 'd1', producto: 'Diésel' }] });
     api.listar.mockImplementation((r: string) =>
       Promise.resolve(r === '/viajes' ? LISTA
-        : r === '/ordenes?estado=validada' ? [{ id: '5', numeroOrdenExterna: 'EXT-1' }] : []));
+        : r === '/ordenes?asignables=true' ? [{ id: '5', numeroOrdenExterna: 'EXT-1' }] : []));
     render(<Viajes />);
     await abrirViaje(usuario);
 
     await screen.findByRole('button', { name: /Quitar/ });
-    expect(screen.queryByRole('combobox', { name: /Orden validada/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: /Orden por asignar/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Asignar orden/ })).not.toBeInTheDocument();
   }, 30_000);
 

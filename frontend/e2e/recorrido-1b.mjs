@@ -150,7 +150,7 @@ await paso('alta de viaje con cisterna y conductor', async () => {
 
 console.log('\n── 5 · Asignar la orden al viaje ──');
 await paso('asignar la orden validada', async () => {
-  const sel = pag.getByLabel('Orden validada');
+  const sel = pag.getByLabel('Orden por asignar');
   await sel.waitFor({ timeout:10000 });
   await elegirQueContenga(sel, `E2E-${sello}`);
   await pag.getByRole('button', { name:/Asignar orden/ }).click();

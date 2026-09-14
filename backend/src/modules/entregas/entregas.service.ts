@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { auditar, contextoActual, gestor } from '../../common/contexto/contexto-peticion';
+import { sincronizarEstadoDeOrdenes } from '../ordenes/estado-derivado';
 import { RegistrarEntregaDto, AprobarEntregaDto, RechazarEntregaDto } from './dto/entregas.dto';
 
 const CAMPOS = `e.entrega_id AS id, e.viaje_id AS "viajeId", e.orden_id AS "ordenId",
@@ -159,6 +160,8 @@ export class EntregasService {
     } catch (e) {
       traducir(e);
     }
+    // §9 etapa 7: con lo entregado, la orden pasa a «Entregada» o «Entrega parcial».
+    await sincronizarEstadoDeOrdenes([detalle.orden_id]);
 
     auditar({
       entidad: 'entregas', entidadId: String(creada.id),
@@ -218,6 +221,8 @@ export class EntregasService {
           SET estado = 'rechazada', aprobada_por = $2, aprobada_en = now(),
               motivo_aprobacion = $3, actualizado_en = now()
         WHERE entrega_id = $1`, [id, ctx.usuarioId, dto.motivo]);
+    // El volumen devuelto puede sacar a la orden de «Entregada».
+    await sincronizarEstadoDeOrdenes([antes.ordenId]);
 
     auditar({
       entidad: 'entregas', entidadId: String(id), motivo: dto.motivo,

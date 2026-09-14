@@ -22,8 +22,12 @@
  * servicio.
  */
 export function unaFila<T = Record<string, unknown>>(resultado: unknown): T {
-  const filas = Array.isArray(resultado) && Array.isArray(resultado[0])
+  return filasDe<T>(resultado)?.[0];
+}
+
+/** Todas las filas de un `RETURNING`, con la misma normalización que `unaFila`. */
+export function filasDe<T = Record<string, unknown>>(resultado: unknown): T[] {
+  return Array.isArray(resultado) && Array.isArray(resultado[0])
     ? (resultado[0] as T[])
     : (resultado as T[]);
-  return filas?.[0];
 }

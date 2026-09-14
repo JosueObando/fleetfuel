@@ -4,6 +4,8 @@ import {
   CrearViajeDto, ActualizarViajeDto, CambiarEstadoViajeDto, AsignarOrdenDto, LineaPlanDto,
 } from './dto/viajes.dto';
 import { FLUJO_VIAJE, EN_MARCHA, PLANIFICABLE, SIN_SALIR_SQL } from './estados';
+import { ordenesDelViaje, sincronizarEstadoDeOrdenes } from '../ordenes/estado-derivado';
+import { ADMITEN_VIAJE } from '../ordenes/estados';
 
 const CAMPOS = `v.viaje_id AS id, v.codigo_viaje AS "codigoViaje", v.tipo_viaje AS "tipoViaje",
                 v.cabezal_id AS "cabezalId", v.cisterna_id AS "cisternaId",
@@ -226,6 +228,9 @@ export class ViajesService {
           WHERE viaje_id = $1`, [id, dto.estado, dto.motivo ?? null]);
     } catch (e) { traducirRestricciones(e); }
 
+    // El momento del viaje mueve el de sus órdenes (§8.1 ↔ §8.2).
+    await sincronizarEstadoDeOrdenes(await ordenesDelViaje(id));
+
     auditar({
       entidad: 'viajes', entidadId: String(id),
       valorAnterior: { estado: antes.estado },
@@ -282,7 +287,7 @@ export class ViajesService {
       `SELECT estado FROM ordenes_abastecimiento
         WHERE orden_id = $1 AND eliminado_en IS NULL`, [dto.ordenId]);
     if (!orden) throw new BadRequestException('La orden indicada no existe');
-    if (!['validada', 'planificada', 'asignada'].includes(orden.estado))
+    if (!ADMITEN_VIAJE.includes(orden.estado))
       throw new ConflictException(
         `Una orden "${orden.estado}" no se puede asignar a un viaje; debe estar validada`);
 
@@ -297,6 +302,8 @@ export class ViajesService {
       throw e;
     }
     auditar({ entidad: 'viaje_ordenes', entidadId: String(viajeId), valorNuevo: { ...dto } });
+    // §9 etapa 2: con el viaje creado y la orden dentro, «la orden pasa a Planificada».
+    await sincronizarEstadoDeOrdenes([dto.ordenId]);
     return this.obtener(viajeId);
   }
 

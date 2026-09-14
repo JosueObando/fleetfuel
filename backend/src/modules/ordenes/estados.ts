@@ -34,3 +34,10 @@ export const EXIGEN_MOTIVO = new Set(['rechazada', 'cancelada', 'suspendida', 'c
  * armados sobre esos datos. Se cancela y se rehace.
  */
 export const ADMITEN_EDICION = new Set(['recibida', 'validada', 'suspendida']);
+
+/**
+ * Estados en los que una orden se puede asignar a un viaje. «Planificada» y
+ * «asignada» también: una orden se divide en varios viajes (§6.2). Lo usan
+ * `asignarOrden` y la lista de asignables que pide la pantalla de viajes.
+ */
+export const ADMITEN_VIAJE = ['validada', 'planificada', 'asignada'];
