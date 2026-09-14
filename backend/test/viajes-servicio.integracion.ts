@@ -347,7 +347,7 @@ describe('actualizar · lo que la base rechaza llega como error de negocio, no c
       const id = await viajeCompleto(s, 'programado');
       const intento = s.actualizar(id, { fechaFin: '2027-02-01T08:00:00Z' } as never);
       await expect(intento).rejects.toBeInstanceOf(BadRequestException);
-      await expect(intento).rejects.toThrow('El fin previsto no puede ser anterior al inicio del viaje');
+      await expect(intento).rejects.toThrow('El fin previsto tiene que ser posterior al inicio del viaje');
     });
   });
 
@@ -358,7 +358,7 @@ describe('actualizar · lo que la base rechaza llega como error de negocio, no c
         fechaProgramada: '2027-03-01T08:00:00Z', fechaFin: '2027-02-01T08:00:00Z',
       });
       await expect(intento).rejects.toBeInstanceOf(BadRequestException);
-      await expect(intento).rejects.toThrow('El fin previsto no puede ser anterior al inicio del viaje');
+      await expect(intento).rejects.toThrow('El fin previsto tiene que ser posterior al inicio del viaje');
     });
   });
 
@@ -371,7 +371,43 @@ describe('actualizar · lo que la base rechaza llega como error de negocio, no c
         `UPDATE viajes SET estado = 'cargando', fecha_inicio = '2027-03-02T08:00:00Z' WHERE viaje_id = $1`, [id]);
       const intento = s.actualizar(id, { fechaFin: '2027-03-01T20:00:00Z' } as never);
       await expect(intento).rejects.toBeInstanceOf(BadRequestException);
-      await expect(intento).rejects.toThrow('El fin previsto no puede ser anterior al inicio del viaje');
+      await expect(intento).rejects.toThrow('El fin previsto tiene que ser posterior al inicio del viaje');
+    });
+  });
+
+  /* Un fin IGUAL al inicio no es un error de tipeo inofensivo: `periodo` sale
+     VACÍO, y un rango vacío no se solapa con nada. Un viaje así no reserva su
+     cisterna ni su conductor, y la exclusión del §5.1 deja programar otro
+     encima. En desarrollo, 16 de 29 viajes estaban así —los recorridos crean
+     viajes de un día con el mismo día en los dos campos—. */
+  it('un fin IGUAL al inicio, al crear: el viaje no reservaría nada', async () => {
+    await enServicio(async s => {
+      const intento = s.crear({
+        codigoViaje: `VAC-${Math.random().toString(36).slice(2, 9)}`, cisternaId: cisterna,
+        fechaProgramada: '2027-03-01T08:00:00Z', fechaFin: '2027-03-01T08:00:00Z',
+      });
+      await expect(intento).rejects.toBeInstanceOf(BadRequestException);
+      await expect(intento).rejects.toThrow('El fin previsto tiene que ser posterior al inicio del viaje');
+    });
+  });
+
+  it('y al editar, igualando el fin a la fecha programada', async () => {
+    await enServicio(async s => {
+      const id = await viajeCompleto(s, 'programado');
+      const intento = s.actualizar(id, { fechaFin: '2027-03-01T08:00:00Z' } as never);
+      await expect(intento).rejects.toBeInstanceOf(BadRequestException);
+      await expect(intento).rejects.toThrow('El fin previsto tiene que ser posterior al inicio del viaje');
+    });
+  });
+
+  it('con un fin posterior, el viaje SÍ ocupa su cisterna: otro encima choca', async () => {
+    // La positiva: que la regla no se quede en rechazar, sino que lo que pasa
+    // la exclusión de verdad reserve.
+    await enServicio(async s => {
+      const base = { cisternaId: cisterna, fechaProgramada: '2029-06-01T00:00:00Z', fechaFin: '2029-06-02T00:00:00Z' };
+      await s.crear({ codigoViaje: `OCU-${Math.random().toString(36).slice(2, 9)}`, ...base });
+      await expect(s.crear({ codigoViaje: `OCU-${Math.random().toString(36).slice(2, 9)}`, ...base }))
+        .rejects.toThrow('La cisterna ya tiene otro viaje que se superpone en esas fechas');
     });
   });
 

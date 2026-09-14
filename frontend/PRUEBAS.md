@@ -34,6 +34,7 @@ El entorno es **jsdom** y no node: lo que se prueba aquí —`localStorage`,
 | `operacion/viajes` | Que **autorizar** sea una acción aparte del §7, no una transición más; y que un viaje en marcha deje anotar el **odómetro** mandando sólo el odómetro |
 | `despacho` (URL) | Que el viaje abierto viva en `?viaje=ID` —recargar y compartir vuelven al mismo sitio—, que nunca se autoseleccione, y que la respuesta tardía del viaje anterior no pise al actual |
 | `pruebas/router.ts` | No es una prueba: un `next/navigation` que SÍ navega. Con un `replace` de mentira, una pantalla que escribiera la URL y nunca la leyera pasaría |
+| `operacion/viajes/fechas` | Que «Fin previsto» sea el ÚLTIMO día ocupado: con el fin como medianoche, un viaje de un día tenía el periodo vacío y no reservaba nada |
 | `api/cambios` | Lo que manda un PATCH: sólo lo que cambió, vaciar es `null`, y la hora local de un `datetime-local` vuelve al mismo instante |
 | `operacion/despacho` | Toda la Fase 1C: qué momento abre cada estado del §8.2, y que la pantalla **no deje declarar un precinto intacto** |
 | `operacion/informes` | Los cuatro informes del §14, el estado en la URL, y que la cadena del volumen **calcule y nombre el descuadre** en vez de dejar la resta a quien mira |

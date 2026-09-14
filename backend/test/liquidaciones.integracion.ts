@@ -73,11 +73,15 @@ async function viajeCerrado(opciones: {
        (empresa_id, cisterna_id, numero, capacidad_nominal, capacidad_calibrada)
      VALUES ($1,$2,1,5000,4980) RETURNING compartimento_id`, [empresa, c.cisterna_id]);
   const km = opciones.km === undefined ? 300 : opciones.km;
+  /* Diez horas de viaje y no cero: un viaje cerrado que empieza y termina en el
+     mismo instante tiene el periodo VACÍO, que `ck_viajes_periodo_no_vacio`
+     rechaza — no reservaría ni la cisterna ni el conductor. Cada viaje cae en
+     su propio día (`secuencia`), así que no se pisan entre ellos. */
   const [v] = await gestor().query(
     `INSERT INTO viajes (empresa_id, codigo_viaje, tipo_viaje, cisterna_id, conductor_id,
                          fecha_programada, estado, fecha_inicio, fecha_fin,
                          odometro_inicial, odometro_final)
-     VALUES ($1,$2,'simple',$3,$4,$5,$6,$5,$5,$7,$8) RETURNING viaje_id`,
+     VALUES ($1,$2,'simple',$3,$4,$5,$6,$5,$5::timestamptz + interval '10 hours',$7,$8) RETURNING viaje_id`,
     [empresa, `LIQ-${marca}`, c.cisterna_id, conductorId,
      new Date(Date.UTC(2035, 0, 1 + secuencia, 8)).toISOString(),
      opciones.estado ?? 'cerrado',

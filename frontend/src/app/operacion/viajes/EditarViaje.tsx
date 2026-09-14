@@ -8,11 +8,7 @@ import { aCampo, cambios } from '@/api/cambios';
 import type { Fila } from '@/api/tipos';
 import catalogo from '@/catalogos/Catalogo.module.css';
 import estilos from './viajes.module.css';
-
-/* Mismo convenio que el alta: el día elegido se manda como su medianoche UTC,
-   y la lista lo pinta recortando el ISO. Cambiarlo sólo aquí haría que un viaje
-   editado y uno recién creado guardaran la fecha de dos formas distintas. */
-const aIso = (dia: string) => new Date(dia).toISOString();
+import { diaDeFin, finDelDia, inicioDelDia } from './fechas';
 
 /**
  * Edición de un viaje: su replanificación y, ya en marcha, los odómetros.
@@ -27,7 +23,7 @@ export function EditarViaje({ viaje, cisternas, conductores, onGuardado, onCance
   const [inicial] = useState(() => ({
     codigoViaje: aCampo(viaje.codigoViaje),
     fechaProgramada: aCampo(viaje.fechaProgramada, 'fecha'),
-    fechaFin: aCampo(viaje.fechaFin, 'fecha'),
+    fechaFin: diaDeFin(viaje.fechaFin),
     cisternaId: aCampo(viaje.cisternaId),
     conductorId: aCampo(viaje.conductorId),
     rutaPlanificada: aCampo(viaje.rutaPlanificada),
@@ -51,7 +47,7 @@ export function EditarViaje({ viaje, cisternas, conductores, onGuardado, onCance
     && Number(valores.odometroFinal) < Number(valores.odometroInicial);
 
   const cuerpo = cambios(inicial, valores, {
-    fechaProgramada: aIso, fechaFin: aIso, odometroInicial: Number, odometroFinal: Number,
+    fechaProgramada: inicioDelDia, fechaFin: finDelDia, odometroInicial: Number, odometroFinal: Number,
   });
 
   async function guardar(e: React.FormEvent) {

@@ -205,8 +205,26 @@ describe('crear un viaje', () => {
     await waitFor(() => expect(api.crear).toHaveBeenCalled());
     const cuerpo = api.crear.mock.calls[0][1] as Record<string, string>;
     expect(cuerpo).toMatchObject({ cisternaId: '3', conductorId: '7' });
-    // El fin también en ISO, por el mismo motivo que el inicio.
-    expect(cuerpo.fechaFin).toMatch(/^2027-05-02T/);
+    // El fin también en ISO, y como FINAL del día elegido: ver `fechas.spec.ts`.
+    expect(cuerpo.fechaFin).toBe('2027-05-03T00:00:00.000Z');
+  });
+
+  it('un viaje de UN día —mismo día en los dos campos— ocupa ese día entero', async () => {
+    // Con el fin como medianoche del mismo día el periodo salía VACÍO y el viaje
+    // no reservaba nada. Es el viaje normal, no un caso raro.
+    const usuario = userEvent.setup();
+    render(<Viajes />);
+    await screen.findAllByText('V-001');
+    await usuario.click(screen.getByRole('button', { name: /Nuevo/ }));
+    await usuario.type(screen.getByLabelText(/Código del viaje/), 'V-995');
+    await usuario.type(screen.getByLabelText(/Programado para/), '2027-05-01');
+    await usuario.type(screen.getByLabelText(/Fin previsto/), '2027-05-01');
+    await usuario.click(screen.getByRole('button', { name: /Crear viaje|Crear/ }));
+
+    await waitFor(() => expect(api.crear).toHaveBeenCalled());
+    expect(api.crear.mock.calls[0][1]).toMatchObject({
+      fechaProgramada: '2027-05-01T00:00:00.000Z', fechaFin: '2027-05-02T00:00:00.000Z',
+    });
   });
 
   it('un choque de ocupación se enseña con el mensaje del servidor', async () => {
@@ -406,7 +424,7 @@ describe('editar un viaje', () => {
     expect(api.actualizar.mock.calls[0][1]).toEqual({
       codigoViaje: 'V-001B',
       fechaProgramada: new Date('2027-03-05').toISOString(),
-      fechaFin: new Date('2027-03-06').toISOString(),
+      fechaFin: '2027-03-07T00:00:00.000Z',
       cisternaId: '8', conductorId: '5',
     });
   });
@@ -501,6 +519,18 @@ describe('editar un viaje', () => {
 
     await reescribir(usuario, within(form).getByLabelText(/Fin previsto/), '2027-02-20');
     expect(within(form).getByText('El fin previsto no puede ser anterior a la programación.')).toBeInTheDocument();
+    expect(within(form).getByRole('button', { name: 'Guardar cambios' })).toBeDisabled();
+  });
+
+  it('el fin guardado se enseña como el último día que el viaje ocupa', async () => {
+    // Guardado como el comienzo del día siguiente: enseñarlo tal cual haría que
+    // abrir y guardar alargara el viaje un día cada vez.
+    api.obtener.mockResolvedValue(detalle({ fechaFin: '2027-03-02T00:00:00.000Z' }));
+    const usuario = userEvent.setup();
+    render(<Viajes />);
+    const form = await abrirEdicion(usuario);
+
+    expect(within(form).getByLabelText(/Fin previsto/)).toHaveValue('2027-03-01');
     expect(within(form).getByRole('button', { name: 'Guardar cambios' })).toBeDisabled();
   });
 

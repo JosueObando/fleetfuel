@@ -26,8 +26,9 @@ const DESDE = `FROM viajes v LEFT JOIN conductores cd ON cd.conductor_id = v.con
  * Las otras tres tampoco las puede ver el servicio mirando sólo la petición:
  * una edición trae UN campo y el resto está guardado. El odómetro final se
  * compara con el inicial ya anotado; el fin previsto, con la hora a la que el
- * viaje empieza a ocupar —la programada o, ya arrancado, la real—, y cuando es
- * anterior ni siquiera se puede construir el `tstzrange` del periodo (22000).
+ * viaje empieza a ocupar —la programada o, ya arrancado, la real—. Anterior, ni
+ * siquiera se puede construir el `tstzrange` del periodo (22000); IGUAL, el
+ * rango sale vacío y no reservaría nada (`ck_viajes_periodo_no_vacio`).
  */
 function traducirRestricciones(e: unknown, codigoViaje?: string): never {
   const { code: codigo, constraint: restriccion = '', message: mensaje = '' } =
@@ -39,9 +40,10 @@ function traducirRestricciones(e: unknown, codigoViaje?: string): never {
   if (restriccion === 'ck_viajes_odometro')
     throw new BadRequestException('El odómetro final no puede ser menor que el inicial');
   /* No se mira `ck_viajes_fechas`: la columna generada `periodo` se calcula
-     ANTES que los CHECK, así que un fin invertido revienta siempre aquí. */
-  if (codigo === '22000' && mensaje.includes('range lower bound'))
-    throw new BadRequestException('El fin previsto no puede ser anterior al inicio del viaje');
+     ANTES que los CHECK, así que un fin invertido revienta siempre en el 22000. */
+  if ((codigo === '22000' && mensaje.includes('range lower bound'))
+      || restriccion === 'ck_viajes_periodo_no_vacio')
+    throw new BadRequestException('El fin previsto tiene que ser posterior al inicio del viaje');
   if (restriccion === 'uq_viajes_empresa_codigo')
     throw new ConflictException(`Ya existe un viaje con el código ${codigoViaje}`);
   throw e as Error;

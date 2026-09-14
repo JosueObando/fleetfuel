@@ -241,6 +241,8 @@ Cerrado el mismo 2026-09-12 todo lo que era de Fase 1 o de §21:
 | `/geocercas` | 4 | ⬜ UX-2 / 2B — el backend sólo las CREA (no hay edición ni baja), y dibujarlas pide el mapa de UX-2 |
 | `/solicitudes-ruta` (§2C) | 5 | ✅ `/operacion/solicitudes` (2026-09-13): la bandeja de pendientes y resolver; el historial de cada viaje, en despacho. Pedir sólo lo tienen el Conductor y el Administrador: su pantalla es la app del conductor (2A) |
 | `/sincronizacion`, `/gps/posiciones` | 2 | — ingesta de máquina, no pantalla (2A) |
+| `PATCH` de `/cisternas`, `/ordenes` y `/viajes` | 3 | ✅ (2026-09-14) — **no estaba en esta tabla**: el cruce por segmentos contaba `PATCH /ordenes/:id` como cubierto porque `PATCH /ordenes/:id/estado` sí lo estaba. Contado verbo a verbo, no se podía editar ninguna de las tres |
+| `GET /empresa` | 1 | ⬜ sin pantalla |
 
 **Por qué las dos bandejas NO esperaron a UX-2** (2026-09-13): la compuerta de
 UX-2 es 2B, y lo que 2B no tiene —el ETA, el WebSocket, las alertas de desvío—
@@ -268,6 +270,40 @@ decidió qué construir y no sólo «pintar el endpoint»:
   marca en Postgres impide futuros logins, el borrado en Redis corta las
   sesiones ya abiertas— y ese número es la diferencia entre «lo hice» y
   «funcionó».
+
+### ⚠ Lo que destapó dar pantalla a las ediciones (2026-09-14)
+
+Tres defectos de DOMINIO, ninguno del frontend, que sólo aparecieron al poder
+editar y al mirar los datos de desarrollo con una sonda de navegador:
+
+- **Un viaje de un día no reservaba nada — CERRADO.** `periodo` es
+  `[inicio, fin)` y la pantalla mandaba el día de fin como su medianoche: con
+  salida y fin el mismo día, el rango salía VACÍO, y un rango vacío no se
+  solapa con nada. La exclusión del §5.1 no lo veía. **16 de 29 viajes de
+  desarrollo** estaban así, los 15 autorizados incluidos; los dos recorridos de
+  navegador crean justo eso. Producción tenía 0 viajes. Arreglo: migración 1805
+  (`ck_viajes_periodo_no_vacio`, `NOT VALID`: los existentes no se reescriben,
+  pero cualquier escritura nueva tiene que dejar duración) y «Fin previsto»
+  significa ahora el ÚLTIMO día ocupado (`viajes/fechas.ts`).
+- **El estado de la orden no sigue al de su viaje — ABIERTO.** Las únicas
+  escrituras sobre `ordenes_abastecimiento.estado` son manuales: hay 28 órdenes
+  «validada» dentro de viajes, 10 de ellos CERRADOS. Mitigado para lo que se
+  construyó —una orden en un viaje que ya salió no admite edición—, pero el
+  §8.1 sigue sin moverse solo, y `asignarOrden` acepta una «validada» que ya se
+  entregó en otro viaje (lo acota `ck_detalles_planificado_cabe`, no el estado).
+  Sincronizar las dos máquinas es un diseño propio: qué transición del viaje
+  mueve cada estado de la orden, y qué pasa con las entregas parciales.
+- **Los días son UTC — ABIERTO, de diseño.** «Programado para el 1 de marzo»
+  se guarda como el 1 de marzo a las 00:00 UTC, que en Panamá son las 19:00 del
+  28 de febrero. Es coherente en toda la aplicación y por eso nadie lo ve, pero
+  el periodo de ocupación está desplazado cinco horas. Lo natural es resolverlo
+  con horas de verdad cuando llegue el planificador del §15.3, que las pide.
+
+Y cinco 500 convertidos en 400/409 legibles, todos del mismo patrón —una
+restricción de FILA que la petición de edición no puede ver porque el otro
+extremo ya está guardado—: calibración invertida, ventana invertida, odómetro
+final menor, fin anterior al inicio y código de viaje repetido. El periodo vacío
+no daba un 500: se aceptaba en silencio, que es peor.
 
 ### El hueco que no estaba en ninguna fase — §7.13 `cargas_terminal`
 

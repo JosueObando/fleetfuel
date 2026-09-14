@@ -9,6 +9,7 @@ import type { Fila } from '@/api/tipos';
 import catalogo from '@/catalogos/Catalogo.module.css';
 import estilos from './viajes.module.css';
 import { EditarViaje } from './EditarViaje';
+import { finDelDia, inicioDelDia } from './fechas';
 
 
 export default function Viajes() {
@@ -90,8 +91,8 @@ export default function Viajes() {
     try {
       const v = await api.crear<Fila>('/viajes', {
         codigoViaje: codigo,
-        fechaProgramada: new Date(fechaProgramada).toISOString(),
-        ...(fechaFin ? { fechaFin: new Date(fechaFin).toISOString() } : {}),
+        fechaProgramada: inicioDelDia(fechaProgramada),
+        ...(fechaFin ? { fechaFin: finDelDia(fechaFin) } : {}),
         ...(cisternaId ? { cisternaId } : {}),
         ...(conductorId ? { conductorId } : {}),
       });
@@ -148,7 +149,7 @@ export default function Viajes() {
                      onCambio={setFechaProgramada} tipo="date"
                      ayuda="La ocupación de cisterna y conductor se calcula desde aquí." />
               <Campo etiqueta="Fin previsto" tipo="date" valor={fechaFin} onCambio={setFechaFin}
-                     ayuda="Sin fin, el viaje ocupa hacia adelante sin límite." />
+                     ayuda="Último día del viaje, incluido. Sin fin, ocupa hacia adelante sin límite." />
               <Campo etiqueta="Cisterna" valor={cisternaId} onCambio={setCisternaId}
                      opciones={cisternas.map(c => ({ valor: String(c.id), etiqueta: String(c.placa) }))} />
               <Campo etiqueta="Conductor" valor={conductorId} onCambio={setConductorId}
