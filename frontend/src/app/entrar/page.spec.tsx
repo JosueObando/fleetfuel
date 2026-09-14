@@ -2,6 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import Entrar from './page';
 import { ErrorApi } from '@/api/cliente';
+import { rellenar } from '../../../pruebas/rellenar';
 
 const empujar = jest.fn();
 jest.mock('next/navigation', () => ({ useRouter: () => ({ push: empujar }) }));
@@ -29,9 +30,9 @@ const SESION = {
   usuario: { id: '1', nombre: 'Ana', correo: 'ana@fleetfuel.jop.lat', roles: [] },
 };
 
-const rellenar = async (usuario: ReturnType<typeof userEvent.setup>, totp?: string) => {
-  await usuario.type(screen.getByLabelText(/Correo/), 'ana@fleetfuel.jop.lat');
-  await usuario.type(screen.getByLabelText(/Contraseña/), 'ClaveDePrueba123');
+const rellenarLogin = async (usuario: ReturnType<typeof userEvent.setup>, totp?: string) => {
+  await rellenar(usuario, screen.getByLabelText(/Correo/), 'ana@fleetfuel.jop.lat');
+  await rellenar(usuario, screen.getByLabelText(/Contraseña/), 'ClaveDePrueba123');
   if (totp) await usuario.type(screen.getByLabelText(/Código de verificación/), totp);
   await usuario.click(screen.getByRole('button', { name: /Entrar/ }));
 };
@@ -65,7 +66,7 @@ describe('entrar bien', () => {
   it('guarda la sesión y lleva a la operación', async () => {
     const usuario = userEvent.setup();
     render(<Entrar />);
-    await rellenar(usuario);
+    await rellenarLogin(usuario);
     await waitFor(() => expect(guardarSesion).toHaveBeenCalledWith(SESION));
     expect(empujar).toHaveBeenCalledWith('/operacion/ordenes');
   });
@@ -75,7 +76,7 @@ describe('entrar bien', () => {
     // 400 en vez de la puerta de MFA, que es un mensaje distinto y confuso.
     const usuario = userEvent.setup();
     render(<Entrar />);
-    await rellenar(usuario);
+    await rellenarLogin(usuario);
     await waitFor(() => expect(entrar).toHaveBeenCalled());
     expect(entrar).toHaveBeenCalledWith('ana@fleetfuel.jop.lat', 'ClaveDePrueba123', undefined);
   });
@@ -83,7 +84,7 @@ describe('entrar bien', () => {
   it('y sí se manda cuando lo hay', async () => {
     const usuario = userEvent.setup();
     render(<Entrar />);
-    await rellenar(usuario, '123456');
+    await rellenarLogin(usuario, '123456');
     await waitFor(() => expect(entrar).toHaveBeenCalled());
     expect(entrar).toHaveBeenCalledWith('ana@fleetfuel.jop.lat', 'ClaveDePrueba123', '123456');
   });
@@ -110,7 +111,7 @@ describe('la puerta del §7: MFA sin inscribir', () => {
     // buscando el fallo en el sitio equivocado.
     const usuario = userEvent.setup();
     render(<Entrar />);
-    await rellenar(usuario);
+    await rellenarLogin(usuario);
 
     await screen.findByRole('heading', { name: /segundo factor/i });
     expect(empujar).not.toHaveBeenCalled();
@@ -120,7 +121,7 @@ describe('la puerta del §7: MFA sin inscribir', () => {
   it('pide el secreto con el token de inscripción, no con una sesión', async () => {
     const usuario = userEvent.setup();
     render(<Entrar />);
-    await rellenar(usuario);
+    await rellenarLogin(usuario);
     await waitFor(() => expect(iniciarMfa).toHaveBeenCalledWith(SESION.accessToken));
   });
 
@@ -132,7 +133,7 @@ describe('la puerta del §7: MFA sin inscribir', () => {
        aplicación de autenticación. */
     const usuario = userEvent.setup();
     render(<Entrar />);
-    await rellenar(usuario);
+    await rellenarLogin(usuario);
     expect(await screen.findByText(/JBSW\s?Y3DP\s?EHPK\s?3PXP/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /aplicación de autenticación/i }))
       .toHaveAttribute('href', 'otpauth://totp/x');
@@ -141,10 +142,10 @@ describe('la puerta del §7: MFA sin inscribir', () => {
   it('confirma con el código y avisa de que ya puede entrar', async () => {
     const usuario = userEvent.setup();
     render(<Entrar />);
-    await rellenar(usuario);
+    await rellenarLogin(usuario);
     await screen.findByRole('heading', { name: /segundo factor/i });
 
-    await usuario.type(screen.getByLabelText(/Código de 6 dígitos/), '123456');
+    await rellenar(usuario, screen.getByLabelText(/Código de 6 dígitos/), '123456');
     await usuario.click(screen.getByRole('button', { name: /Confirmar/ }));
 
     await waitFor(() =>
@@ -159,9 +160,9 @@ describe('la puerta del §7: MFA sin inscribir', () => {
        existe el código de verificación. */
     const usuario = userEvent.setup();
     render(<Entrar />);
-    await rellenar(usuario);
+    await rellenarLogin(usuario);
     await screen.findByRole('heading', { name: /segundo factor/i });
-    await usuario.type(screen.getByLabelText(/Código de 6 dígitos/), '123456');
+    await rellenar(usuario, screen.getByLabelText(/Código de 6 dígitos/), '123456');
     await usuario.click(screen.getByRole('button', { name: /Confirmar/ }));
 
     await screen.findByText(/Ya puedes entrar/i);
@@ -175,10 +176,10 @@ describe('la puerta del §7: MFA sin inscribir', () => {
     confirmarMfa.mockRejectedValue(
       new ErrorApi(400, 'Código incorrecto. Revisa la hora del dispositivo.'));
     render(<Entrar />);
-    await rellenar(usuario);
+    await rellenarLogin(usuario);
     await screen.findByRole('heading', { name: /segundo factor/i });
 
-    await usuario.type(screen.getByLabelText(/Código de 6 dígitos/), '000000');
+    await rellenar(usuario, screen.getByLabelText(/Código de 6 dígitos/), '000000');
     await usuario.click(screen.getByRole('button', { name: /Confirmar/ }));
 
     expect(await screen.findByText(/Revisa la hora del dispositivo/)).toBeInTheDocument();
@@ -189,7 +190,7 @@ describe('la puerta del §7: MFA sin inscribir', () => {
     const usuario = userEvent.setup();
     iniciarMfa.mockRejectedValue(new ErrorApi(500, 'No se pudo generar el secreto'));
     render(<Entrar />);
-    await rellenar(usuario);
+    await rellenarLogin(usuario);
     expect(await screen.findByText(/No se pudo generar el secreto/)).toBeInTheDocument();
   });
 });
@@ -199,7 +200,7 @@ describe('cuando no entra', () => {
     const usuario = userEvent.setup();
     entrar.mockRejectedValue(new ErrorApi(401, 'Credenciales inválidas'));
     render(<Entrar />);
-    await rellenar(usuario);
+    await rellenarLogin(usuario);
     expect(await screen.findByText('Credenciales inválidas')).toBeInTheDocument();
     expect(empujar).not.toHaveBeenCalled();
   });
@@ -208,7 +209,7 @@ describe('cuando no entra', () => {
     const usuario = userEvent.setup();
     entrar.mockRejectedValue(new ErrorApi(429, 'Demasiados intentos. Espera un momento y vuelve a intentarlo.'));
     render(<Entrar />);
-    await rellenar(usuario);
+    await rellenarLogin(usuario);
     expect(await screen.findByText(/Demasiados intentos/)).toBeInTheDocument();
   });
 
@@ -216,7 +217,7 @@ describe('cuando no entra', () => {
     const usuario = userEvent.setup();
     entrar.mockRejectedValue(new TypeError('Failed to fetch'));
     render(<Entrar />);
-    await rellenar(usuario);
+    await rellenarLogin(usuario);
     expect(await screen.findByText(/No se pudo conectar con el servidor/)).toBeInTheDocument();
   });
 
@@ -226,7 +227,7 @@ describe('cuando no entra', () => {
     const usuario = userEvent.setup();
     entrar.mockRejectedValue(new ErrorApi(401, 'Credenciales inválidas'));
     render(<Entrar />);
-    await rellenar(usuario);
+    await rellenarLogin(usuario);
     await screen.findByText('Credenciales inválidas');
 
     entrar.mockResolvedValue(SESION);

@@ -2,6 +2,7 @@ import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Solicitudes } from './Solicitudes';
 import { ErrorApi } from '@/api/cliente';
+import { rellenar } from '../../../pruebas/rellenar';
 
 jest.mock('@/api/cliente', () => {
   const real = jest.requireActual('@/api/cliente');
@@ -121,7 +122,7 @@ describe('quien pide no resuelve', () => {
       new ErrorApi(409, 'Quien la pidió no puede resolverla: tiene que hacerlo otra persona'));
     render(<Solicitudes />);
     const fila = await filaDe('V-001');
-    await usuario.type(within(fila).getByLabelText(/Motivo/), 'Ruta alterna despejada');
+    await rellenar(usuario, within(fila).getByLabelText(/Motivo/), 'Ruta alterna despejada');
     await usuario.click(within(fila).getByRole('button', { name: /Aprobar/ }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Quien la pidió no puede resolverla');
   });
@@ -136,9 +137,9 @@ describe('resolver exige motivo, en los dos sentidos', () => {
     const rechazar = within(fila).getByRole('button', { name: /Rechazar/ });
     expect(aprobar).toBeDisabled();
     expect(rechazar).toBeDisabled();
-    await usuario.type(within(fila).getByLabelText(/Motivo/), '  sí ');
+    await rellenar(usuario, within(fila).getByLabelText(/Motivo/), '  sí ');
     expect(aprobar).toBeDisabled();
-    await usuario.type(within(fila).getByLabelText(/Motivo/), 'por Transístmica');
+    await rellenar(usuario, within(fila).getByLabelText(/Motivo/), 'por Transístmica');
     expect(aprobar).toBeEnabled();
     expect(rechazar).toBeEnabled();
   });
@@ -147,7 +148,7 @@ describe('resolver exige motivo, en los dos sentidos', () => {
     const usuario = userEvent.setup();
     render(<Solicitudes />);
     const fila = await filaDe('V-001');
-    await usuario.type(within(fila).getByLabelText(/Motivo/), 'Ruta alterna despejada');
+    await rellenar(usuario, within(fila).getByLabelText(/Motivo/), 'Ruta alterna despejada');
     await usuario.click(within(fila).getByRole('button', { name: /Aprobar/ }));
     await waitFor(() => expect(api.actualizar).toHaveBeenCalledWith(
       '/solicitudes-ruta/s1', { estado: 'aprobada', motivo: 'Ruta alterna despejada' }));
@@ -159,7 +160,7 @@ describe('resolver exige motivo, en los dos sentidos', () => {
     const usuario = userEvent.setup();
     render(<Solicitudes />);
     const fila = await filaDe('V-001');
-    await usuario.type(within(fila).getByLabelText(/Motivo/), 'La calle ya abrió');
+    await rellenar(usuario, within(fila).getByLabelText(/Motivo/), 'La calle ya abrió');
     await usuario.click(within(fila).getByRole('button', { name: /Rechazar/ }));
     await waitFor(() => expect(api.actualizar).toHaveBeenCalledWith(
       '/solicitudes-ruta/s1', { estado: 'rechazada', motivo: 'La calle ya abrió' }));
@@ -171,7 +172,7 @@ describe('resolver exige motivo, en los dos sentidos', () => {
     api.listar.mockResolvedValue([{ ...PENDIENTES[1], solicitadaPor: 'u2' }]);
     render(<Solicitudes />);
     const fila = await filaDe('V-002');
-    await usuario.type(within(fila).getByLabelText(/Motivo/), 'El sello llega en terminal');
+    await rellenar(usuario, within(fila).getByLabelText(/Motivo/), 'El sello llega en terminal');
     await usuario.click(within(fila).getByRole('button', { name: /Rechazar/ }));
     expect(await screen.findByRole('status')).toHaveTextContent('Rechazada la parada extra de V-002.');
   });
@@ -194,7 +195,7 @@ describe('lo que llega mal o tarde', () => {
     api.actualizar.mockRejectedValue(new TypeError('Failed to fetch'));
     render(<Solicitudes />);
     const fila = await filaDe('V-001');
-    await usuario.type(within(fila).getByLabelText(/Motivo/), 'Ruta alterna despejada');
+    await rellenar(usuario, within(fila).getByLabelText(/Motivo/), 'Ruta alterna despejada');
     await usuario.click(within(fila).getByRole('button', { name: /Aprobar/ }));
     expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo resolver la solicitud');
   });
@@ -214,10 +215,10 @@ describe('lo que llega mal o tarde', () => {
     render(<Solicitudes />);
 
     const primera = await filaDe('V-001');
-    await usuario.type(within(primera).getByLabelText(/Motivo/), 'Ruta alterna despejada');
+    await rellenar(usuario, within(primera).getByLabelText(/Motivo/), 'Ruta alterna despejada');
     await usuario.click(within(primera).getByRole('button', { name: /Aprobar/ }));
     const segunda = await filaDe('V-003');
-    await usuario.type(within(segunda).getByLabelText(/Motivo/), 'También despejada');
+    await rellenar(usuario, within(segunda).getByLabelText(/Motivo/), 'También despejada');
     await usuario.click(within(segunda).getByRole('button', { name: /Aprobar/ }));
     expect(await screen.findByText('Ninguna solicitud espera decisión.')).toBeInTheDocument();
 
@@ -238,10 +239,10 @@ describe('lo que llega mal o tarde', () => {
     render(<Solicitudes />);
 
     const primera = await filaDe('V-001');
-    await usuario.type(within(primera).getByLabelText(/Motivo/), 'Ruta alterna despejada');
+    await rellenar(usuario, within(primera).getByLabelText(/Motivo/), 'Ruta alterna despejada');
     await usuario.click(within(primera).getByRole('button', { name: /Aprobar/ }));
     const segunda = await filaDe('V-003');
-    await usuario.type(within(segunda).getByLabelText(/Motivo/), 'También despejada');
+    await rellenar(usuario, within(segunda).getByLabelText(/Motivo/), 'También despejada');
     await usuario.click(within(segunda).getByRole('button', { name: /Aprobar/ }));
     expect(await screen.findByText('Ninguna solicitud espera decisión.')).toBeInTheDocument();
 

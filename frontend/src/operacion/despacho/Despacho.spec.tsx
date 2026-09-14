@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { Despacho } from './Despacho';
 import { ErrorApi } from '@/api/cliente';
 import { reiniciarUrl } from '../../../pruebas/router';
+import { rellenar } from '../../../pruebas/rellenar';
 
 /* Un router que navega de verdad: elegir un viaje escribe `?viaje=ID` y la
    pantalla lo abre LEYENDO la URL. Ver `Despacho.url.spec.tsx`. */
@@ -232,13 +233,13 @@ describe('el precinto · la pantalla no deja declararlo intacto', () => {
     render(<Despacho />);
     await abrirViaje(usuario);
 
-    await usuario.type(await screen.findByLabelText(/Volumen recibido/i), '2985');
-    await usuario.type(screen.getByLabelText(/Sello leído/i), 'SELLO-77');
-    await usuario.type(screen.getByLabelText(/Quién recibe/i), 'Marta');
+    await rellenar(usuario, await screen.findByLabelText(/Volumen recibido/i), '2985');
+    await rellenar(usuario, screen.getByLabelText(/Sello leído/i), 'SELLO-77');
+    await rellenar(usuario, screen.getByLabelText(/Quién recibe/i), 'Marta');
     // Regla 8 · «Toda entrega debe incluir geolocalización». En un navegador
     // sin permiso de ubicación se escriben, y quedan igual de auditadas.
-    await usuario.type(screen.getByLabelText(/Latitud/i), '8.9824');
-    await usuario.type(screen.getByLabelText(/Longitud/i), '-79.5199');
+    await rellenar(usuario, screen.getByLabelText(/Latitud/i), '8.9824');
+    await rellenar(usuario, screen.getByLabelText(/Longitud/i), '-79.5199');
     await usuario.click(screen.getByRole('button', { name: /Registrar entrega/i }));
 
     await waitFor(() => expect(api.crear).toHaveBeenCalled());
@@ -254,11 +255,11 @@ describe('el precinto · la pantalla no deja declararlo intacto', () => {
     render(<Despacho />);
     await abrirViaje(usuario);
 
-    await usuario.type(await screen.findByLabelText(/Volumen recibido/i), '2985');
-    await usuario.type(screen.getByLabelText(/Sello leído/i), 'SELLO-77');
-    await usuario.type(screen.getByLabelText(/Quién recibe/i), 'Marta');
-    await usuario.type(screen.getByLabelText(/Latitud/i), '8.9824');
-    await usuario.type(screen.getByLabelText(/Longitud/i), '-79.5199');
+    await rellenar(usuario, await screen.findByLabelText(/Volumen recibido/i), '2985');
+    await rellenar(usuario, screen.getByLabelText(/Sello leído/i), 'SELLO-77');
+    await rellenar(usuario, screen.getByLabelText(/Quién recibe/i), 'Marta');
+    await rellenar(usuario, screen.getByLabelText(/Latitud/i), '8.9824');
+    await rellenar(usuario, screen.getByLabelText(/Longitud/i), '-79.5199');
     await usuario.click(screen.getByLabelText(/precinto llegó roto/i));
     await usuario.click(screen.getByRole('button', { name: /Registrar entrega/i }));
 
@@ -279,7 +280,7 @@ describe('la merma se calcula contra lo CARGADO y se ve antes de enviar', () => 
     render(<Despacho />);
     await abrirViaje(usuario);
 
-    await usuario.type(await screen.findByLabelText(/Volumen recibido/i), '2985');
+    await rellenar(usuario, await screen.findByLabelText(/Volumen recibido/i), '2985');
     // `es-PA` usa PUNTO decimal —Panamá sigue la convención anglosajona—, y
     // toda la aplicación formatea con ese locale. Escribir aquí una coma
     // habría hecho fallar una implementación correcta.
@@ -292,7 +293,7 @@ describe('la merma se calcula contra lo CARGADO y se ve antes de enviar', () => 
     render(<Despacho />);
     await abrirViaje(usuario);
 
-    await usuario.type(await screen.findByLabelText(/Volumen recibido/i), '2800');
+    await rellenar(usuario, await screen.findByLabelText(/Volumen recibido/i), '2800');
     expect(await screen.findByText(/necesitará aprobación/i)).toBeInTheDocument();
   });
 });
@@ -331,7 +332,7 @@ describe('quien registra no es quien da por bueno', () => {
     const aprobar = await screen.findByRole('button', { name: /Aprobar gasto/i });
     expect(aprobar).toBeDisabled();
 
-    await usuario.type(screen.getByLabelText(/Motivo/i), 'Comprobantes verificados');
+    await rellenar(usuario, screen.getByLabelText(/Motivo/i), 'Comprobantes verificados');
     expect(aprobar).toBeEnabled();
     await usuario.click(aprobar);
     await waitFor(() => expect(api.actualizar).toHaveBeenCalledWith(
@@ -416,10 +417,10 @@ describe('§15.5 · liquidación del viaje', () => {
     const pagar = await screen.findByRole('button', { name: /Registrar el pago/i });
     expect(pagar).toBeDisabled();
     // `PagarLiquidacionDto` pide al menos 3: con dos, el botón aún no manda nada.
-    await usuario.type(screen.getByLabelText(/Referencia/i), 'TR');
+    await rellenar(usuario, screen.getByLabelText(/Referencia/i), 'TR');
     expect(pagar).toBeDisabled();
     await usuario.clear(screen.getByLabelText(/Referencia/i));
-    await usuario.type(screen.getByLabelText(/Referencia/i), 'TRF-9001');
+    await rellenar(usuario, screen.getByLabelText(/Referencia/i), 'TRF-9001');
     await usuario.click(pagar);
     await waitFor(() => expect(api.crear).toHaveBeenCalledWith(
       '/liquidaciones/l1/pagar', { referenciaPago: 'TRF-9001' }));
@@ -498,11 +499,11 @@ describe('registrar la carga en terminal', () => {
 
     await usuario.selectOptions(
       await screen.findByLabelText(/Compartimento del plan/i), 'c1:d1');
-    await usuario.type(screen.getByLabelText(/Volumen cargado/i), '2990');
-    await usuario.type(screen.getByLabelText(/Número de sello/i), 'SELLO-77');
-    await usuario.type(screen.getByLabelText(/Operador de la terminal/i), 'Luis');
-    await usuario.type(screen.getByLabelText(/Latitud/i), '9.3547');
-    await usuario.type(screen.getByLabelText(/Longitud/i), '-79.9003');
+    await rellenar(usuario, screen.getByLabelText(/Volumen cargado/i), '2990');
+    await rellenar(usuario, screen.getByLabelText(/Número de sello/i), 'SELLO-77');
+    await rellenar(usuario, screen.getByLabelText(/Operador de la terminal/i), 'Luis');
+    await rellenar(usuario, screen.getByLabelText(/Latitud/i), '9.3547');
+    await rellenar(usuario, screen.getByLabelText(/Longitud/i), '-79.9003');
     await usuario.click(screen.getByRole('button', { name: /Registrar carga/i }));
 
     await waitFor(() => expect(api.crear).toHaveBeenCalledWith('/cargas/viaje/1', {
@@ -519,15 +520,15 @@ describe('registrar la carga en terminal', () => {
 
     await usuario.selectOptions(
       await screen.findByLabelText(/Compartimento del plan/i), 'c1:d1');
-    await usuario.type(screen.getByLabelText(/Volumen cargado/i), '2990');
-    await usuario.type(screen.getByLabelText(/Número de sello/i), 'S-1');
-    await usuario.type(screen.getByLabelText(/Operador de la terminal/i), 'Luis');
-    await usuario.type(screen.getByLabelText(/Medidor inicial/i), '1000');
-    await usuario.type(screen.getByLabelText(/Medidor final/i), '3990');
-    await usuario.type(screen.getByLabelText(/Temperatura/i), '29.5');
-    await usuario.type(screen.getByLabelText(/Densidad/i), '0.832');
-    await usuario.type(screen.getByLabelText(/Latitud/i), '9.3');
-    await usuario.type(screen.getByLabelText(/Longitud/i), '-79.9');
+    await rellenar(usuario, screen.getByLabelText(/Volumen cargado/i), '2990');
+    await rellenar(usuario, screen.getByLabelText(/Número de sello/i), 'S-1');
+    await rellenar(usuario, screen.getByLabelText(/Operador de la terminal/i), 'Luis');
+    await rellenar(usuario, screen.getByLabelText(/Medidor inicial/i), '1000');
+    await rellenar(usuario, screen.getByLabelText(/Medidor final/i), '3990');
+    await rellenar(usuario, screen.getByLabelText(/Temperatura/i), '29.5');
+    await rellenar(usuario, screen.getByLabelText(/Densidad/i), '0.832');
+    await rellenar(usuario, screen.getByLabelText(/Latitud/i), '9.3');
+    await rellenar(usuario, screen.getByLabelText(/Longitud/i), '-79.9');
     await usuario.click(screen.getByRole('button', { name: /Registrar carga/i }));
 
     await waitFor(() => expect(api.crear).toHaveBeenCalled());
@@ -545,7 +546,7 @@ describe('registrar la carga en terminal', () => {
 
     await usuario.selectOptions(
       await screen.findByLabelText(/Compartimento del plan/i), 'c1:d1');
-    await usuario.type(screen.getByLabelText(/Volumen cargado/i), '4981');
+    await rellenar(usuario, screen.getByLabelText(/Volumen cargado/i), '4981');
     expect(await screen.findByText(/No caben más de/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Registrar carga/i })).toBeDisabled();
   });
@@ -622,8 +623,8 @@ describe('registrar un gasto', () => {
     await abrirViaje(usuario);
 
     await usuario.selectOptions(await screen.findByLabelText(/^Categoría/i), 'peaje');
-    await usuario.type(screen.getByLabelText(/Descripción del gasto/i), 'Peajes');
-    await usuario.type(screen.getByLabelText(/^Monto/i), '18.75');
+    await rellenar(usuario, screen.getByLabelText(/Descripción del gasto/i), 'Peajes');
+    await rellenar(usuario, screen.getByLabelText(/^Monto/i), '18.75');
     await usuario.click(screen.getByRole('button', { name: /Registrar gasto/i }));
 
     await waitFor(() => expect(api.crear).toHaveBeenCalledWith('/gastos/viaje/1', {
@@ -656,10 +657,10 @@ describe('registrar un gasto', () => {
     await abrirViaje(usuario);
 
     await usuario.selectOptions(await screen.findByLabelText(/^Categoría/i), 'estacionamiento');
-    await usuario.type(screen.getByLabelText(/Descripción del gasto/i), 'Parking');
-    await usuario.type(screen.getByLabelText(/^Monto/i), '4');
+    await rellenar(usuario, screen.getByLabelText(/Descripción del gasto/i), 'Parking');
+    await rellenar(usuario, screen.getByLabelText(/^Monto/i), '4');
     await usuario.selectOptions(screen.getByLabelText(/Quién pagó/i), 'empresa');
-    await usuario.type(screen.getByLabelText(/^Comprobante/i), 'F-001');
+    await rellenar(usuario, screen.getByLabelText(/^Comprobante/i), 'F-001');
     await usuario.click(screen.getByRole('button', { name: /Registrar gasto/i }));
 
     await waitFor(() => expect(api.crear).toHaveBeenCalledWith('/gastos/viaje/1', {
@@ -692,7 +693,7 @@ describe('registrar un gasto', () => {
     render(<Despacho />);
     await abrirViaje(usuario);
 
-    await usuario.type(await screen.findByLabelText(/Motivo/i), 'Sin comprobante');
+    await rellenar(usuario, await screen.findByLabelText(/Motivo/i), 'Sin comprobante');
     await usuario.click(screen.getByRole('button', { name: /Rechazar gasto/i }));
     await waitFor(() => expect(api.actualizar).toHaveBeenCalledWith(
       '/gastos/x1', { estado: 'rechazado', motivo: 'Sin comprobante' }));

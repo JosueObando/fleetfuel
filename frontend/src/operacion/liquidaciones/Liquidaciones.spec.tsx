@@ -2,6 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Liquidaciones } from './Liquidaciones';
 import { ErrorApi } from '@/api/cliente';
+import { rellenar } from '../../../pruebas/rellenar';
 
 const reemplazar = jest.fn();
 let consulta = new URLSearchParams();
@@ -198,9 +199,9 @@ describe('por pagar: el pago lleva su referencia', () => {
     render(<Liquidaciones />);
     const fila = await filaDe(/V-001/);
     const pagar = within(fila).getByRole('button', { name: /Registrar el pago.*V-001/ });
-    await usuario.type(within(fila).getByLabelText(/Referencia/), 'TR');
+    await rellenar(usuario, within(fila).getByLabelText(/Referencia/), 'TR');
     expect(pagar).toBeDisabled();
-    await usuario.type(within(fila).getByLabelText(/Referencia/), 'F-9');
+    await rellenar(usuario, within(fila).getByLabelText(/Referencia/), 'F-9');
     await usuario.click(pagar);
     await waitFor(() => expect(api.crear).toHaveBeenCalledWith(
       '/liquidaciones/l1/pagar', { referenciaPago: 'TRF-9' }));
@@ -220,7 +221,7 @@ describe('por pagar: el pago lleva su referencia', () => {
       .mockRejectedValueOnce(new TypeError('Failed to fetch'));
     render(<Liquidaciones />);
     const fila = await filaDe(/V-001/);
-    await usuario.type(within(fila).getByLabelText(/Referencia/), 'TRF-1');
+    await rellenar(usuario, within(fila).getByLabelText(/Referencia/), 'TRF-1');
     await usuario.click(within(fila).getByRole('button', { name: /Registrar el pago/ }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Esa liquidación ya está pagada');
     await usuario.click(within(fila).getByRole('button', { name: /Registrar el pago/ }));

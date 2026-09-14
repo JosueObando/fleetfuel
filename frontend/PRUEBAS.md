@@ -100,6 +100,27 @@ tocar una prueba. Las ramas suben 0,8 puntos porque el istanbul nuevo las
 cuenta distinto, no porque se cubra más; el trinquete sube igual, porque
 protege contra retrocesos medidos CON ESTE instrumento.
 
+**La suite volvió a pasar de 30 s** (33,5 s el 2026-09-14, con 734 pruebas) y
+se bajó a **~28,5 s** sin quitar una sola. Lo que se midió antes de tocar nada:
+
+- Los ficheros suman ~89 s de CPU con 3 workers en 4 núcleos; poner 4 workers
+  NO ayuda (35 s): la máquina la comparten los tres entornos y hay swap en zram.
+  En esta máquina el tiempo de pared es ruidoso: medir tres veces.
+- Perfil de Despacho: 27 % render de React, **15 % teclear**, 12 %
+  `getComputedStyle` (visibilidad de `getByRole` y la comprobación de
+  `pointer-events` de user-event).
+
+Dos cambios. `pointerEventsCheck: 0` en `pruebas/preparar.ts`, que aquí nunca
+podía fallar (explicado allí). Y **`rellenar()`** (`pruebas/rellenar.ts`): clic
+y pegar, para las 108 llamadas que rellenaban un formulario para mirar el
+cuerpo enviado. `usuario.type` se queda donde lo probado es el teclado
+(`Campo.spec.tsx`), en las fechas y con teclas especiales; `rellenar` se niega
+en esos casos en vez de dar un verde dudoso, y `src/rellenar.spec.tsx` fija que
+el valor final es el mismo que tecleando. Verificado por mutación sobre una
+muestra de seis ficheros convertidos: todas cazadas salvo una que **ya
+sobrevivía antes** —«resolver exige un motivo» escribía `'ok  '`, cuatro
+caracteres, así que nunca comprobó el `trim()`—, arreglada con `'ok   '`.
+
 **La columna «mutaciones»** (2026-09-13) cierra las ramas de los doce ficheros
 que quedaban por debajo del 80 %. Cada prueba nueva se dio por buena sólo
 después de ROMPER a propósito la línea que dice proteger y verla en rojo: 38

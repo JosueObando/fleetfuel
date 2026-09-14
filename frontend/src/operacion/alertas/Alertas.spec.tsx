@@ -2,6 +2,7 @@ import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Alertas } from './Alertas';
 import { ErrorApi } from '@/api/cliente';
+import { rellenar } from '../../../pruebas/rellenar';
 
 const reemplazar = jest.fn();
 let consulta = new URLSearchParams();
@@ -351,9 +352,12 @@ describe('resolver exige un motivo', () => {
     const campo = within(fila).getByLabelText(/Motivo/);
     const boton = within(fila).getByRole('button', { name: /Resolver/ });
     expect(boton).toBeDisabled();
-    await usuario.type(campo, 'ok  ');
+    // Cinco caracteres, dos de ellos útiles: con «ok  » (cuatro) el mínimo ya
+    // bastaba para deshabilitar y la prueba no veía si se recortaban espacios.
+    await rellenar(usuario, campo, 'ok   ');
     expect(boton).toBeDisabled();
-    await usuario.type(campo, 'volvió la señal');
+    await usuario.clear(campo);
+    await rellenar(usuario, campo, 'volvió la señal');
     expect(boton).toBeEnabled();
   });
 
@@ -361,7 +365,7 @@ describe('resolver exige un motivo', () => {
     const usuario = userEvent.setup();
     render(<Alertas />);
     const fila = await filaDe('Sin GPS en V-002');
-    await usuario.type(within(fila).getByLabelText(/Motivo/), 'Volvió la señal en Chilibre');
+    await rellenar(usuario, within(fila).getByLabelText(/Motivo/), 'Volvió la señal en Chilibre');
     await usuario.click(within(fila).getByRole('button', { name: /Resolver/ }));
     await waitFor(() => expect(api.crear).toHaveBeenCalledWith(
       '/alertas/a2/resolver', { motivo: 'Volvió la señal en Chilibre' }));

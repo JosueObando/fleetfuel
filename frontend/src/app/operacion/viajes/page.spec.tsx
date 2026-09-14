@@ -2,6 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import Viajes from './page';
 import { ErrorApi } from '@/api/cliente';
+import { rellenar } from '../../../../pruebas/rellenar';
 
 jest.mock('@/api/cliente', () => {
   const real = jest.requireActual('@/api/cliente');
@@ -159,7 +160,7 @@ describe('crear un viaje', () => {
     render(<Viajes />);
     await screen.findAllByText('V-001');
     await usuario.click(screen.getByRole('button', { name: /Nuevo/ }));
-    await usuario.type(screen.getByLabelText(/Código del viaje/), 'V-999');
+    await rellenar(usuario, screen.getByLabelText(/Código del viaje/), 'V-999');
     await usuario.type(screen.getByLabelText(/Programado para/), '2027-05-01');
     await usuario.click(screen.getByRole('button', { name: /Crear viaje|Crear/ }));
 
@@ -174,7 +175,7 @@ describe('crear un viaje', () => {
     render(<Viajes />);
     await screen.findAllByText('V-001');
     await usuario.click(screen.getByRole('button', { name: /Nuevo/ }));
-    await usuario.type(screen.getByLabelText(/Código del viaje/), 'V-998');
+    await rellenar(usuario, screen.getByLabelText(/Código del viaje/), 'V-998');
     await usuario.type(screen.getByLabelText(/Programado para/), '2027-05-01');
     await usuario.click(screen.getByRole('button', { name: /Crear viaje|Crear/ }));
 
@@ -195,7 +196,7 @@ describe('crear un viaje', () => {
     render(<Viajes />);
     await screen.findAllByText('V-001');
     await usuario.click(screen.getByRole('button', { name: /Nuevo/ }));
-    await usuario.type(screen.getByLabelText(/Código del viaje/), 'V-996');
+    await rellenar(usuario, screen.getByLabelText(/Código del viaje/), 'V-996');
     await usuario.type(screen.getByLabelText(/Programado para/), '2027-05-01');
     await usuario.type(screen.getByLabelText(/Fin previsto/), '2027-05-02');
     await usuario.selectOptions(await screen.findByRole('combobox', { name: /Cisterna/ }), '3');
@@ -216,7 +217,7 @@ describe('crear un viaje', () => {
     render(<Viajes />);
     await screen.findAllByText('V-001');
     await usuario.click(screen.getByRole('button', { name: /Nuevo/ }));
-    await usuario.type(screen.getByLabelText(/Código del viaje/), 'V-995');
+    await rellenar(usuario, screen.getByLabelText(/Código del viaje/), 'V-995');
     await usuario.type(screen.getByLabelText(/Programado para/), '2027-05-01');
     await usuario.type(screen.getByLabelText(/Fin previsto/), '2027-05-01');
     await usuario.click(screen.getByRole('button', { name: /Crear viaje|Crear/ }));
@@ -234,7 +235,7 @@ describe('crear un viaje', () => {
     render(<Viajes />);
     await screen.findAllByText('V-001');
     await usuario.click(screen.getByRole('button', { name: /Nuevo/ }));
-    await usuario.type(screen.getByLabelText(/Código del viaje/), 'V-997');
+    await rellenar(usuario, screen.getByLabelText(/Código del viaje/), 'V-997');
     await usuario.type(screen.getByLabelText(/Programado para/), '2027-05-01');
     await usuario.click(screen.getByRole('button', { name: /Crear viaje|Crear/ }));
 
@@ -442,7 +443,7 @@ describe('editar un viaje', () => {
     render(<Viajes />);
     const form = await abrirEdicion(usuario);
 
-    await usuario.type(within(form).getByLabelText(/Odómetro inicial/), '120000');
+    await rellenar(usuario, within(form).getByLabelText(/Odómetro inicial/), '120000');
     await guardar(usuario, form);
 
     await waitFor(() => expect(api.actualizar).toHaveBeenCalled());
@@ -496,7 +497,7 @@ describe('editar un viaje', () => {
     render(<Viajes />);
     const form = await abrirEdicion(usuario);
 
-    await usuario.type(within(form).getByLabelText(/Odómetro final/), '119500');
+    await rellenar(usuario, within(form).getByLabelText(/Odómetro final/), '119500');
     expect(within(form).getByText('El odómetro final no puede ser menor que el inicial.')).toBeInTheDocument();
     expect(within(form).getByRole('button', { name: 'Guardar cambios' })).toBeDisabled();
   });
@@ -509,7 +510,7 @@ describe('editar un viaje', () => {
     render(<Viajes />);
     const form = await abrirEdicion(usuario);
 
-    await usuario.type(within(form).getByLabelText(/Odómetro final/), '120000');
+    await rellenar(usuario, within(form).getByLabelText(/Odómetro final/), '120000');
     expect(within(form).queryByText(/odómetro final no puede ser menor/)).not.toBeInTheDocument();
     await reescribir(usuario, within(form).getByLabelText(/Odómetro final/), '99999');
     expect(within(form).queryByText(/odómetro final no puede ser menor/)).not.toBeInTheDocument();

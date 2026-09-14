@@ -2,6 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Roles } from './Roles';
 import { ErrorApi } from '@/api/cliente';
+import { rellenar } from '../../pruebas/rellenar';
 
 jest.mock('@/api/cliente', () => {
   const real = jest.requireActual('@/api/cliente');
@@ -153,8 +154,8 @@ describe('crear un rol', () => {
     await screen.findByRole('button', { name: /Administrador/ });
 
     await usuario.click(screen.getByRole('button', { name: /Nuevo rol/ }));
-    await usuario.type(screen.getByLabelText(/Nombre/), 'Auditor');
-    await usuario.type(screen.getByLabelText(/Descripción/), 'Sólo lectura');
+    await rellenar(usuario, screen.getByLabelText(/Nombre/), 'Auditor');
+    await rellenar(usuario, screen.getByLabelText(/Descripción/), 'Sólo lectura');
     await usuario.click(screen.getByRole('checkbox', { name: /Exige segundo factor/ }));
     await usuario.click(screen.getByRole('button', { name: /Crear rol/ }));
 
@@ -190,7 +191,7 @@ describe('los caminos que no salen bien', () => {
     await screen.findByRole('button', { name: /Administrador/ });
 
     await usuario.click(screen.getByRole('button', { name: /Nuevo rol/ }));
-    await usuario.type(screen.getByLabelText(/Nombre/), 'Administrador');
+    await rellenar(usuario, screen.getByLabelText(/Nombre/), 'Administrador');
     await usuario.click(screen.getByRole('button', { name: /Crear rol/ }));
 
     expect(await screen.findByText(/Ya existe un rol con ese nombre/)).toBeInTheDocument();

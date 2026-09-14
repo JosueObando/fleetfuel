@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { Catalogo } from './Catalogo';
 import { ErrorApi } from '@/api/cliente';
 import type { CatalogoDef } from './definiciones';
+import { rellenar } from '../../pruebas/rellenar';
 
 jest.mock('@/api/cliente', () => {
   const real = jest.requireActual('@/api/cliente');
@@ -116,7 +117,7 @@ describe('dar de alta', () => {
     await screen.findAllByText('Terpelo Panamá');
 
     await usuario.click(screen.getByRole('button', { name: /Nuevo cliente/ }));
-    await usuario.type(screen.getByLabelText(/Nombre/), 'Cliente Nuevo');
+    await rellenar(usuario, screen.getByLabelText(/Nombre/), 'Cliente Nuevo');
     await usuario.click(screen.getByRole('button', { name: /Crear cliente/ }));
 
     await waitFor(() => expect(api.crear).toHaveBeenCalled());
@@ -129,8 +130,8 @@ describe('dar de alta', () => {
     await screen.findAllByText('Terpelo Panamá');
 
     await usuario.click(screen.getByRole('button', { name: /Nuevo cliente/ }));
-    await usuario.type(screen.getByLabelText(/Nombre/), 'Con cupo');
-    await usuario.type(screen.getByLabelText(/Cupo/), '250');
+    await rellenar(usuario, screen.getByLabelText(/Nombre/), 'Con cupo');
+    await rellenar(usuario, screen.getByLabelText(/Cupo/), '250');
     await usuario.click(screen.getByRole('button', { name: /Crear cliente/ }));
 
     await waitFor(() => expect(api.crear).toHaveBeenCalled());
@@ -144,7 +145,7 @@ describe('dar de alta', () => {
     expect(api.listar).toHaveBeenCalledTimes(1);
 
     await usuario.click(screen.getByRole('button', { name: /Nuevo cliente/ }));
-    await usuario.type(screen.getByLabelText(/Nombre/), 'X');
+    await rellenar(usuario, screen.getByLabelText(/Nombre/), 'X');
     await usuario.click(screen.getByRole('button', { name: /Crear cliente/ }));
 
     await waitFor(() => expect(api.listar).toHaveBeenCalledTimes(2));
@@ -158,7 +159,7 @@ describe('dar de alta', () => {
     await screen.findAllByText('Terpelo Panamá');
 
     await usuario.click(screen.getByRole('button', { name: /Nuevo cliente/ }));
-    await usuario.type(screen.getByLabelText(/Nombre/), 'Duplicado');
+    await rellenar(usuario, screen.getByLabelText(/Nombre/), 'Duplicado');
     await usuario.click(screen.getByRole('button', { name: /Crear cliente/ }));
 
     expect(await screen.findByText(/Ya existe un cliente con ese RUC/)).toBeInTheDocument();

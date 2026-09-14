@@ -2,6 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import Cisternas from './page';
 import { ErrorApi } from '@/api/cliente';
+import { rellenar } from '../../../../pruebas/rellenar';
 
 jest.mock('@/api/cliente', () => {
   const real = jest.requireActual('@/api/cliente');
@@ -86,8 +87,8 @@ describe('la suma de los compartimentos', () => {
     render(<Cisternas />);
     await abrirFormulario(usuario);
 
-    await usuario.type(screen.getByLabelText(/Capacidad total/), '10000');
-    await usuario.type(screen.getByLabelText(/Nominal/), '4000');
+    await rellenar(usuario, screen.getByLabelText(/Capacidad total/), '10000');
+    await rellenar(usuario, screen.getByLabelText(/Nominal/), '4000');
     expect(await screen.findByText(/4,000 de 10,000/)).toBeInTheDocument();
   });
 
@@ -96,8 +97,8 @@ describe('la suma de los compartimentos', () => {
     render(<Cisternas />);
     await abrirFormulario(usuario);
 
-    await usuario.type(screen.getByLabelText(/Capacidad total/), '5000');
-    await usuario.type(screen.getByLabelText(/Nominal/), '6000');
+    await rellenar(usuario, screen.getByLabelText(/Capacidad total/), '5000');
+    await rellenar(usuario, screen.getByLabelText(/Nominal/), '6000');
 
     expect(await screen.findByText(/excede la capacidad/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Crear cisterna/ })).toBeDisabled();
@@ -118,7 +119,7 @@ describe('la suma de los compartimentos', () => {
     const usuario = userEvent.setup();
     render(<Cisternas />);
     await abrirFormulario(usuario);
-    await usuario.type(screen.getByLabelText(/Nominal/), '6000');
+    await rellenar(usuario, screen.getByLabelText(/Nominal/), '6000');
     expect(screen.queryByText(/excede la capacidad/)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Crear cisterna/ })).not.toBeDisabled();
   });
@@ -159,7 +160,7 @@ describe('añadir y quitar compartimentos', () => {
     await abrirFormulario(usuario);
     await usuario.click(screen.getByRole('button', { name: /Añadir compartimento/ }));
     const nominales = screen.getAllByLabelText(/Nominal/);
-    await usuario.type(nominales[1], '3000');
+    await rellenar(usuario, nominales[1], '3000');
     await usuario.click(screen.getAllByRole('button', { name: /Quitar/ })[0]);
 
     const quedan = screen.getAllByLabelText(/Nominal/) as HTMLInputElement[];
@@ -175,9 +176,9 @@ describe('lo que se envía', () => {
     await abrirFormulario(usuario);
 
     await usuario.selectOptions(screen.getByRole('combobox', { name: /Vehículo/ }), '1');
-    await usuario.type(screen.getByLabelText(/Capacidad total/), '9000');
-    await usuario.type(screen.getByLabelText(/Nominal/), '4000');
-    await usuario.type(screen.getByLabelText(/Calibrada/), '3980');
+    await rellenar(usuario, screen.getByLabelText(/Capacidad total/), '9000');
+    await rellenar(usuario, screen.getByLabelText(/Nominal/), '4000');
+    await rellenar(usuario, screen.getByLabelText(/Calibrada/), '3980');
     await usuario.click(screen.getByRole('button', { name: /Crear cisterna/ }));
 
     await waitFor(() => expect(api.crear).toHaveBeenCalled());
@@ -197,13 +198,13 @@ describe('lo que se envía', () => {
     await abrirFormulario(usuario);
 
     await usuario.selectOptions(screen.getByRole('combobox', { name: /Vehículo/ }), '1');
-    await usuario.type(screen.getByLabelText(/Capacidad total/), '9000');
-    await usuario.type(screen.getByLabelText(/Certificado de calibración/), 'CAL-2026-14');
+    await rellenar(usuario, screen.getByLabelText(/Capacidad total/), '9000');
+    await rellenar(usuario, screen.getByLabelText(/Certificado de calibración/), 'CAL-2026-14');
     await usuario.type(screen.getByLabelText(/Fecha de calibración/), '2026-01-15');
     await usuario.type(screen.getByLabelText(/Próxima calibración/), '2027-01-15');
-    await usuario.type(screen.getByLabelText(/^Material/), 'aluminio');
-    await usuario.type(screen.getByLabelText(/Nominal/), '4000');
-    await usuario.type(screen.getByLabelText(/Calibrada/), '3980');
+    await rellenar(usuario, screen.getByLabelText(/^Material/), 'aluminio');
+    await rellenar(usuario, screen.getByLabelText(/Nominal/), '4000');
+    await rellenar(usuario, screen.getByLabelText(/Calibrada/), '3980');
     await usuario.selectOptions(await screen.findByRole('combobox', { name: /Producto permitido/ }), '9');
     await usuario.click(screen.getByRole('button', { name: /Crear cisterna/ }));
 
@@ -223,9 +224,9 @@ describe('lo que se envía', () => {
     await abrirFormulario(usuario);
 
     await usuario.selectOptions(screen.getByRole('combobox', { name: /Vehículo/ }), '1');
-    await usuario.type(screen.getByLabelText(/Capacidad total/), '9000');
-    await usuario.type(screen.getByLabelText(/Nominal/), '4000');
-    await usuario.type(screen.getByLabelText(/Calibrada/), '3980');
+    await rellenar(usuario, screen.getByLabelText(/Capacidad total/), '9000');
+    await rellenar(usuario, screen.getByLabelText(/Nominal/), '4000');
+    await rellenar(usuario, screen.getByLabelText(/Calibrada/), '3980');
     await usuario.click(screen.getByRole('button', { name: /Crear cisterna/ }));
 
     await waitFor(() => expect(api.listar).toHaveBeenCalledWith('/cisternas'));
@@ -240,9 +241,9 @@ describe('lo que se envía', () => {
     await abrirFormulario(usuario);
 
     await usuario.selectOptions(screen.getByRole('combobox', { name: /Vehículo/ }), '1');
-    await usuario.type(screen.getByLabelText(/Capacidad total/), '9000');
-    await usuario.type(screen.getByLabelText(/Nominal/), '4000');
-    await usuario.type(screen.getByLabelText(/Calibrada/), '3980');
+    await rellenar(usuario, screen.getByLabelText(/Capacidad total/), '9000');
+    await rellenar(usuario, screen.getByLabelText(/Nominal/), '4000');
+    await rellenar(usuario, screen.getByLabelText(/Calibrada/), '3980');
     await usuario.click(screen.getByRole('button', { name: /Crear cisterna/ }));
 
     expect(await screen.findByText(/ya tiene una cisterna registrada/)).toBeInTheDocument();
@@ -345,7 +346,7 @@ describe('editar una cisterna', () => {
 
     const material = within(form).getByLabelText(/^Material/);
     await usuario.clear(material);
-    await usuario.type(material, 'acero');
+    await rellenar(usuario, material, 'acero');
     await usuario.click(within(form).getByRole('button', { name: 'Guardar cambios' }));
 
     await waitFor(() => expect(api.actualizar).toHaveBeenCalled());
@@ -361,7 +362,7 @@ describe('editar una cisterna', () => {
 
     const capacidad = within(form).getByLabelText(/Capacidad total/);
     await usuario.clear(capacidad);
-    await usuario.type(capacidad, '9500');
+    await rellenar(usuario, capacidad, '9500');
     const proxima = within(form).getByLabelText(/Próxima calibración/);
     await usuario.clear(proxima);
     await usuario.type(proxima, '2027-06-30');
@@ -405,7 +406,7 @@ describe('editar una cisterna', () => {
 
     const capacidad = within(form).getByLabelText(/Capacidad total/);
     await usuario.clear(capacidad);
-    await usuario.type(capacidad, '8000');
+    await rellenar(usuario, capacidad, '8000');
 
     expect(within(form).getByText('Los compartimentos suman 9,000: la capacidad no puede ser menor.'))
       .toBeInTheDocument();
@@ -419,7 +420,7 @@ describe('editar una cisterna', () => {
 
     const capacidad = within(form).getByLabelText(/Capacidad total/);
     await usuario.clear(capacidad);
-    await usuario.type(capacidad, '9000');
+    await rellenar(usuario, capacidad, '9000');
 
     expect(within(form).queryByText(/la capacidad no puede ser menor/)).not.toBeInTheDocument();
     expect(within(form).getByRole('button', { name: 'Guardar cambios' })).not.toBeDisabled();

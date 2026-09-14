@@ -1,6 +1,7 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SeccionBitacora } from './SeccionBitacora';
+import { rellenar } from '../../../pruebas/rellenar';
 
 jest.mock('@/api/cliente', () => {
   const real = jest.requireActual('@/api/cliente');
@@ -129,7 +130,7 @@ describe('anular es añadir, no borrar', () => {
     pintar();
     await usuario.click(within(filaDe('Salida de planta'))
       .getByRole('button', { name: /Anular/ }));
-    await usuario.type(screen.getByLabelText(/Motivo/), 'Se registró con la hora equivocada');
+    await rellenar(usuario, screen.getByLabelText(/Motivo/), 'Se registró con la hora equivocada');
     await usuario.click(screen.getByRole('button', { name: /Confirmar anulación/ }));
 
     await waitFor(() => expect(api.crear).toHaveBeenCalledWith(
@@ -144,7 +145,7 @@ describe('anular es añadir, no borrar', () => {
       pintar();
       await usuario.click(within(filaDe('Salida de planta'))
         .getByRole('button', { name: /Anular/ }));
-      await usuario.type(screen.getByLabelText(/Motivo/), 'ups');
+      await rellenar(usuario, screen.getByLabelText(/Motivo/), 'ups');
       await usuario.click(screen.getByRole('button', { name: /Confirmar anulación/ }));
       expect(api.crear).not.toHaveBeenCalled();
       expect(await screen.findByText(/al menos 5/i)).toBeInTheDocument();
@@ -174,7 +175,7 @@ describe('registrar un evento a mano', () => {
     pintar();
     await usuario.click(screen.getByRole('button', { name: /Registrar evento/ }));
     await usuario.selectOptions(screen.getByLabelText(/Tipo/), 'incidente');
-    await usuario.type(screen.getByLabelText(/Observación/), 'Pinchazo en la vía');
+    await rellenar(usuario, screen.getByLabelText(/Observación/), 'Pinchazo en la vía');
     await usuario.click(screen.getByRole('button', { name: /^Registrar$/ }));
 
     await waitFor(() => expect(api.crear).toHaveBeenCalledWith('/eventos/viaje/v1',
@@ -200,7 +201,7 @@ describe('arrepentirse', () => {
     pintar();
     await usuario.click(within(filaDe('Salida de planta'))
       .getByRole('button', { name: /Anular/ }));
-    await usuario.type(screen.getByLabelText(/Motivo/), 'Me equivoqué de evento');
+    await rellenar(usuario, screen.getByLabelText(/Motivo/), 'Me equivoqué de evento');
     await usuario.click(screen.getByRole('button', { name: /^Cancelar$/ }));
 
     expect(api.crear).not.toHaveBeenCalled();
@@ -214,7 +215,7 @@ describe('arrepentirse', () => {
     const usuario = userEvent.setup();
     pintar();
     await usuario.click(screen.getByRole('button', { name: /Registrar evento/ }));
-    await usuario.type(screen.getByLabelText(/Observación/), 'me lo estoy pensando');
+    await rellenar(usuario, screen.getByLabelText(/Observación/), 'me lo estoy pensando');
     await usuario.click(screen.getByRole('button', { name: /^Cancelar$/ }));
 
     expect(api.crear).not.toHaveBeenCalled();

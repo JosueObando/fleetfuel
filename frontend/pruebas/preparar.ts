@@ -33,6 +33,14 @@ if (!globalThis.crypto?.randomUUID) {
  *     grep el 2026-09-13). Si alguno llega a hacerlo, esa prueba pasa
  *     `userEvent.setup({ skipHover: false })` y aquí no hay que tocar nada.
  *
+ *   · `pointerEventsCheck: 0` (2026-09-14) quita la comprobación de que el
+ *     elemento no tenga `pointer-events: none` calculado. Aquí NUNCA puede
+ *     fallar: `next/jest` sustituye los `.module.css` por un proxy de nombres
+ *     de clase, así que a jsdom no llega ningún estilo y ese valor siempre es
+ *     el por omisión. Costaba un `getComputedStyle` por ancestro en cada clic.
+ *     Lo que el `.cargando { pointer-events: none }` del kit protege en el
+ *     navegador, en las pruebas lo protege el `disabled` que lo acompaña.
+ *
  * Vive aquí y no en cada fichero para que una prueba nueva lo herede sin
  * saberlo: veinte `userEvent.setup()` copiados son veinte sitios donde olvidarlo.
  */
@@ -40,6 +48,6 @@ jest.mock('@testing-library/user-event', () => {
   const real = jest.requireActual('@testing-library/user-event');
   const base = real.default ?? real;
   const setup = (opciones: Record<string, unknown> = {}) =>
-    base.setup({ delay: null, skipHover: true, ...opciones });
+    base.setup({ delay: null, skipHover: true, pointerEventsCheck: 0, ...opciones });
   return { __esModule: true, ...real, default: { ...base, setup } };
 });

@@ -2,6 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { GastosPendientes } from './GastosPendientes';
 import { ErrorApi } from '@/api/cliente';
+import { rellenar } from '../../../pruebas/rellenar';
 
 jest.mock('@/api/cliente', () => {
   const real = jest.requireActual('@/api/cliente');
@@ -131,10 +132,10 @@ describe('aprobar y rechazar, con motivo', () => {
     const fila = await filaDe(/V-001/);
     const aprobar = within(fila).getByRole('button', { name: /Aprobar/ });
     expect(aprobar).toBeDisabled();
-    await usuario.type(within(fila).getByLabelText(/Motivo/), 'okey');
+    await rellenar(usuario, within(fila).getByLabelText(/Motivo/), 'okey');
     expect(aprobar).toBeDisabled();
     expect(within(fila).getByRole('button', { name: /Rechazar/ })).toBeDisabled();
-    await usuario.type(within(fila).getByLabelText(/Motivo/), '!');
+    await rellenar(usuario, within(fila).getByLabelText(/Motivo/), '!');
     expect(aprobar).toBeEnabled();
   });
 
@@ -142,7 +143,7 @@ describe('aprobar y rechazar, con motivo', () => {
     const usuario = userEvent.setup();
     render(<GastosPendientes />);
     const fila = await filaDe(/V-001/);
-    await usuario.type(within(fila).getByLabelText(/Motivo/), 'F-88 ok');
+    await rellenar(usuario, within(fila).getByLabelText(/Motivo/), 'F-88 ok');
     await usuario.click(within(fila).getByRole('button', { name: /Aprobar/ }));
     await waitFor(() => expect(api.actualizar).toHaveBeenCalledWith(
       '/gastos/x1', { estado: 'aprobado', motivo: 'F-88 ok' }));
@@ -154,7 +155,7 @@ describe('aprobar y rechazar, con motivo', () => {
     const usuario = userEvent.setup();
     render(<GastosPendientes />);
     const fila = await filaDe(/V-001/);
-    await usuario.type(within(fila).getByLabelText(/Motivo/), 'Doble');
+    await rellenar(usuario, within(fila).getByLabelText(/Motivo/), 'Doble');
     await usuario.click(within(fila).getByRole('button', { name: /Rechazar/ }));
     await waitFor(() => expect(api.actualizar).toHaveBeenCalledWith(
       '/gastos/x1', { estado: 'rechazado', motivo: 'Doble' }));
@@ -178,7 +179,7 @@ describe('aprobar y rechazar, con motivo', () => {
       .mockRejectedValueOnce(new TypeError('Failed to fetch'));
     render(<GastosPendientes />);
     const fila = await filaDe(/V-001/);
-    await usuario.type(within(fila).getByLabelText(/Motivo/), 'Listo');
+    await rellenar(usuario, within(fila).getByLabelText(/Motivo/), 'Listo');
     await usuario.click(within(fila).getByRole('button', { name: /Aprobar/ }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Ese gasto ya está "aprobado"');
     await usuario.click(within(fila).getByRole('button', { name: /Aprobar/ }));
