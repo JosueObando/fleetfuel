@@ -180,6 +180,14 @@ describe('las tarjetas que piden una acción llevan a donde se hace', () => {
 });
 
 describe('el día vive en la URL', () => {
+  it('permite volver a hoy desde una fecha histórica', async () => {
+    const usuario = userEvent.setup();
+    reiniciarUrl('/operacion/panel?fecha=2033-03-15');
+    render(<PanelEjecutivo />);
+    await usuario.click(screen.getByRole('button', { name: 'Volver a hoy' }));
+    expect(reemplazos).toHaveBeenLastCalledWith('/operacion/panel', { scroll: false });
+  });
+
   it('con ?fecha pide ese día y lo enseña escrito', async () => {
     reiniciarUrl('/operacion/panel?fecha=2033-03-15');
     render(<PanelEjecutivo />);
