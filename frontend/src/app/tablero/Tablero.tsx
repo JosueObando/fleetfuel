@@ -32,12 +32,12 @@ const FOTOS = [
   { id: 'f2', titulo: 'Sello',    direccion: 'San Miguelito', hora: '15:10', estado: 'pendiente' as const },
 ];
 
-const DESTINOS: Array<{ id: string; etiqueta: string; icono: NombreIcono }> = [
-  { id: 'seguimiento', etiqueta: 'Seguimiento', icono: 'seguimiento' },
-  { id: 'flota',       etiqueta: 'Flota',       icono: 'flota' },
-  { id: 'conductores', etiqueta: 'Conductores', icono: 'conductores' },
-  { id: 'ordenes',     etiqueta: 'Órdenes',     icono: 'ordenes' },
-  { id: 'informes',    etiqueta: 'Informes',    icono: 'informes' },
+const DESTINOS: Array<{ id: string; etiqueta: string; icono: NombreIcono; ruta: string }> = [
+  { id: 'seguimiento', etiqueta: 'Seguimiento', icono: 'seguimiento', ruta: '/tablero' },
+  { id: 'flota',       etiqueta: 'Flota',       icono: 'flota', ruta: '/catalogos/vehiculos' },
+  { id: 'conductores', etiqueta: 'Conductores', icono: 'conductores', ruta: '/catalogos/conductores' },
+  { id: 'ordenes',     etiqueta: 'Órdenes',     icono: 'ordenes', ruta: '/operacion/ordenes' },
+  { id: 'informes',    etiqueta: 'Informes',    icono: 'informes', ruta: '/operacion/informes' },
 ];
 
 export function Tablero() {
@@ -172,7 +172,8 @@ export function Tablero() {
       <nav className={estilos.tabBar} aria-label="Destinos">
         {DESTINOS.map((d, i) => (
           <button key={d.id} type="button" className={estilos.destino}
-                  aria-current={i === 0 ? 'page' : undefined}>
+                  onClick={() => { if (d.ruta !== pathname) router.push(d.ruta); }}
+                  aria-current={d.ruta === pathname ? 'page' : undefined}>
             <Icon nombre={d.icono} tamano={20} />
             <span>{d.etiqueta}</span>
           </button>
