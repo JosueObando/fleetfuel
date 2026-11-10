@@ -1,12 +1,13 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Tablero } from './Tablero';
 import { ENVIOS, SOCIOS, ACTIVOS } from './datos';
 
 const reemplazar = jest.fn();
+const empujar = jest.fn();
 let consulta = new URLSearchParams();
 jest.mock('next/navigation', () => ({
-  useRouter: () => ({ replace: reemplazar, push: jest.fn() }),
+  useRouter: () => ({ replace: reemplazar, push: empujar }),
   usePathname: () => '/tablero',
   useSearchParams: () => consulta,
 }));
@@ -176,5 +177,34 @@ describe('es un boceto, y tiene que decirlo', () => {
     render(<Tablero />);
     expect(screen.getByRole('note', { name: /boceto/i }))
       .toHaveTextContent(/UX-2/);
+  });
+});
+
+
+describe('la navegación móvil del boceto', () => {
+  it('abre las rutas existentes sin perder la navegación principal', async () => {
+    const usuario = userEvent.setup();
+    render(<Tablero />);
+    const barra = screen.getByRole('navigation', { name: 'Destinos' });
+    const destinos = [
+      ['Flota', '/catalogos/vehiculos'],
+      ['Conductores', '/catalogos/conductores'],
+      ['Órdenes', '/operacion/ordenes'],
+      ['Informes', '/operacion/informes'],
+    ] as const;
+    for (const [etiqueta, ruta] of destinos) {
+      await usuario.click(within(barra).getByRole('button', { name: etiqueta }));
+      expect(empujar).toHaveBeenLastCalledWith(ruta);
+    }
+  });
+
+  it('mantiene Seguimiento como ruta activa sin navegar sobre sí misma', async () => {
+    const usuario = userEvent.setup();
+    render(<Tablero />);
+    const barra = screen.getByRole('navigation', { name: 'Destinos' });
+    const seguimiento = within(barra).getByRole('button', { name: 'Seguimiento' });
+    expect(seguimiento).toHaveAttribute('aria-current', 'page');
+    await usuario.click(seguimiento);
+    expect(empujar).not.toHaveBeenCalled();
   });
 });
