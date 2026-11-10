@@ -89,15 +89,20 @@ export function PanelEjecutivo() {
   return (
     <section className={catalogo.panel}>
       <div className={catalogo.barra}>
-        <h1 className={catalogo.titulo}>Panel</h1>
+        <h1 className={catalogo.titulo}>Panel ejecutivo</h1>
       </div>
 
       <div className={catalogo.cuerpo}>
+        <div className={estilos.introduccion}>
+          <p className={estilos.descripcion}>Resumen operativo del día: actividad, entregas, gastos y alertas.</p>
+          <span className={estilos.frecuencia}>{fecha ? "Consulta histórica" : "Actualización automática cada minuto"}</span>
+        </div>
         <div className={estilos.cabecera}>
           <Campo etiqueta="Día" tipo="date" valor={fecha} onCambio={elegirDia}
-                 ayuda="Sin fecha, hoy, y se actualiza cada minuto." />
+                 ayuda="Sin fecha se muestra hoy y se actualiza cada minuto." />
+          {fecha && <button type="button" className={estilos.volverHoy} onClick={() => elegirDia("")}>Volver a hoy</button>}
           {actual && (
-            <p className={estilos.sello}>
+            <p className={estilos.sello} role="status">
               Datos del {diaEscrito(String(actual.datos.fecha))}
               {!fecha && ` · actualizado a las ${horaEscrita(actual.hora)}`}
             </p>
@@ -116,7 +121,7 @@ export function PanelEjecutivo() {
 
         {actual ? <Tarjetas d={actual.datos} enlace={enlace} />
           : !error && (
-            <div className={estilos.tarjetas}>
+            <div className={estilos.tarjetas} role="status" aria-label="Cargando indicadores del panel">
               {Array.from({ length: 8 }, (_, i) => (
                 <div key={i} aria-hidden="true" className={`${catalogo.esqueleto} ${estilos.esqueleto}`} />
               ))}
