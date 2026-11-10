@@ -170,7 +170,7 @@ export function Tablero() {
 
       {/* <768: tab bar de 5 destinos, alto 56, objetivos ≥44 px. */}
       <nav className={estilos.tabBar} aria-label="Destinos">
-        {DESTINOS.map((d, i) => (
+        {DESTINOS.map(d => (
           <button key={d.id} type="button" className={estilos.destino}
                   onClick={() => { if (d.ruta !== pathname) router.push(d.ruta); }}
                   aria-current={d.ruta === pathname ? 'page' : undefined}>
