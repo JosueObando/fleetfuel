@@ -13,3 +13,14 @@
   display: inline-flex; align-items: center; min-height: 44px;
   font-size: var(--texto-sm); color: var(--action); font-weight: var(--peso-semi);
 }
+
+/* Capa visual del panel ejecutivo: no modifica la lógica ni los datos. */
+.introduccion { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--esp-3); margin: var(--esp-4) 0 0; }
+.descripcion { margin: 0; color: var(--fg-default); font-size: var(--texto-md); line-height: 1.5; }
+.frecuencia { display: inline-flex; align-items: center; border: 1px solid var(--border-subtle); background: var(--bg-surface); color: var(--fg-muted); border-radius: var(--radius-pill); padding: var(--esp-2) var(--esp-3); font-size: var(--texto-sm); }
+.volverHoy { min-height: 44px; padding: 0 var(--esp-4); border: 1px solid var(--border-subtle); border-radius: var(--radius-pill); background: var(--bg-surface); color: var(--action); font-weight: var(--peso-semi); }
+.volverHoy:hover { background: var(--action-subtle); border-color: var(--action); }
+.tarjetas { grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); gap: var(--esp-4); }
+.enlace { text-decoration: underline; text-underline-offset: 3px; }
+.enlace:hover { color: var(--action-hover); }
+@media (max-width: 767px) { .introduccion { align-items: flex-start; flex-direction: column; } .tarjetas { grid-template-columns: 1fr; } }
