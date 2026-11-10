@@ -133,7 +133,7 @@ await paso('el alta pide una clave y explica cuál vale', async () => {
 await paso('roles enseña el recuento que delató el incidente', async () => {
   await pag.getByRole('button', { name: /Roles y permisos/ }).click();
   await pag.waitForURL('**/administracion/roles', { timeout: 15000 });
-  const tarjeta = pag.locator('[aria-expanded]').first();
+  const tarjeta = pag.locator('button[aria-expanded]').filter({ hasText: 'permisos' }).first();
   await tarjeta.waitFor({ timeout: 15000 });
   const texto = await tarjeta.innerText();
   const m = texto.match(/(\d+) de (\d+) permisos/);
@@ -142,7 +142,7 @@ await paso('roles enseña el recuento que delató el incidente', async () => {
 });
 
 await paso('abrir un rol enseña sus permisos agrupados por módulo', async () => {
-  await pag.locator('[aria-expanded]').first().click();
+  await pag.locator('button[aria-expanded]').filter({ hasText: 'permisos' }).first().click();
   const grupos = pag.locator('fieldset');
   await grupos.first().waitFor({ timeout: 10000 });
   const n = await grupos.count();
